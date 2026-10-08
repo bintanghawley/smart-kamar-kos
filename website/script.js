@@ -4,7 +4,7 @@ const MAX_HISTORY = 40;
 
 const GAS_THRESHOLD = 1200;
 const LDR_THRESHOLD = 1000;
-HUMIDITY_THRESHOLD = 60;
+const HUMIDITY_THRESHOLD = 60;
 
 let historyData = [];
 let isServerConnected = false;

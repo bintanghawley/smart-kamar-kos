@@ -38,6 +38,7 @@ suhu = 0
 kelembapan = 0
 fan_running = False
 fan_off_timer = None
+wifi_logged = False
 
 last_dht = time.ticks_ms() - DHT_INTERVAL
 last_post = time.ticks_ms()
@@ -47,15 +48,17 @@ wlan = network.WLAN(network.STA_IF)
 wlan.active(True)
 
 def connect_wifi():
+    global wifi_logged
     try:
         wlan.connect(WIFI_SSID, WIFI_PASSWORD)
     except Exception:
         pass
     start = time.ticks_ms()
-    while not wlan.isconnected() and time.ticks_diff(time.ticks_ms(), start) < 6000:
-        time.sleep(0.5)
+    while not wlan.isconnected() and time.ticks_diff(time.ticks_ms(), start) < 1000:
+        time.sleep(0.1)
     if wlan.isconnected():
         print("Wi-Fi connected:", wlan.ifconfig()[0])
+        wifi_logged = True
     else:
         print("Wi-Fi pending...")
 
@@ -78,7 +81,7 @@ def kirim_data(payload):
         body = ujson.dumps(payload)
         addr = usocket.getaddrinfo(SERVER_HOST, SERVER_PORT)[0][-1]
         s = usocket.socket()
-        s.settimeout(2.0)
+        s.settimeout(1.5)
         s.connect(addr)
         req = (
             f"POST {SERVER_PATH} HTTP/1.1\r\n"
@@ -144,6 +147,7 @@ while True:
         last_post = sekarang
 
         if not wlan.isconnected():
+            wifi_logged = False
             if time.ticks_diff(sekarang, last_wifi_retry) >= WIFI_RETRY_INTERVAL:
                 last_wifi_retry = sekarang
                 try:
@@ -151,6 +155,10 @@ while True:
                 except Exception:
                     pass
         else:
+            if not wifi_logged:
+                print("Wi-Fi connected:", wlan.ifconfig()[0])
+                wifi_logged = True
+
             payload = {
                 "suhu": suhu,
                 "kelembapan": kelembapan,
