@@ -2,7 +2,7 @@ import os
 import json
 import time
 from datetime import datetime
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HOST = "0.0.0.0"
 PORT = 5000
@@ -22,86 +22,144 @@ sensor_data = {
 last_received_timestamp = 0
 last_received_time_str = "Belum ada data"
 
-class SmartKosServer(BaseHTTPRequestHandler):
-    def send_cors_headers(self):
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
 
-    def do_OPTIONS(self):
-        self.send_response(200)
-        self.send_cors_headers()
+class SmartKosServer(BaseHTTPRequestHandler):
+
+    def send_json(self, status_code, data):
+        response = json.dumps(data).encode("utf-8")
+
+        self.send_response(status_code)
+        self.send_header(
+            "Content-Type",
+            "application/json; charset=utf-8"
+        )
+        self.send_header(
+            "Content-Length",
+            str(len(response))
+        )
+        self.send_header(
+            "Cache-Control",
+            "no-store"
+        )
         self.end_headers()
 
+        try:
+            self.wfile.write(response)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+
     def do_POST(self):
-        global sensor_data, last_received_timestamp, last_received_time_str
+        global sensor_data
+        global last_received_timestamp
+        global last_received_time_str
 
-        if self.path == "/data":
-            try:
-                length = int(self.headers.get("Content-Length", 0))
-                if length == 0:
-                    self.send_response(400)
-                    self.send_header("Content-Type", "text/plain")
-                    self.end_headers()
-                    self.wfile.write(b"Bad Request: Payload Kosong")
-                    return
+        clean_path = self.path.split("?")[0]
 
-                body = self.rfile.read(length).decode("utf-8")
-                payload = json.loads(body)
+        if clean_path != "/data":
+            self.send_json(
+                404,
+                {"error": "Endpoint Tidak Ditemukan"}
+            )
+            return
 
-                for key in ("suhu", "kelembapan", "cahaya", "gas"):
-                    if key in payload:
-                        sensor_data[key] = payload[key]
-
-                for actuator in ("led", "buzzer", "kipas"):
-                    if actuator in payload:
-                        sensor_data[actuator] = str(payload[actuator]).upper()
-
-                last_received_timestamp = time.time()
-                last_received_time_str = datetime.now().strftime("%H:%M:%S")
-
-                print(f"[{last_received_time_str}] Data ESP32: {sensor_data}")
-
-                response = b'{"status":"OK"}'
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Content-Length", str(len(response)))
-                self.send_cors_headers()
-                self.end_headers()
-                self.wfile.write(response)
-
-            except Exception as e:
-                print("Error memproses POST:", e)
-                self.send_response(400)
-                self.send_header("Content-Type", "text/plain")
-                self.end_headers()
-                self.wfile.write(b"Bad Request: Format JSON Invalid")
-        else:
-            self.send_response(404)
-            self.send_header("Content-Type", "text/plain")
-            self.end_headers()
-            self.wfile.write(b"Endpoint Tidak Ditemukan")
-
-    def do_GET(self):
-        global sensor_data, last_received_timestamp, last_received_time_str
-
-        if self.path == "/api/data":
-            is_esp32_online = (
-                (time.time() - last_received_timestamp <= ESP32_TIMEOUT_SECONDS)
-                if last_received_timestamp > 0 else False
+        try:
+            length = int(
+                self.headers.get("Content-Length", 0)
             )
 
-            response_payload = dict(sensor_data)
-            response_payload["esp32_online"] = is_esp32_online
-            response_payload["last_seen"] = last_received_time_str
+            if length <= 0:
+                self.send_json(
+                    400,
+                    {"error": "Payload Kosong"}
+                )
+                return
 
-            response = json.dumps(response_payload).encode("utf-8")
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(response)))
-            self.send_cors_headers()
-            self.end_headers()
-            self.wfile.write(response)
+            body = self.rfile.read(length)
+
+            payload = json.loads(
+                body.decode("utf-8")
+            )
+
+            for key in (
+                "suhu",
+                "kelembapan",
+                "cahaya",
+                "gas"
+            ):
+                if key in payload:
+                    sensor_data[key] = payload[key]
+
+            for key in (
+                "led",
+                "buzzer",
+                "kipas"
+            ):
+                if key in payload:
+                    sensor_data[key] = str(
+                        payload[key]
+                    ).upper()
+
+            last_received_timestamp = time.time()
+
+            last_received_time_str = (
+                datetime.now().strftime("%H:%M:%S")
+            )
+
+            print(
+                f"[{last_received_time_str}] "
+                f"Data ESP32: {sensor_data}"
+            )
+
+            self.send_json(
+                200,
+                {"status": "OK"}
+            )
+
+        except json.JSONDecodeError:
+            self.send_json(
+                400,
+                {"error": "Format JSON Invalid"}
+            )
+
+        except Exception as e:
+            print("Error memproses POST:", e)
+
+            self.send_json(
+                500,
+                {"error": "Internal Server Error"}
+            )
+
+    def do_GET(self):
+        global sensor_data
+        global last_received_timestamp
+        global last_received_time_str
+
+        clean_path = self.path.split("?")[0]
+
+        if clean_path == "/api/data":
+            if last_received_timestamp > 0:
+                esp32_online = (
+                    time.time()
+                    - last_received_timestamp
+                    <= ESP32_TIMEOUT_SECONDS
+                )
+            else:
+                esp32_online = False
+
+            response_payload = dict(sensor_data)
+
+            response_payload["esp32_online"] = (
+                esp32_online
+            )
+
+            response_payload["last_seen"] = (
+                last_received_time_str
+            )
+
+            self.send_json(
+                200,
+                response_payload
+            )
             return
 
         path_map = {
@@ -111,42 +169,76 @@ class SmartKosServer(BaseHTTPRequestHandler):
             "/script.js": "script.js"
         }
 
-        clean_path = self.path.split("?")[0]
+        if clean_path not in path_map:
+            self.send_error(404)
+            return
 
-        if clean_path in path_map:
-            filename = path_map[clean_path]
-            filepath = os.path.join(BASE_DIR, filename)
+        filename = path_map[clean_path]
+        filepath = os.path.join(
+            BASE_DIR,
+            filename
+        )
 
-            if os.path.exists(filepath):
-                if filename.endswith(".html"):
-                    ctype = "text/html; charset=utf-8"
-                elif filename.endswith(".css"):
-                    ctype = "text/css; charset=utf-8"
-                elif filename.endswith(".js"):
-                    ctype = "application/javascript; charset=utf-8"
-                else:
-                    ctype = "application/octet-stream"
+        if not os.path.exists(filepath):
+            self.send_error(404)
+            return
 
-                with open(filepath, "rb") as f:
-                    content = f.read()
+        if filename.endswith(".html"):
+            content_type = "text/html; charset=utf-8"
+        elif filename.endswith(".css"):
+            content_type = "text/css; charset=utf-8"
+        elif filename.endswith(".js"):
+            content_type = (
+                "application/javascript; charset=utf-8"
+            )
+        else:
+            content_type = "application/octet-stream"
 
-                self.send_response(200)
-                self.send_header("Content-Type", ctype)
-                self.send_header("Content-Length", str(len(content)))
-                self.end_headers()
+        try:
+            with open(filepath, "rb") as file:
+                content = file.read()
+
+            self.send_response(200)
+            self.send_header(
+                "Content-Type",
+                content_type
+            )
+            self.send_header(
+                "Content-Length",
+                str(len(content))
+            )
+            self.send_header(
+                "Cache-Control",
+                "no-store"
+            )
+            self.end_headers()
+
+            try:
                 self.wfile.write(content)
-                return
+            except (BrokenPipeError, ConnectionResetError):
+                pass
 
-        self.send_response(404)
-        self.send_header("Content-Type", "text/plain")
-        self.end_headers()
-        self.wfile.write(b"404 Not Found")
+        except Exception as e:
+            print("Error membaca file:", e)
+
+            self.send_error(500)
+
 
 if __name__ == "__main__":
-    server = HTTPServer((HOST, PORT), SmartKosServer)
-    print(f"Server aktif di http://localhost:{PORT}")
+    server = ThreadingHTTPServer(
+        (HOST, PORT),
+        SmartKosServer
+    )
+
+    print(
+        f"Server aktif di http://localhost:{PORT}"
+    )
+
     try:
         server.serve_forever()
+
     except KeyboardInterrupt:
         print("\nServer dihentikan.")
+
+    finally:
         server.server_close()

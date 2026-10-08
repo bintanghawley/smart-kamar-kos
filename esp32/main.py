@@ -61,7 +61,8 @@ def connect_wifi():
     start = time.ticks_ms()
 
     while not wlan.isconnected() and time.ticks_diff(
-        time.ticks_ms(), start
+        time.ticks_ms(),
+        start
     ) < 1000:
         time.sleep(0.1)
 
@@ -90,43 +91,43 @@ def parse_url(url):
 
 SERVER_HOST, SERVER_PORT, SERVER_PATH = parse_url(SERVER_URL)
 
+SERVER_ADDR = None
+
+try:
+    SERVER_ADDR = usocket.getaddrinfo(
+        SERVER_HOST,
+        SERVER_PORT
+    )[0][-1]
+except Exception as e:
+    print("Gagal mencari alamat server:", e)
+
 
 def kirim_data(payload):
     s = None
 
     try:
-        body = ujson.dumps(payload)
-        data = (
-            f"POST {SERVER_PATH} HTTP/1.1\r\n"
-            f"Host: {SERVER_HOST}:{SERVER_PORT}\r\n"
-            "Content-Type: application/json\r\n"
-            f"Content-Length: {len(body)}\r\n"
-            "Connection: close\r\n\r\n"
-            f"{body}"
-        ).encode()
+        if SERVER_ADDR is None:
+            return False
 
-        addr = usocket.getaddrinfo(
-            SERVER_HOST, SERVER_PORT
-        )[0][-1]
+        body = ujson.dumps(payload)
+        body_bytes = body.encode()
+
+        request = (
+            f"POST {SERVER_PATH} HTTP/1.0\r\n"
+            f"Host: {SERVER_HOST}\r\n"
+            "Content-Type: application/json\r\n"
+            f"Content-Length: {len(body_bytes)}\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+        ).encode() + body_bytes
 
         s = usocket.socket()
         s.settimeout(1.5)
-        s.connect(addr)
 
-        sent = 0
+        s.connect(SERVER_ADDR)
+        s.write(request)
 
-        while sent < len(data):
-            jumlah = s.send(data[sent:])
-
-            if not jumlah:
-                raise OSError("Gagal mengirim data")
-
-            sent += jumlah
-
-        try:
-            s.recv(128)
-        except Exception:
-            pass
+        time.sleep_ms(50)
 
         return True
 
@@ -136,13 +137,20 @@ def kirim_data(payload):
 
     finally:
         if s:
-            s.close()
+            try:
+                s.close()
+            except Exception:
+                pass
 
 
 while True:
     sekarang = time.ticks_ms()
 
-    if time.ticks_diff(sekarang, last_dht) >= DHT_INTERVAL:
+    if time.ticks_diff(
+        sekarang,
+        last_dht
+    ) >= DHT_INTERVAL:
+
         last_dht = sekarang
 
         try:
@@ -179,8 +187,10 @@ while True:
             fan_off_timer = sekarang
 
         elif time.ticks_diff(
-            sekarang, fan_off_timer
+            sekarang,
+            fan_off_timer
         ) >= FAN_OFF_DELAY:
+
             relay.value(0)
             fan_running = False
             fan_off_timer = None
@@ -188,14 +198,19 @@ while True:
     else:
         relay.value(0)
 
-    if time.ticks_diff(sekarang, last_post) >= POST_INTERVAL:
+    if time.ticks_diff(
+        sekarang,
+        last_post
+    ) >= POST_INTERVAL:
+
         last_post = sekarang
 
         if not wlan.isconnected():
             wifi_logged = False
 
             if time.ticks_diff(
-                sekarang, last_wifi_retry
+                sekarang,
+                last_wifi_retry
             ) >= WIFI_RETRY_INTERVAL:
 
                 last_wifi_retry = sekarang
