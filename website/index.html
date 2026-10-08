@@ -122,7 +122,7 @@
                 <!-- GAS (MQ-2) -->
                 <div class="card sensor-card" id="card-gas">
                     <div class="card-top">
-                        <span class="sensor-name">Sensor Gas / Asap</span>
+                        <span class="sensor-name">Sensor Gas MQ-2</span>
                         <span class="sensor-icon">⚠️</span>
                     </div>
                     <div class="sensor-metric">
@@ -131,7 +131,7 @@
                     </div>
                     <div class="sensor-meta">
                         <span class="sensor-status-badge" id="status-gas">Normal</span>
-                        <span class="sensor-label">Batas Bahaya: &ge; 1200</span>
+                        <span class="sensor-label">Threshold: &ge; 1200</span>
                     </div>
                     <div class="meter-bar">
                         <div class="meter-fill" id="meter-gas" style="width: 0%"></div>
@@ -144,7 +144,7 @@
         <section class="section-container">
             <div class="section-header">
                 <h3 class="section-heading">Status Aktuator & Output</h3>
-                <span class="section-subheading">Kontrol Otomatis Berdasarkan Logika ESP32</span>
+                <span class="section-subheading">Status Aktual dari Kontrol ESP32</span>
             </div>
             <div class="outputs-grid">
                 <!-- LED -->
@@ -180,7 +180,7 @@
                         <span class="output-state-text" id="state-text-buzzer">OFF</span>
                         <span class="output-state-pill pill-off" id="pill-buzzer">HENING</span>
                     </div>
-                    <p class="output-desc">Berbunyi nyaring saat kadar gas terdeteksi &ge; 1200.</p>
+                    <p class="output-desc">Berbunyi saat nilai sensor gas MQ-2 terdeteksi &ge; 1200 ADC.</p>
                 </div>
 
                 <!-- EXHAUST FAN -->
@@ -198,7 +198,7 @@
                         <span class="output-state-text" id="state-text-kipas">OFF</span>
                         <span class="output-state-pill pill-off" id="pill-kipas">MATI</span>
                     </div>
-                    <p class="output-desc">Aktif saat gas tinggi (&ge; 1200) atau kelembapan tinggi (&ge; 60%). Delay mati 10s.</p>
+                    <p class="output-desc">Aktif saat gas tinggi (&ge; 1200) atau kelembapan tinggi (&ge; 60%). Delay mati 10 detik.</p>
                 </div>
             </div>
         </section>
@@ -210,7 +210,7 @@
                 <div class="chart-header">
                     <div>
                         <h3 class="card-title">Grafik Tren Sensor</h3>
-                        <span class="chart-subtitle" id="chart-data-count">Menampilkan 0 data historis</span>
+                        <span class="chart-subtitle" id="chart-data-count">Menampilkan 0 data riwayat</span>
                     </div>
                     <div class="chart-controls">
                         <button type="button" class="chart-tab active" data-metric="all">Semua</button>
