@@ -2,20 +2,21 @@
 // SMART KAMAR KOS - SCRIPT JAVASCRIPT VANILLA
 // ==========================================================================
 
-// 1. KONFIGURASI API (Menggunakan origin yang sama dengan server.py)
+// 1. KONFIGURASI API (Origin yang sama dengan server.py)
 const API_URL = "/api/data";
 const POLLING_INTERVAL = 2000; // Polling data setiap 2 detik
 const MAX_HISTORY = 40;        // Maksimal 40 riwayat data untuk grafik
 
-// 2. THRESHOLD SISTEM (Sama dengan konstanta di ESP32)
-const GAS_THRESHOLD = 1200;       // Nilai ADC MQ-2: Buzzer ON, Fan ON
-const LDR_THRESHOLD = 1000;       // Nilai ADC LDR: Gelap -> LED ON
-const HUMIDITY_THRESHOLD = 60;    // Kelembapan %: Fan ON
+// 2. THRESHOLD SISTEM (Konsisten dengan ESP32)
+const GAS_THRESHOLD = 1200;       // Nilai ADC MQ-2: Pemicu Buzzer & Fan
+const LDR_THRESHOLD = 1000;       // Nilai ADC LDR: Nilai >= 1000 dianggap Gelap -> LED ON
+const HUMIDITY_THRESHOLD = 60;    // Kelembapan %: Pemicu Fan
 
 // 3. STATE APLIKASI
 let historyData = [];
-let isConnected = false;
-let lastSuccessfulTime = null;
+let isServerConnected = false;
+let isEsp32Online = false;
+let lastSeenTime = "-";
 let activeMetric = "all";
 let isDemoMode = false;
 let demoStep = 0;
@@ -122,38 +123,44 @@ async function fetchSensorData() {
 
 // Berhasil Menerima Data dari Server
 function handleDataSuccess(data) {
-    isConnected = true;
-    lastSuccessfulTime = new Date();
+    isServerConnected = true;
+    isEsp32Online = Boolean(data.esp32_online);
+    lastSeenTime = data.last_seen || "-";
 
+    // Validasi data angka
     const suhu = Number(data.suhu ?? 0);
     const kelembapan = Number(data.kelembapan ?? 0);
     const cahaya = Number(data.cahaya ?? 0);
     const gas = Number(data.gas ?? 0);
 
-    // Status aktuator diambil LANGSUNG dari data ESP32
+    // Status aktual aktuator LANGSUNG dari data ESP32
     const led = String(data.led ?? "OFF").toUpperCase();
     const buzzer = String(data.buzzer ?? "OFF").toUpperCase();
     const kipas = String(data.kipas ?? "OFF").toUpperCase();
 
     const normalizedData = {
-        time: new Date().toLocaleTimeString("id-ID", { hour12: false }),
+        time: lastSeenTime !== "-" && lastSeenTime !== "Belum ada data" ? lastSeenTime : new Date().toLocaleTimeString("id-ID", { hour12: false }),
         suhu,
         kelembapan,
         cahaya,
         gas,
         led,
         buzzer,
-        kipas
+        kipas,
+        esp32Online: isEsp32Online,
+        lastSeen: lastSeenTime
     };
 
-    // Simpan riwayat untuk grafik (maksimal 40 data)
-    historyData.push(normalizedData);
-    if (historyData.length > MAX_HISTORY) {
-        historyData.shift();
+    // Tambahkan ke riwayat grafik jika data berasal dari ESP32 online atau demo
+    if (isEsp32Online || isDemoMode) {
+        historyData.push(normalizedData);
+        if (historyData.length > MAX_HISTORY) {
+            historyData.shift();
+        }
     }
 
-    // Perbarui Tampilan UI
-    updateConnectionUI(true);
+    // Perbarui Komponen Tampilan
+    updateConnectionUI();
     updateSensorCards(normalizedData);
     updateActuatorCards(normalizedData);
     updateAlertBanner(normalizedData);
@@ -164,29 +171,34 @@ function handleDataSuccess(data) {
 
 // Gagal Menghubungi Server
 function handleDataError(error) {
-    isConnected = false;
-    updateConnectionUI(false);
+    isServerConnected = false;
+    isEsp32Online = false;
+
+    updateConnectionUI();
     updateSystemInfo(false, error.message);
     updateAlertBannerOnDisconnect();
-    // Data terakhir tetap dipertahankan pada halaman, tidak dihapus
+    // Data terakhir tetap dipertahankan pada layar, tidak dikosongkan
 }
 
 // ==========================================================================
-// PEMBARUAN TAMPILAN ELEMEN
+// PEMBARUAN TAMPILAN STATUS & ELEMEN
 // ==========================================================================
-function updateConnectionUI(online) {
+function updateConnectionUI() {
     if (isDemoMode) {
         elConnectionPill.className = "status-pill status-demo";
         elConnectionText.textContent = "Mode Simulasi Demo";
         return;
     }
 
-    if (online) {
-        elConnectionPill.className = "status-pill status-connected";
-        elConnectionText.textContent = "Terhubung";
-    } else {
+    if (!isServerConnected) {
         elConnectionPill.className = "status-pill status-disconnected";
         elConnectionText.textContent = "Server Terputus";
+    } else if (isEsp32Online) {
+        elConnectionPill.className = "status-pill status-connected";
+        elConnectionText.textContent = "ESP32 Online";
+    } else {
+        elConnectionPill.className = "status-pill status-warning";
+        elConnectionText.textContent = "ESP32 Offline";
     }
 }
 
@@ -294,7 +306,7 @@ function updateActuatorCards(data) {
     }
 }
 
-// Logika Alert Berdasarkan Prioritas
+// Logika Notifikasi Alert Berdasarkan Prioritas
 function updateAlertBanner(data) {
     elAlertTime.textContent = data.time;
 
@@ -311,7 +323,7 @@ function updateAlertBanner(data) {
     if (data.kelembapan >= HUMIDITY_THRESHOLD) {
         elAlertBanner.className = "alert-banner alert-warning";
         elAlertIcon.textContent = "💧";
-        elAlertTitle.textContent = "Peringatan: Kelembapan tinggi";
+        elAlertTitle.textContent = "Ruangan sedang lembap. Exhaust fan aktif.";
         elAlertMessage.textContent = `Kelembapan udara kamar mencapai ${data.kelembapan}% (ambang batas >= ${HUMIDITY_THRESHOLD}%). Exhaust fan aktif untuk membantu ventilasi.`;
         return;
     }
@@ -325,12 +337,12 @@ function updateAlertBanner(data) {
         return;
     }
 
-    // Prioritas 4: LED Aktif
-    if (data.led === "ON") {
+    // Prioritas 4: Ruangan Gelap
+    if (data.led === "ON" || data.cahaya >= LDR_THRESHOLD) {
         elAlertBanner.className = "alert-banner alert-normal";
         elAlertIcon.textContent = "💡";
-        elAlertTitle.textContent = "Lampu otomatis menyala";
-        elAlertMessage.textContent = "Ruangan terdeteksi gelap. Lampu otomatis menyala.";
+        elAlertTitle.textContent = "Ruangan sedang gelap. LED otomatis menyala.";
+        elAlertMessage.textContent = "Sensor LDR mendeteksi intensitas cahaya rendah. Lampu LED kamar menyala otomatis.";
         return;
     }
 
@@ -345,8 +357,7 @@ function updateAlertBannerOnDisconnect() {
     elAlertBanner.className = "alert-banner alert-disconnected";
     elAlertIcon.textContent = "⚠️";
     elAlertTitle.textContent = "Server Terputus";
-    const lastTimeStr = lastSuccessfulTime ? lastSuccessfulTime.toLocaleTimeString("id-ID") : "Belum ada";
-    elAlertMessage.textContent = `Gagal mengambil data dari ${API_URL}. Menampilkan data terakhir yang tersimpan (${lastTimeStr}).`;
+    elAlertMessage.textContent = `Gagal mengambil data dari ${API_URL}. Menampilkan data terakhir yang tersimpan (${lastSeenTime}).`;
 }
 
 // Logika Ringkasan Kondisi Kamar
@@ -378,6 +389,7 @@ function updateRoomSummary(data) {
 
     details.push({ icon: "🌡️", text: `Suhu ruangan terpantau ${data.suhu}°C.` });
     details.push({ icon: "⚙️", text: `Status aktuator: LED ${data.led}, Buzzer ${data.buzzer}, Exhaust Fan ${data.kipas}.` });
+    details.push({ icon: "📡", text: `Koneksi ESP32: ${isEsp32Online ? "Online" : "Offline"} (Update terakhir: ${lastSeenTime}).` });
 
     elSummaryLead.textContent = leadSentence;
     elSummaryDetails.innerHTML = details.map(item => `
@@ -390,7 +402,7 @@ function updateRoomSummary(data) {
 
 function updateSystemInfo(success, errText = "") {
     if (isDemoMode) {
-        elSysServerStatus.textContent = "Mode Simulasi Demo";
+        elSysServerStatus.textContent = "Simulasi Demo (Aktif)";
         elSysEspStatus.textContent = "Simulasi Sensor Aktif";
         elSysLastUpdate.textContent = new Date().toLocaleTimeString("id-ID");
         return;
@@ -398,8 +410,8 @@ function updateSystemInfo(success, errText = "") {
 
     if (success) {
         elSysServerStatus.textContent = "Terhubung (200 OK)";
-        elSysEspStatus.textContent = "Data Terkini";
-        elSysLastUpdate.textContent = lastSuccessfulTime ? lastSuccessfulTime.toLocaleTimeString("id-ID") : "-";
+        elSysEspStatus.textContent = isEsp32Online ? "Online (Menerima Data)" : "Offline (Menunggu Data)";
+        elSysLastUpdate.textContent = lastSeenTime;
     } else {
         elSysServerStatus.textContent = `Terputus: ${errText || "Offline"}`;
         elSysEspStatus.textContent = "Menunggu Server";
@@ -600,7 +612,6 @@ function generateDemoData() {
     const mockCahaya = Math.round(baseCahaya);
     const mockGas = Math.round(baseGas);
 
-    // Pada mode demo, simulasikan status aktuator sesuai perilaku ESP32
     handleDataSuccess({
         suhu: mockSuhu,
         kelembapan: mockKelembapan,
@@ -608,7 +619,9 @@ function generateDemoData() {
         gas: mockGas,
         led: mockCahaya >= LDR_THRESHOLD ? "ON" : "OFF",
         buzzer: mockGas >= GAS_THRESHOLD ? "ON" : "OFF",
-        kipas: (mockGas >= GAS_THRESHOLD || mockKelembapan >= HUMIDITY_THRESHOLD) ? "ON" : "OFF"
+        kipas: (mockGas >= GAS_THRESHOLD || mockKelembapan >= HUMIDITY_THRESHOLD) ? "ON" : "OFF",
+        esp32_online: true,
+        last_seen: new Date().toLocaleTimeString("id-ID", { hour12: false })
     });
 }
 
@@ -624,10 +637,12 @@ tabButtons.forEach(btn => {
     });
 });
 
+// Tombol Refresh Manual (Hanya fetch sekali, tidak membuat interval baru)
 elBtnRefresh.addEventListener("click", () => {
     fetchSensorData();
 });
 
+// Tombol Mode Demo
 elBtnToggleDemo.addEventListener("click", () => {
     isDemoMode = !isDemoMode;
     if (isDemoMode) {
