@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Dashboard Monitoring Smart Kamar Kos berbasis IoT ESP32">
+    <title>SMART KAMAR KOS - Monitoring System</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- HEADER -->
+        <header class="app-header">
+            <div class="header-brand">
+                <div class="brand-icon">🏠</div>
+                <div>
+                    <h1 class="brand-title">SMART KAMAR KOS</h1>
+                    <p class="brand-subtitle">Smart Room Monitoring System</p>
+                </div>
+            </div>
+
+            <div class="header-status">
+                <div id="connection-pill" class="status-pill status-disconnected">
+                    <span class="status-dot"></span>
+                    <span id="connection-text">Menghubungkan...</span>
+                </div>
+                <div class="header-time" id="header-clock">--:--:--</div>
+            </div>
+        </header>
+
+        <!-- ALERT BANNER -->
+        <section id="alert-banner" class="alert-banner alert-normal">
+            <div class="alert-icon" id="alert-icon">🛡️</div>
+            <div class="alert-content">
+                <h4 id="alert-title">Sistem Siap</h4>
+                <p id="alert-message">Menunggu data dari sensor ESP32...</p>
+            </div>
+            <div class="alert-timestamp" id="alert-time">-</div>
+        </section>
+
+        <!-- KONDISI KAMAR SAAT INI -->
+        <section class="card summary-card">
+            <div class="card-header">
+                <div class="card-title-group">
+                    <span class="section-icon">📋</span>
+                    <h2 class="card-title">Kondisi Kamar Saat Ini</h2>
+                </div>
+                <span class="badge" id="summary-badge">Menganalisis...</span>
+            </div>
+            <div class="summary-body">
+                <p class="summary-lead" id="summary-lead">Memuat kesimpulan kondisi kamar...</p>
+                <div class="summary-details" id="summary-details">
+                    <!-- Detail poin kondisi kamar diisi oleh script.js -->
+                </div>
+            </div>
+        </section>
+
+        <!-- RINGKASAN SENSOR -->
+        <section class="section-container">
+            <div class="section-header">
+                <h3 class="section-heading">Ringkasan Sensor Lingkungan</h3>
+                <span class="section-subheading">Update Real-Time dari ESP32</span>
+            </div>
+            <div class="cards-grid">
+                <!-- SUHU -->
+                <div class="card sensor-card" id="card-suhu">
+                    <div class="card-top">
+                        <span class="sensor-name">Suhu Ruangan</span>
+                        <span class="sensor-icon">🌡️</span>
+                    </div>
+                    <div class="sensor-metric">
+                        <span class="sensor-value" id="val-suhu">--</span>
+                        <span class="sensor-unit">°C</span>
+                    </div>
+                    <div class="sensor-meta">
+                        <span class="sensor-status-badge" id="status-suhu">Normal</span>
+                        <span class="sensor-label">DHT11 (GPIO18)</span>
+                    </div>
+                    <div class="meter-bar">
+                        <div class="meter-fill" id="meter-suhu" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- KELEMBAPAN -->
+                <div class="card sensor-card" id="card-kelembapan">
+                    <div class="card-top">
+                        <span class="sensor-name">Kelembapan Udara</span>
+                        <span class="sensor-icon">💧</span>
+                    </div>
+                    <div class="sensor-metric">
+                        <span class="sensor-value" id="val-kelembapan">--</span>
+                        <span class="sensor-unit">%</span>
+                    </div>
+                    <div class="sensor-meta">
+                        <span class="sensor-status-badge" id="status-kelembapan">Normal</span>
+                        <span class="sensor-label">Threshold: &ge; 60%</span>
+                    </div>
+                    <div class="meter-bar">
+                        <div class="meter-fill" id="meter-kelembapan" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- CAHAYA (LDR) -->
+                <div class="card sensor-card" id="card-cahaya">
+                    <div class="card-top">
+                        <span class="sensor-name">Intensitas Cahaya</span>
+                        <span class="sensor-icon">☀️</span>
+                    </div>
+                    <div class="sensor-metric">
+                        <span class="sensor-value" id="val-cahaya">--</span>
+                        <span class="sensor-unit">ADC</span>
+                    </div>
+                    <div class="sensor-meta">
+                        <span class="sensor-status-badge" id="status-cahaya">Terang</span>
+                        <span class="sensor-label">Gelap jika &ge; 1000</span>
+                    </div>
+                    <div class="meter-bar">
+                        <div class="meter-fill" id="meter-cahaya" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- GAS (MQ-2) -->
+                <div class="card sensor-card" id="card-gas">
+                    <div class="card-top">
+                        <span class="sensor-name">Sensor Gas / Asap</span>
+                        <span class="sensor-icon">⚠️</span>
+                    </div>
+                    <div class="sensor-metric">
+                        <span class="sensor-value" id="val-gas">--</span>
+                        <span class="sensor-unit">ADC</span>
+                    </div>
+                    <div class="sensor-meta">
+                        <span class="sensor-status-badge" id="status-gas">Normal</span>
+                        <span class="sensor-label">Batas Bahaya: &ge; 1200</span>
+                    </div>
+                    <div class="meter-bar">
+                        <div class="meter-fill" id="meter-gas" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- STATUS PERANGKAT / OUTPUT -->
+        <section class="section-container">
+            <div class="section-header">
+                <h3 class="section-heading">Status Aktuator & Output</h3>
+                <span class="section-subheading">Kontrol Otomatis Berdasarkan Logika ESP32</span>
+            </div>
+            <div class="outputs-grid">
+                <!-- LED -->
+                <div class="card output-card" id="card-actuator-led">
+                    <div class="output-header">
+                        <div class="output-icon-wrapper led-icon-wrapper" id="actuator-icon-led">
+                            <span class="output-icon">💡</span>
+                        </div>
+                        <div>
+                            <h4 class="output-name">LED Lampu Kamar</h4>
+                            <span class="output-pin">GPIO26 &bull; Otomatis</span>
+                        </div>
+                    </div>
+                    <div class="output-state-row">
+                        <span class="output-state-text" id="state-text-led">OFF</span>
+                        <span class="output-state-pill pill-off" id="pill-led">PADAM</span>
+                    </div>
+                    <p class="output-desc">Menyala otomatis ketika ruangan gelap (LDR &ge; 1000).</p>
+                </div>
+
+                <!-- BUZZER -->
+                <div class="card output-card" id="card-actuator-buzzer">
+                    <div class="output-header">
+                        <div class="output-icon-wrapper buzzer-icon-wrapper" id="actuator-icon-buzzer">
+                            <span class="output-icon">🔔</span>
+                        </div>
+                        <div>
+                            <h4 class="output-name">Buzzer Alarm</h4>
+                            <span class="output-pin">GPIO25 &bull; Peringatan</span>
+                        </div>
+                    </div>
+                    <div class="output-state-row">
+                        <span class="output-state-text" id="state-text-buzzer">OFF</span>
+                        <span class="output-state-pill pill-off" id="pill-buzzer">HENING</span>
+                    </div>
+                    <p class="output-desc">Berbunyi nyaring saat kadar gas terdeteksi &ge; 1200.</p>
+                </div>
+
+                <!-- EXHAUST FAN -->
+                <div class="card output-card" id="card-actuator-kipas">
+                    <div class="output-header">
+                        <div class="output-icon-wrapper fan-icon-wrapper" id="actuator-icon-kipas">
+                            <span class="output-icon fan-icon">🌀</span>
+                        </div>
+                        <div>
+                            <h4 class="output-name">Exhaust Fan</h4>
+                            <span class="output-pin">Relay GPIO27 &bull; Ventilasi</span>
+                        </div>
+                    </div>
+                    <div class="output-state-row">
+                        <span class="output-state-text" id="state-text-kipas">OFF</span>
+                        <span class="output-state-pill pill-off" id="pill-kipas">MATI</span>
+                    </div>
+                    <p class="output-desc">Aktif saat gas tinggi (&ge; 1200) atau kelembapan tinggi (&ge; 60%). Delay mati 10s.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- GRAFIK MONITORING & STATUS SISTEM -->
+        <div class="split-grid">
+            <!-- GRAFIK MONITORING -->
+            <section class="card chart-section">
+                <div class="chart-header">
+                    <div>
+                        <h3 class="card-title">Grafik Tren Sensor</h3>
+                        <span class="chart-subtitle" id="chart-data-count">Menampilkan 0 data historis</span>
+                    </div>
+                    <div class="chart-controls">
+                        <button type="button" class="chart-tab active" data-metric="all">Semua</button>
+                        <button type="button" class="chart-tab" data-metric="suhu">Suhu</button>
+                        <button type="button" class="chart-tab" data-metric="kelembapan">Kelembapan</button>
+                        <button type="button" class="chart-tab" data-metric="gas">Gas</button>
+                        <button type="button" class="chart-tab" data-metric="cahaya">Cahaya</button>
+                    </div>
+                </div>
+
+                <div class="chart-legend" id="chart-legend">
+                    <span class="legend-item"><span class="legend-dot dot-suhu"></span> Suhu (°C)</span>
+                    <span class="legend-item"><span class="legend-dot dot-kelembapan"></span> Kelembapan (%)</span>
+                    <span class="legend-item"><span class="legend-dot dot-gas"></span> Gas (MQ-2)</span>
+                    <span class="legend-item"><span class="legend-dot dot-cahaya"></span> Cahaya (LDR)</span>
+                </div>
+
+                <div class="canvas-wrapper">
+                    <canvas id="monitoring-chart"></canvas>
+                </div>
+            </section>
+
+            <!-- STATUS SISTEM -->
+            <section class="card system-section">
+                <div class="card-header">
+                    <div class="card-title-group">
+                        <span class="section-icon">⚙️</span>
+                        <h3 class="card-title">Informasi Sistem</h3>
+                    </div>
+                    <button type="button" id="btn-refresh" class="btn-sm" title="Refresh Sekarang">🔄 Refresh</button>
+                </div>
+
+                <div class="info-list">
+                    <div class="info-item">
+                        <span class="info-label">Status Server</span>
+                        <span class="info-val" id="sys-server-status">Menghubungkan...</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Koneksi ESP32</span>
+                        <span class="info-val" id="sys-esp-status">Menunggu Data</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Update Terakhir</span>
+                        <span class="info-val" id="sys-last-update">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Endpoint API</span>
+                        <span class="info-val code-font" id="sys-api-url">/api/data</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Interval Polling</span>
+                        <span class="info-val" id="sys-poll-rate">2.0 detik</span>
+                    </div>
+                </div>
+
+                <div class="system-actions">
+                    <button type="button" id="btn-toggle-demo" class="btn-demo">Mode Demo / Simulasi Data</button>
+                    <p class="demo-tip">Gunakan jika ESP32 atau server sedang offline untuk keperluan presentasi.</p>
+                </div>
+            </section>
+        </div>
+
+        <!-- FOOTER -->
+        <footer class="app-footer">
+            <p>&copy; Project IoT Smart Kamar Kos &bull; ESP32 MicroPython &bull; Standalone Vanilla Dashboard</p>
+        </footer>
+    </div>
+
+    <script src="script.js" defer></script>
+</body>
+</html>
