@@ -7,12 +7,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 HOST = "0.0.0.0"
 PORT = 5000
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# Batas waktu toleransi data ESP32 (dalam detik)
-# Jika tidak menerima data dalam 7 detik, status ESP32 dianggap offline
 ESP32_TIMEOUT_SECONDS = 7
 
-# Penyimpanan data sensor dan status aktuator terakhir di memori server
 sensor_data = {
     "suhu": 0,
     "kelembapan": 0,
@@ -23,7 +19,6 @@ sensor_data = {
     "kipas": "OFF"
 }
 
-# Timestamp pelacakan waktu data terakhir diterima dari ESP32
 last_received_timestamp = 0
 last_received_time_str = "Belum ada data"
 
@@ -54,23 +49,18 @@ class SmartKosServer(BaseHTTPRequestHandler):
                 body = self.rfile.read(length).decode("utf-8")
                 payload = json.loads(body)
 
-                # Update nilai sensor dari ESP32
                 for key in ("suhu", "kelembapan", "cahaya", "gas"):
                     if key in payload:
                         sensor_data[key] = payload[key]
 
-                # Update status fisik aktuator dari ESP32
                 for actuator in ("led", "buzzer", "kipas"):
                     if actuator in payload:
                         sensor_data[actuator] = str(payload[actuator]).upper()
 
-                # Catat waktu penerimaan data
                 last_received_timestamp = time.time()
                 last_received_time_str = datetime.now().strftime("%H:%M:%S")
 
-                print(f"[{last_received_time_str}] Data diterima dari ESP32:")
-                print(json.dumps(sensor_data))
-                print("-" * 40)
+                print(f"[{last_received_time_str}] Data ESP32: {sensor_data}")
 
                 response = b'{"status":"OK"}'
                 self.send_response(200)
@@ -81,7 +71,7 @@ class SmartKosServer(BaseHTTPRequestHandler):
                 self.wfile.write(response)
 
             except Exception as e:
-                print(f"Error memproses data POST: {e}")
+                print("Error memproses POST:", e)
                 self.send_response(400)
                 self.send_header("Content-Type", "text/plain")
                 self.end_headers()
@@ -95,9 +85,7 @@ class SmartKosServer(BaseHTTPRequestHandler):
     def do_GET(self):
         global sensor_data, last_received_timestamp, last_received_time_str
 
-        # 1. API endpoint data sensor dan status koneksi untuk frontend
         if self.path == "/api/data":
-            # Tentukan apakah ESP32 aktif berdasarkan timeout
             is_esp32_online = (
                 (time.time() - last_received_timestamp <= ESP32_TIMEOUT_SECONDS)
                 if last_received_timestamp > 0 else False
@@ -116,7 +104,6 @@ class SmartKosServer(BaseHTTPRequestHandler):
             self.wfile.write(response)
             return
 
-        # 2. Static File Server untuk Dashboard Website
         path_map = {
             "/": "index.html",
             "/index.html": "index.html",
@@ -157,10 +144,7 @@ class SmartKosServer(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     server = HTTPServer((HOST, PORT), SmartKosServer)
-    print(f"Server Smart Kamar Kos aktif di http://localhost:{PORT}")
-    print("Menerima data ESP32 pada: POST /data")
-    print("Menyajikan API data pada:  GET /api/data")
-    print("Menyajikan Website pada:   GET /")
+    print(f"Server aktif di http://localhost:{PORT}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
