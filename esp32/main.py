@@ -1,3 +1,4 @@
+
 from machine import Pin, ADC
 import dht
 import time
@@ -39,7 +40,6 @@ kelembapan = 0
 
 fan_running = False
 fan_off_timer = None
-
 wifi_logged = False
 
 last_dht = time.ticks_ms() - DHT_INTERVAL
@@ -61,8 +61,7 @@ def connect_wifi():
     start = time.ticks_ms()
 
     while not wlan.isconnected() and time.ticks_diff(
-        time.ticks_ms(),
-        start
+        time.ticks_ms(), start
     ) < 1000:
         time.sleep(0.1)
 
@@ -83,7 +82,6 @@ def parse_url(url):
     host_port = parts[0].split(":")
     host = host_port[0]
     port = int(host_port[1]) if len(host_port) > 1 else 5000
-
     path = "/" + parts[1] if len(parts) > 1 else "/data"
 
     return host, port, path
@@ -98,6 +96,7 @@ try:
         SERVER_HOST,
         SERVER_PORT
     )[0][-1]
+    print("Alamat server:", SERVER_ADDR)
 except Exception as e:
     print("Gagal mencari alamat server:", e)
 
@@ -109,17 +108,16 @@ def kirim_data(payload):
         if SERVER_ADDR is None:
             return False
 
-        body = ujson.dumps(payload)
-        body_bytes = body.encode()
+        body = ujson.dumps(payload).encode()
 
         request = (
             f"POST {SERVER_PATH} HTTP/1.0\r\n"
             f"Host: {SERVER_HOST}\r\n"
             "Content-Type: application/json\r\n"
-            f"Content-Length: {len(body_bytes)}\r\n"
+            f"Content-Length: {len(body)}\r\n"
             "Connection: close\r\n"
             "\r\n"
-        ).encode() + body_bytes
+        ).encode() + body
 
         s = usocket.socket()
         s.settimeout(1.5)
@@ -127,9 +125,16 @@ def kirim_data(payload):
         s.connect(SERVER_ADDR)
         s.write(request)
 
-        time.sleep_ms(50)
+        response = s.recv(64)
 
-        return True
+        if response.startswith(b"HTTP/1.0 200") or response.startswith(
+            b"HTTP/1.1 200"
+        ):
+            print("Data terkirim ke server")
+            return True
+
+        print("Respons server tidak sesuai:", response)
+        return False
 
     except Exception as e:
         print("Gagal kirim data:", e)
@@ -146,11 +151,7 @@ def kirim_data(payload):
 while True:
     sekarang = time.ticks_ms()
 
-    if time.ticks_diff(
-        sekarang,
-        last_dht
-    ) >= DHT_INTERVAL:
-
+    if time.ticks_diff(sekarang, last_dht) >= DHT_INTERVAL:
         last_dht = sekarang
 
         try:
@@ -187,10 +188,8 @@ while True:
             fan_off_timer = sekarang
 
         elif time.ticks_diff(
-            sekarang,
-            fan_off_timer
+            sekarang, fan_off_timer
         ) >= FAN_OFF_DELAY:
-
             relay.value(0)
             fan_running = False
             fan_off_timer = None
@@ -198,37 +197,25 @@ while True:
     else:
         relay.value(0)
 
-    if time.ticks_diff(
-        sekarang,
-        last_post
-    ) >= POST_INTERVAL:
-
+    if time.ticks_diff(sekarang, last_post) >= POST_INTERVAL:
         last_post = sekarang
 
         if not wlan.isconnected():
             wifi_logged = False
 
             if time.ticks_diff(
-                sekarang,
-                last_wifi_retry
+                sekarang, last_wifi_retry
             ) >= WIFI_RETRY_INTERVAL:
-
                 last_wifi_retry = sekarang
 
                 try:
-                    wlan.connect(
-                        WIFI_SSID,
-                        WIFI_PASSWORD
-                    )
+                    wlan.connect(WIFI_SSID, WIFI_PASSWORD)
                 except Exception:
                     pass
 
         else:
             if not wifi_logged:
-                print(
-                    "Wi-Fi connected:",
-                    wlan.ifconfig()[0]
-                )
+                print("Wi-Fi connected:", wlan.ifconfig()[0])
                 wifi_logged = True
 
             payload = {
