@@ -68,7 +68,7 @@ with open(DATASET_FILE, "r", newline="", encoding="utf-8") as file:
                 "gas": gas
             })
 
-            if gas >= 1200 or kelembapan >= 60:
+            if gas >= 1200 or kelembapan >= 60 or cahaya >= 1800:
                 threshold_rows.append(line_number)
 
         except (ValueError, TypeError, KeyError) as error:
@@ -98,7 +98,7 @@ if invalid_rows:
         print("Baris {}: {}".format(line_number, reason))
 
 if threshold_rows:
-    print("\nBaris dengan gas >= 1200 ADC atau kelembapan >= 60%:")
+    print("\nBaris dengan gas >= 1200 ADC, kelembapan >= 60%, atau cahaya >= 1800 ADC:")
     print("Nomor baris:", threshold_rows[:30])
 
 print("\nPemeriksaan selesai. Dataset asli tidak diubah.")

@@ -117,7 +117,7 @@ Konfigurasi pin yang digunakan pada mikrokontroler ESP32:
 Sistem bekerja berdasarkan nilai ambang batas (*threshold*) yang telah ditentukan di dalam program:
 
 - **Threshold Gas**: `1200` (nilai ADC)
-- **Threshold Cahaya**: `1000` (nilai ADC)
+- **Threshold Cahaya**: `1800` (nilai ADC)
 - **Threshold Kelembapan**: `60%`
 
 ### 1. Sensor Gas (MQ-2)
@@ -141,10 +141,10 @@ $$\text{Kipas ON} \iff (\text{Gas} \ge 1200) \lor (\text{Kelembapan} \ge 60\%)$$
 - Jika sebelum 10 detik berakhir nilai gas kembali $\ge$ 1200 atau kelembapan kembali $\ge$ 60%, timer pemadaman dibatalkan dan kipas terus menyala.
 
 ### 4. Sensor Cahaya (LDR)
-- Jika nilai LDR **$\ge$ 1000**:
+- Jika nilai LDR **$\ge$ 1800**:
   - Ruangan dinyatakan **GELAP**.
   - LED menyala secara otomatis untuk memberikan penerangan.
-- Jika nilai LDR **< 1000**:
+- Jika nilai LDR **< 1800**:
   - Ruangan dinyatakan **TERANG**.
   - LED dimatikan untuk menghemat energi.
 
@@ -306,7 +306,7 @@ Backend `server.py` menyediakan dua endpoint utama:
 Nilai ambang batas yang digunakan dalam kode program:
 ```python
 GAS_THRESHOLD = 1200
-LDR_THRESHOLD = 1000
+LDR_THRESHOLD = 1800
 HUMIDITY_THRESHOLD = 60
 FAN_OFF_DELAY = 10000  # 10 detik
 ```

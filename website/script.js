@@ -3,7 +3,7 @@ const POLLING_INTERVAL = 2000;
 const MAX_HISTORY = 40;
 
 const GAS_THRESHOLD = 1200;
-const LDR_THRESHOLD = 1000;
+const LDR_THRESHOLD = 1800;
 const HUMIDITY_THRESHOLD = 60;
 
 let historyData = [];
@@ -208,7 +208,7 @@ function updateAIUI(data) {
     if (!elAiStatusBadge) return;
 
     const status = String(data.ai_status || "TIDAK TERSEDIA").toUpperCase();
-    const busy = Boolean(data.calibration_busy) || status === "KALIBRASI";
+    const busy = Boolean(data.calibration_busy) || status === "KALIBRASI" || data.calibration_status === "KALIBRASI BERLANGSUNG" || data.calibration_status === "MELATIH MODEL" || data.calibration_status === "COLLECTING" || data.calibration_status === "TRAINING";
     const available = Boolean(data.ai_available);
 
     let title = "AI belum tersedia";
@@ -217,7 +217,7 @@ function updateAIUI(data) {
     let badgeClass = "ai-state-neutral";
 
     if (busy) {
-        title = data.calibration_status === "TRAINING" ? "Melatih model AI" : "Kalibrasi sedang berjalan";
+        title = (data.calibration_status === "MELATIH MODEL" || data.calibration_status === "TRAINING") ? "Melatih model AI" : "Kalibrasi sedang berjalan";
         description = data.calibration_message || "Sampel normal sedang dikumpulkan.";
         symbol = "🧪";
         badgeClass = "ai-state-calibration";
@@ -268,27 +268,39 @@ function updateAIUI(data) {
 function updateCalibrationUI(data) {
     if (!elCalibrationStatusBadge) return;
 
-    const status = String(data.calibration_status || "IDLE").toUpperCase();
+    const status = String(data.calibration_status || "BELUM DIKALIBRASI").toUpperCase();
     const samples = Math.max(0, Number(data.calibration_samples ?? 0));
     const target = Math.max(1, Number(data.calibration_target ?? 100));
     const skipped = Math.max(0, Number(data.calibration_skipped ?? 0));
     const percent = Math.min(100, (samples / target) * 100);
-    const busy = Boolean(data.calibration_busy) || status === "COLLECTING" || status === "TRAINING";
+    const busy = Boolean(data.calibration_busy) || status === "KALIBRASI BERLANGSUNG" || status === "MELATIH MODEL" || status === "COLLECTING" || status === "TRAINING";
 
     const statusLabels = {
-        IDLE: "BELUM DIMULAI",
-        COLLECTING: "MENGUMPULKAN",
+        "BELUM DIKALIBRASI": "BELUM DIKALIBRASI",
+        "KALIBRASI BERLANGSUNG": "KALIBRASI BERLANGSUNG",
+        "MELATIH MODEL": "MELATIH MODEL",
+        "KALIBRASI BERHASIL": "KALIBRASI BERHASIL",
+        "KALIBRASI DIBATALKAN": "KALIBRASI DIBATALKAN",
+        "KALIBRASI GAGAL": "KALIBRASI GAGAL",
+        IDLE: "BELUM DIKALIBRASI",
+        COLLECTING: "KALIBRASI BERLANGSUNG",
         TRAINING: "MELATIH MODEL",
-        COMPLETED: "SELESAI",
-        CANCELLED: "DIBATALKAN",
-        FAILED: "GAGAL",
-        UNKNOWN: "SERVER OFFLINE"
+        COMPLETED: "KALIBRASI BERHASIL",
+        CANCELLED: "KALIBRASI DIBATALKAN",
+        FAILED: "KALIBRASI GAGAL",
+        UNKNOWN: "SERVER TERPUTUS"
     };
 
     let pillClass = "ai-state-neutral";
-    if (status === "COLLECTING" || status === "TRAINING") pillClass = "ai-state-calibration";
-    if (status === "COMPLETED") pillClass = "ai-state-normal";
-    if (status === "FAILED") pillClass = "ai-state-failed";
+    if (status === "KALIBRASI BERLANGSUNG" || status === "COLLECTING" || status === "MELATIH MODEL" || status === "TRAINING") {
+        pillClass = "ai-state-calibration";
+    } else if (status === "KALIBRASI BERHASIL" || status === "COMPLETED") {
+        pillClass = "ai-state-normal";
+    } else if (status === "KALIBRASI GAGAL" || status === "FAILED") {
+        pillClass = "ai-state-failed";
+    } else if (status === "KALIBRASI DIBATALKAN" || status === "CANCELLED" || status === "BELUM DIKALIBRASI" || status === "IDLE") {
+        pillClass = "ai-state-neutral";
+    }
 
     setStatusPill(elCalibrationStatusBadge, statusLabels[status] || status, pillClass);
     elCalibrationMessage.textContent = calibrationActionNotice || data.calibration_message || "Model yang tersimpan akan digunakan sampai kalibrasi baru berhasil.";
@@ -298,14 +310,15 @@ function updateCalibrationUI(data) {
     elCalibrationSkipped.textContent = String(skipped);
     elCalibrationFinished.textContent = formatModelDate(data.calibration_finished_at);
 
+    const canCancel = (status === "KALIBRASI BERLANGSUNG" || status === "COLLECTING") && !calibrationActionInProgress;
     elBtnCalibrationStart.disabled = calibrationActionInProgress || busy || !isServerConnected || !isEsp32Online;
-    elBtnCalibrationCancel.disabled = calibrationActionInProgress || status !== "COLLECTING";
+    elBtnCalibrationCancel.disabled = !canCancel;
 
     if (calibrationActionInProgress) {
         elBtnCalibrationStart.textContent = "Memproses...";
-    } else if (status === "COLLECTING") {
+    } else if (status === "KALIBRASI BERLANGSUNG" || status === "COLLECTING") {
         elBtnCalibrationStart.textContent = "Kalibrasi Berjalan";
-    } else if (status === "TRAINING") {
+    } else if (status === "MELATIH MODEL" || status === "TRAINING") {
         elBtnCalibrationStart.textContent = "Melatih Model...";
     } else {
         elBtnCalibrationStart.textContent = "Mulai Kalibrasi";
@@ -644,7 +657,7 @@ function drawChart() {
     } else if (activeMetric === "kelembapan") {
         drawThresholdLine(HUMIDITY_THRESHOLD, minY, maxY, padding, chartW, chartH, "#f59e0b", "Ambang Kipas ON (60%)");
     } else if (activeMetric === "cahaya") {
-        drawThresholdLine(LDR_THRESHOLD, minY, maxY, padding, chartW, chartH, "#a855f7", "Ambang Gelap (1000)");
+        drawThresholdLine(LDR_THRESHOLD, minY, maxY, padding, chartW, chartH, "#a855f7", "Ambang Gelap (1800)");
     }
 
     const getX = (index) => padding.left + (index / (historyData.length - 1)) * chartW;

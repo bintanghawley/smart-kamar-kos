@@ -35,6 +35,16 @@ CALIBRATION_TARGET = 100
 CALIBRATION_INTERVAL_SECONDS = 10
 CALIBRATION_CONTAMINATION = 0.02
 GAS_THRESHOLD = 1200
+LDR_THRESHOLD = 1800
+HUMIDITY_THRESHOLD = 60
+FAN_OFF_DELAY = 10000
+
+STATUS_BELUM_DIKALIBRASI = "BELUM DIKALIBRASI"
+STATUS_KALIBRASI_BERLANGSUNG = "KALIBRASI BERLANGSUNG"
+STATUS_MELATIH_MODEL = "MELATIH MODEL"
+STATUS_KALIBRASI_BERHASIL = "KALIBRASI BERHASIL"
+STATUS_KALIBRASI_DIBATALKAN = "KALIBRASI DIBATALKAN"
+STATUS_KALIBRASI_GAGAL = "KALIBRASI GAGAL"
 
 AI_FEATURES = ["suhu", "kelembapan", "cahaya", "gas"]
 AI_WINDOW_SIZE = 5
@@ -69,7 +79,7 @@ calibration_samples = []
 last_calibration_sample_time = 0
 
 calibration_state = {
-    "status": "IDLE",
+    "status": STATUS_BELUM_DIKALIBRASI,
     "active": False,
     "samples_collected": 0,
     "target_samples": CALIBRATION_TARGET,
@@ -91,6 +101,16 @@ def load_ai_model():
         ai_model = None
         ai_status = "TIDAK TERSEDIA"
         ai_error = "Model AI belum tersedia."
+        with state_lock:
+            calibration_state.update({
+                "status": STATUS_BELUM_DIKALIBRASI,
+                "active": False,
+                "samples_collected": 0,
+                "target_samples": CALIBRATION_TARGET,
+                "skipped_samples": 0,
+                "message": "Model AI belum tersedia. Kalibrasi manual dapat dilakukan.",
+                "finished_at": None
+            })
         print("Model AI belum tersedia. Kalibrasi diperlukan.")
         return
 
@@ -108,21 +128,29 @@ def load_ai_model():
         ai_status = "MENUNGGU DATA"
         ai_error = None
 
-        if bundle.get("calibration_mode") == "manual":
-            calibration_state.update({
-                "status": "COMPLETED",
-                "active": False,
-                "samples_collected": bundle.get(
-                    "training_samples", CALIBRATION_TARGET
-                ),
-                "target_samples": CALIBRATION_TARGET,
-                "message": "Model hasil kalibrasi tersimpan dan siap digunakan.",
-                "finished_at": bundle.get("trained_at")
-            })
-        else:
-            calibration_state["message"] = (
-                "Model awal tersedia. Kalibrasi ruangan dapat dilakukan."
-            )
+        with state_lock:
+            if bundle.get("calibration_mode") == "manual":
+                calibration_state.update({
+                    "status": STATUS_KALIBRASI_BERHASIL,
+                    "active": False,
+                    "samples_collected": bundle.get(
+                        "training_samples", CALIBRATION_TARGET
+                    ),
+                    "target_samples": CALIBRATION_TARGET,
+                    "skipped_samples": 0,
+                    "message": "Model hasil kalibrasi tersimpan dan siap digunakan.",
+                    "finished_at": bundle.get("trained_at")
+                })
+            else:
+                calibration_state.update({
+                    "status": STATUS_BELUM_DIKALIBRASI,
+                    "active": False,
+                    "samples_collected": 0,
+                    "target_samples": CALIBRATION_TARGET,
+                    "skipped_samples": 0,
+                    "message": "Model awal tersedia. Kalibrasi ruangan dapat dilakukan.",
+                    "finished_at": None
+                })
 
         print("Model AI berhasil dimuat.")
         print("Fitur AI:", ", ".join(ai_features))
@@ -131,6 +159,16 @@ def load_ai_model():
         ai_model = None
         ai_status = "TIDAK TERSEDIA"
         ai_error = str(error)
+        with state_lock:
+            calibration_state.update({
+                "status": STATUS_BELUM_DIKALIBRASI,
+                "active": False,
+                "samples_collected": 0,
+                "target_samples": CALIBRATION_TARGET,
+                "skipped_samples": 0,
+                "message": "Model AI gagal dimuat. Kalibrasi diperlukan.",
+                "finished_at": None
+            })
         print("Model AI gagal dimuat:", error)
 
 
@@ -188,7 +226,7 @@ def get_calibration_payload():
             "calibration_status": calibration_state["status"],
             "calibration_active": calibration_state["active"],
             "calibration_busy": calibration_state["status"] in (
-                "COLLECTING", "TRAINING"
+                STATUS_KALIBRASI_BERLANGSUNG, STATUS_MELATIH_MODEL
             ),
             "calibration_samples": calibration_state["samples_collected"],
             "calibration_target": calibration_state["target_samples"],
@@ -228,7 +266,9 @@ def start_calibration():
     global ai_score
 
     with state_lock:
-        if calibration_state["status"] in ("COLLECTING", "TRAINING"):
+        if calibration_state["status"] in (
+            STATUS_KALIBRASI_BERLANGSUNG, STATUS_MELATIH_MODEL
+        ):
             return 409, {
                 "status": "ERROR",
                 "message": "Kalibrasi sedang berjalan."
@@ -257,6 +297,13 @@ def start_calibration():
         try:
             os.makedirs(AI_DIR, exist_ok=True)
 
+            for pending_file in (PENDING_DATASET_FILE, PENDING_MODEL_FILE):
+                if os.path.exists(pending_file):
+                    try:
+                        os.remove(pending_file)
+                    except OSError:
+                        pass
+
             with open(
                 PENDING_DATASET_FILE,
                 "w",
@@ -278,7 +325,7 @@ def start_calibration():
         last_calibration_sample_time = 0
 
         calibration_state.update({
-            "status": "COLLECTING",
+            "status": STATUS_KALIBRASI_BERLANGSUNG,
             "active": True,
             "samples_collected": 0,
             "target_samples": CALIBRATION_TARGET,
@@ -306,7 +353,7 @@ def cancel_calibration():
     global ai_score
 
     with state_lock:
-        if calibration_state["status"] == "TRAINING":
+        if calibration_state["status"] == STATUS_MELATIH_MODEL:
             return 409, {
                 "status": "ERROR",
                 "message": (
@@ -314,14 +361,14 @@ def cancel_calibration():
                 )
             }
 
-        if calibration_state["status"] != "COLLECTING":
+        if calibration_state["status"] != STATUS_KALIBRASI_BERLANGSUNG:
             return 409, {
                 "status": "ERROR",
-                "message": "Tidak ada kalibrasi aktif."
+                "message": "Tidak ada kalibrasi aktif yang dapat dibatalkan."
             }
 
         calibration_state.update({
-            "status": "CANCELLED",
+            "status": STATUS_KALIBRASI_DIBATALKAN,
             "active": False,
             "message": (
                 "Kalibrasi dibatalkan. Model sebelumnya tetap digunakan."
@@ -331,11 +378,12 @@ def cancel_calibration():
 
         calibration_samples.clear()
 
-        try:
-            if os.path.exists(PENDING_DATASET_FILE):
-                os.remove(PENDING_DATASET_FILE)
-        except OSError as error:
-            print("Peringatan, file sementara belum terhapus:", error)
+        for pending_file in (PENDING_DATASET_FILE, PENDING_MODEL_FILE):
+            if os.path.exists(pending_file):
+                try:
+                    os.remove(pending_file)
+                except OSError as error:
+                    print("Peringatan, file sementara belum terhapus:", error)
 
         ai_predictions.clear()
         ai_status = (
@@ -355,7 +403,7 @@ def cancel_calibration():
 def collect_calibration_sample(data):
     global last_calibration_sample_time
 
-    if calibration_state["status"] != "COLLECTING":
+    if calibration_state["status"] != STATUS_KALIBRASI_BERLANGSUNG:
         return None
 
     now = time.monotonic()
@@ -396,7 +444,7 @@ def collect_calibration_sample(data):
 
     except Exception as error:
         calibration_state.update({
-            "status": "FAILED",
+            "status": STATUS_KALIBRASI_GAGAL,
             "active": False,
             "message": "Gagal menyimpan sampel: " + str(error)
         })
@@ -406,13 +454,15 @@ def collect_calibration_sample(data):
     calibration_samples.append(record)
 
     calibration_state["samples_collected"] = len(calibration_samples)
-    calibration_state["message"] = "Mengumpulkan data normal."
+    calibration_state["message"] = (
+        f"Mengumpulkan data normal ({len(calibration_samples)}/{CALIBRATION_TARGET})."
+    )
 
     if len(calibration_samples) >= CALIBRATION_TARGET:
         calibration_state.update({
-            "status": "TRAINING",
+            "status": STATUS_MELATIH_MODEL,
             "active": False,
-            "message": "Sampel lengkap. Melatih model AI."
+            "message": "Sampel lengkap (100). Melatih model AI..."
         })
         return list(calibration_samples)
 
@@ -433,6 +483,17 @@ def train_calibration_model(samples):
     try:
         if len(samples) < CALIBRATION_TARGET:
             raise ValueError("Jumlah sampel kalibrasi belum mencukupi.")
+
+        if not os.path.exists(PENDING_DATASET_FILE):
+            raise FileNotFoundError("File dataset sementara tidak ditemukan.")
+
+        with open(PENDING_DATASET_FILE, "r", newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            file_rows = list(reader)
+            if len(file_rows) != CALIBRATION_TARGET:
+                raise ValueError(
+                    f"Jumlah baris file ({len(file_rows)}) tidak sesuai target ({CALIBRATION_TARGET})."
+                )
 
         X = [
             [float(sample[feature]) for feature in AI_FEATURES]
@@ -483,13 +544,23 @@ def train_calibration_model(samples):
 
         joblib.dump(bundle, PENDING_MODEL_FILE)
 
+        if (
+            not os.path.exists(PENDING_MODEL_FILE)
+            or os.path.getsize(PENDING_MODEL_FILE) == 0
+        ):
+            raise IOError("File kandidat model tidak berhasil dibuat.")
+
+        test_bundle = joblib.load(PENDING_MODEL_FILE)
+        if not isinstance(test_bundle, dict) or "model" not in test_bundle:
+            raise ValueError("Verifikasi integritas model kandidat gagal.")
+
+        if os.path.exists(MODEL_FILE):
+            shutil.copy2(MODEL_FILE, BACKUP_MODEL_FILE)
+
         shutil.copy2(
             PENDING_DATASET_FILE,
             CALIBRATION_DATASET_FILE
         )
-
-        if os.path.exists(MODEL_FILE):
-            shutil.copy2(MODEL_FILE, BACKUP_MODEL_FILE)
 
         os.replace(PENDING_MODEL_FILE, MODEL_FILE)
         model_replaced = True
@@ -507,10 +578,10 @@ def train_calibration_model(samples):
             ai_error = None
 
             calibration_state.update({
-                "status": "COMPLETED",
+                "status": STATUS_KALIBRASI_BERHASIL,
                 "active": False,
                 "samples_collected": len(samples),
-                "message": "Kalibrasi berhasil. Model baru sudah disimpan.",
+                "message": "Kalibrasi berhasil. Model baru sudah disimpan dan aktif.",
                 "finished_at": trained_at
             })
 
@@ -523,6 +594,7 @@ def train_calibration_model(samples):
         print("Kalibrasi berhasil.")
         print("Sampel pelatihan:", len(samples))
         print("Model baru tersimpan:", MODEL_FILE)
+        print("Dataset kalibrasi tersimpan:", CALIBRATION_DATASET_FILE)
 
         if os.path.exists(BACKUP_MODEL_FILE):
             print("Cadangan model tersedia:", BACKUP_MODEL_FILE)
@@ -536,10 +608,10 @@ def train_calibration_model(samples):
 
         with state_lock:
             calibration_state.update({
-                "status": "FAILED",
+                "status": STATUS_KALIBRASI_GAGAL,
                 "active": False,
                 "message": (
-                    "Kalibrasi gagal. Model sebelumnya dipertahankan."
+                    f"Kalibrasi gagal: {error}. Model sebelumnya dipertahankan."
                 ),
                 "finished_at": datetime.now().isoformat(timespec="seconds")
             })
@@ -561,7 +633,9 @@ def predict_ai(data):
     global ai_error
 
     with state_lock:
-        if calibration_state["status"] in ("COLLECTING", "TRAINING"):
+        if calibration_state["status"] in (
+            STATUS_KALIBRASI_BERLANGSUNG, STATUS_MELATIH_MODEL
+        ):
             ai_status = "KALIBRASI"
             ai_raw_status = "KALIBRASI"
             return
@@ -587,7 +661,7 @@ def predict_ai(data):
 
         with state_lock:
             if calibration_state["status"] in (
-                "COLLECTING", "TRAINING"
+                STATUS_KALIBRASI_BERLANGSUNG, STATUS_MELATIH_MODEL
             ):
                 ai_status = "KALIBRASI"
                 ai_raw_status = "KALIBRASI"
@@ -699,13 +773,13 @@ class SmartKosServer(BaseHTTPRequestHandler):
                 current_data = dict(sensor_data)
                 samples_to_train = None
 
-                if calibration_state["status"] == "COLLECTING":
+                if calibration_state["status"] == STATUS_KALIBRASI_BERLANGSUNG:
                     samples_to_train = collect_calibration_sample(
                         current_data
                     )
 
                 busy = calibration_state["status"] in (
-                    "COLLECTING", "TRAINING"
+                    STATUS_KALIBRASI_BERLANGSUNG, STATUS_MELATIH_MODEL
                 )
 
                 if busy:
@@ -820,6 +894,16 @@ class SmartKosServer(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     os.makedirs(AI_DIR, exist_ok=True)
+
+    # Bersihkan file sementara yang tertinggal jika server terhenti di tengah kalibrasi
+    for pending_path in (PENDING_DATASET_FILE, PENDING_MODEL_FILE):
+        if os.path.exists(pending_path):
+            try:
+                os.remove(pending_path)
+                print("Membersihkan file sementara:", os.path.basename(pending_path))
+            except OSError:
+                pass
+
     load_ai_model()
 
     server = ThreadingHTTPServer((HOST, PORT), SmartKosServer)
