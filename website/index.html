@@ -53,6 +53,89 @@
             </div>
         </section>
 
+        <!-- AI ANALYSIS & KALIBRASI -->
+        <section class="section-container ai-section-container">
+            <div class="section-header">
+                <h3 class="section-heading">AI Analysis & Kalibrasi</h3>
+                <span class="section-subheading">Isolation Forest • Analisis di server</span>
+            </div>
+
+            <div class="ai-dashboard-grid">
+                <section class="card ai-analysis-card" aria-labelledby="ai-section-title">
+                    <div class="card-header">
+                        <div class="card-title-group">
+                            <span class="section-icon">🤖</span>
+                            <h3 class="card-title" id="ai-section-title">Analisis Pola Sensor</h3>
+                        </div>
+                        <span id="ai-status-badge" class="ai-status-pill ai-state-neutral">MENUNGGU DATA</span>
+                    </div>
+
+                    <div class="ai-status-main">
+                        <div class="ai-status-symbol" id="ai-status-symbol">🤖</div>
+                        <div class="ai-status-copy">
+                            <h4 id="ai-status-title">AI menunggu data</h4>
+                            <p id="ai-status-description">Menunggu pembacaan sensor dari ESP32.</p>
+                        </div>
+                    </div>
+
+                    <div class="ai-metrics-grid">
+                        <div class="ai-metric">
+                            <span class="ai-metric-label">Skor keputusan</span>
+                            <strong class="ai-metric-value" id="ai-score-value">—</strong>
+                        </div>
+                        <div class="ai-metric">
+                            <span class="ai-metric-label">Sampel pelatihan</span>
+                            <strong class="ai-metric-value" id="ai-training-samples">—</strong>
+                        </div>
+                        <div class="ai-metric">
+                            <span class="ai-metric-label">Model terakhir dilatih</span>
+                            <strong class="ai-metric-value ai-metric-date" id="ai-model-date">—</strong>
+                        </div>
+                    </div>
+
+                    <p class="ai-disclaimer">ANOMALI berarti pola sensor berbeda dari pola normal yang dipelajari AI. Status ini bukan bukti pasti adanya bahaya. Otomatisasi ESP32 tetap berjalan secara terpisah.</p>
+                </section>
+
+                <section class="card calibration-card" aria-labelledby="calibration-title">
+                    <div class="card-header">
+                        <div class="card-title-group">
+                            <span class="section-icon">🧪</span>
+                            <h3 class="card-title" id="calibration-title">Kalibrasi Ruangan</h3>
+                        </div>
+                        <span id="calibration-status-badge" class="ai-status-pill ai-state-neutral">BELUM DIMULAI</span>
+                    </div>
+
+                    <p class="calibration-description" id="calibration-message">Model yang tersimpan akan digunakan sampai kalibrasi baru berhasil.</p>
+
+                    <div class="calibration-progress-heading">
+                        <span>Progres sampel</span>
+                        <strong id="calibration-count">0 / 100</strong>
+                    </div>
+                    <div class="calibration-progress-track" role="progressbar" aria-label="Progres kalibrasi" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="calibration-progress-track">
+                        <div class="calibration-progress-fill" id="calibration-progress-fill"></div>
+                    </div>
+
+                    <div class="calibration-stats">
+                        <div class="calibration-stat">
+                            <span class="ai-metric-label">Sampel dilewati</span>
+                            <strong id="calibration-skipped">0</strong>
+                        </div>
+                        <div class="calibration-stat">
+                            <span class="ai-metric-label">Kalibrasi terakhir</span>
+                            <strong id="calibration-finished">Belum ada</strong>
+                        </div>
+                    </div>
+
+                    <div class="calibration-actions">
+                        <button type="button" id="btn-calibration-start" class="btn-calibration btn-calibration-primary" disabled>Mulai Kalibrasi</button>
+                        <button type="button" id="btn-calibration-cancel" class="btn-calibration btn-calibration-secondary" disabled>Batalkan</button>
+                    </div>
+
+                    <p class="calibration-hint">Sebelum mulai, nyalakan ESP32 dan tunggu sensor stabil (sekitar 10 menit sebagai panduan awal). Pastikan ruangan dalam kondisi normal dan aman. Pengumpulan mengambil 100 sampel, sekitar 17 menit. Jangan gunakan proses ini saat buzzer peringatan gas aktif.</p>
+                </section>
+            </div>
+        </section>
+
         <!-- RINGKASAN SENSOR -->
         <section class="section-container">
             <div class="section-header">

@@ -61,6 +61,26 @@ const elSysApiUrl = document.getElementById("sys-api-url");
 const elSysPollRate = document.getElementById("sys-poll-rate");
 const elBtnRefresh = document.getElementById("btn-refresh");
 
+const elAiStatusBadge = document.getElementById("ai-status-badge");
+const elAiStatusSymbol = document.getElementById("ai-status-symbol");
+const elAiStatusTitle = document.getElementById("ai-status-title");
+const elAiStatusDescription = document.getElementById("ai-status-description");
+const elAiScoreValue = document.getElementById("ai-score-value");
+const elAiTrainingSamples = document.getElementById("ai-training-samples");
+const elAiModelDate = document.getElementById("ai-model-date");
+
+const elCalibrationStatusBadge = document.getElementById("calibration-status-badge");
+const elCalibrationMessage = document.getElementById("calibration-message");
+const elCalibrationCount = document.getElementById("calibration-count");
+const elCalibrationProgressTrack = document.getElementById("calibration-progress-track");
+const elCalibrationProgressFill = document.getElementById("calibration-progress-fill");
+const elCalibrationSkipped = document.getElementById("calibration-skipped");
+const elCalibrationFinished = document.getElementById("calibration-finished");
+const elBtnCalibrationStart = document.getElementById("btn-calibration-start");
+const elBtnCalibrationCancel = document.getElementById("btn-calibration-cancel");
+let calibrationActionInProgress = false;
+let calibrationActionNotice = "";
+
 const canvas = document.getElementById("monitoring-chart");
 const ctx = canvas.getContext("2d");
 const elChartCount = document.getElementById("chart-data-count");
@@ -140,6 +160,8 @@ function handleDataSuccess(data) {
     updateAlertBanner(normalizedData);
     updateRoomSummary(normalizedData);
     updateSystemInfo(true);
+    updateAIUI(data);
+    updateCalibrationUI(data);
     drawChart();
 }
 
@@ -149,7 +171,180 @@ function handleDataError(error) {
 
     updateConnectionUI();
     updateSystemInfo(false, error.message);
+    updateAIUI({ ai_available: false, ai_status: "TIDAK TERSEDIA", ai_error: "Server tidak dapat dihubungi." });
+    updateCalibrationUI({
+        calibration_status: "UNKNOWN",
+        calibration_active: false,
+        calibration_busy: false,
+        calibration_samples: 0,
+        calibration_target: 100,
+        calibration_skipped: 0,
+        calibration_message: "Tidak dapat mengambil status kalibrasi karena server tidak terhubung."
+    });
     updateAlertBannerOnDisconnect();
+}
+
+function setStatusPill(element, label, stateClass) {
+    if (!element) return;
+    element.textContent = label;
+    element.className = `ai-status-pill ${stateClass}`;
+}
+
+function formatModelDate(value) {
+    if (!value) return "Belum tersedia";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return date.toLocaleString("id-ID", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false
+    });
+}
+
+function updateAIUI(data) {
+    if (!elAiStatusBadge) return;
+
+    const status = String(data.ai_status || "TIDAK TERSEDIA").toUpperCase();
+    const busy = Boolean(data.calibration_busy) || status === "KALIBRASI";
+    const available = Boolean(data.ai_available);
+
+    let title = "AI belum tersedia";
+    let description = data.ai_error || "Model AI belum dimuat.";
+    let symbol = "🤖";
+    let badgeClass = "ai-state-neutral";
+
+    if (busy) {
+        title = data.calibration_status === "TRAINING" ? "Melatih model AI" : "Kalibrasi sedang berjalan";
+        description = data.calibration_message || "Sampel normal sedang dikumpulkan.";
+        symbol = "🧪";
+        badgeClass = "ai-state-calibration";
+    } else if (!available || status === "TIDAK TERSEDIA") {
+        title = "AI tidak tersedia";
+        description = data.ai_error || "Periksa model atau lakukan kalibrasi.";
+        symbol = "⚙️";
+        badgeClass = "ai-state-neutral";
+    } else if (status === "NORMAL") {
+        title = "Pola sensor sesuai baseline";
+        description = "Pola sensor saat ini masih sesuai dengan pola normal yang dipelajari AI.";
+        symbol = "✅";
+        badgeClass = "ai-state-normal";
+    } else if (status === "ANOMALI") {
+        title = "Pola berbeda terdeteksi";
+        description = "Pola sensor berbeda dari pola normal yang dipelajari. Ini bukan bukti pasti adanya bahaya; periksa nilai sensor dan kondisi ruangan.";
+        symbol = "🔎";
+        badgeClass = "ai-state-anomaly";
+    } else if (status === "MENGANALISIS" || status === "MENUNGGU DATA") {
+        title = status === "MENGANALISIS" ? "Mengumpulkan pola awal" : "AI menunggu data";
+        description = status === "MENGANALISIS"
+            ? "AI menunggu beberapa prediksi agar status lebih stabil."
+            : "Model sudah tersedia dan menunggu pembacaan sensor.";
+        symbol = "🤖";
+        badgeClass = "ai-state-neutral";
+    } else {
+        title = "AI sedang memeriksa data";
+        description = data.calibration_message || "Menunggu data sensor berikutnya.";
+        symbol = "🤖";
+        badgeClass = "ai-state-neutral";
+    }
+
+    setStatusPill(elAiStatusBadge, busy ? "KALIBRASI" : status, badgeClass);
+    elAiStatusSymbol.textContent = symbol;
+    elAiStatusTitle.textContent = title;
+    elAiStatusDescription.textContent = description;
+
+    if (data.ai_score === null || data.ai_score === undefined || !Number.isFinite(Number(data.ai_score))) {
+        elAiScoreValue.textContent = "—";
+    } else {
+        elAiScoreValue.textContent = Number(data.ai_score).toFixed(4);
+    }
+
+    elAiTrainingSamples.textContent = data.ai_training_samples ?? "—";
+    elAiModelDate.textContent = formatModelDate(data.ai_model_trained_at);
+}
+
+function updateCalibrationUI(data) {
+    if (!elCalibrationStatusBadge) return;
+
+    const status = String(data.calibration_status || "IDLE").toUpperCase();
+    const samples = Math.max(0, Number(data.calibration_samples ?? 0));
+    const target = Math.max(1, Number(data.calibration_target ?? 100));
+    const skipped = Math.max(0, Number(data.calibration_skipped ?? 0));
+    const percent = Math.min(100, (samples / target) * 100);
+    const busy = Boolean(data.calibration_busy) || status === "COLLECTING" || status === "TRAINING";
+
+    const statusLabels = {
+        IDLE: "BELUM DIMULAI",
+        COLLECTING: "MENGUMPULKAN",
+        TRAINING: "MELATIH MODEL",
+        COMPLETED: "SELESAI",
+        CANCELLED: "DIBATALKAN",
+        FAILED: "GAGAL",
+        UNKNOWN: "SERVER OFFLINE"
+    };
+
+    let pillClass = "ai-state-neutral";
+    if (status === "COLLECTING" || status === "TRAINING") pillClass = "ai-state-calibration";
+    if (status === "COMPLETED") pillClass = "ai-state-normal";
+    if (status === "FAILED") pillClass = "ai-state-failed";
+
+    setStatusPill(elCalibrationStatusBadge, statusLabels[status] || status, pillClass);
+    elCalibrationMessage.textContent = calibrationActionNotice || data.calibration_message || "Model yang tersimpan akan digunakan sampai kalibrasi baru berhasil.";
+    elCalibrationCount.textContent = `${samples} / ${target}`;
+    elCalibrationProgressFill.style.width = `${percent}%`;
+    elCalibrationProgressTrack.setAttribute("aria-valuenow", String(Math.round(percent)));
+    elCalibrationSkipped.textContent = String(skipped);
+    elCalibrationFinished.textContent = formatModelDate(data.calibration_finished_at);
+
+    elBtnCalibrationStart.disabled = calibrationActionInProgress || busy || !isServerConnected || !isEsp32Online;
+    elBtnCalibrationCancel.disabled = calibrationActionInProgress || status !== "COLLECTING";
+
+    if (calibrationActionInProgress) {
+        elBtnCalibrationStart.textContent = "Memproses...";
+    } else if (status === "COLLECTING") {
+        elBtnCalibrationStart.textContent = "Kalibrasi Berjalan";
+    } else if (status === "TRAINING") {
+        elBtnCalibrationStart.textContent = "Melatih Model...";
+    } else {
+        elBtnCalibrationStart.textContent = "Mulai Kalibrasi";
+    }
+}
+
+async function sendCalibrationAction(endpoint, actionName) {
+    if (calibrationActionInProgress) return;
+
+    calibrationActionInProgress = true;
+    calibrationActionNotice = "";
+    elBtnCalibrationStart.disabled = true;
+    elBtnCalibrationCancel.disabled = true;
+    elCalibrationMessage.textContent = `${actionName} sedang diproses...`;
+
+    let actionError = "";
+
+    try {
+        const response = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Accept": "application/json", "Content-Type": "application/json" },
+            body: "{}"
+        });
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.message || `HTTP ${response.status}`);
+        }
+    } catch (error) {
+        actionError = `${actionName} gagal: ${error.message}`;
+        calibrationActionNotice = actionError;
+    } finally {
+        calibrationActionInProgress = false;
+        await fetchSensorData();
+
+        if (actionError) {
+            elCalibrationMessage.textContent = actionError;
+        }
+    }
 }
 
 function updateConnectionUI() {
@@ -557,6 +752,27 @@ tabButtons.forEach(btn => {
         activeMetric = btn.dataset.metric;
         drawChart();
     });
+});
+
+elBtnCalibrationStart.addEventListener("click", () => {
+    const confirmed = window.confirm(
+        "Pastikan ESP32 sudah menyala dan sensor telah diberi waktu untuk stabil. " +
+        "Pastikan ruangan dalam kondisi normal dan aman. Mulai kalibrasi 100 sampel?"
+    );
+
+    if (confirmed) {
+        sendCalibrationAction("/api/calibration/start", "Mulai kalibrasi");
+    }
+});
+
+elBtnCalibrationCancel.addEventListener("click", () => {
+    const confirmed = window.confirm(
+        "Batalkan pengumpulan sampel? Model lama akan tetap digunakan."
+    );
+
+    if (confirmed) {
+        sendCalibrationAction("/api/calibration/cancel", "Pembatalan kalibrasi");
+    }
 });
 
 elBtnRefresh.addEventListener("click", () => {
