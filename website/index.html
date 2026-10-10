@@ -4,355 +4,692 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Dashboard Monitoring Smart Kamar Kos berbasis IoT ESP32">
-    <title>SMART KAMAR KOS - Monitoring System</title>
+    <title>Smart Kamar Kos - Dashboard Monitoring</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="app-container">
-        <!-- HEADER -->
-        <header class="app-header">
-            <div class="header-brand">
-                <div class="brand-icon">🏠</div>
-                <div>
-                    <h1 class="brand-title">SMART KAMAR KOS</h1>
-                    <p class="brand-subtitle">Smart Room Monitoring System</p>
+    <div class="app-shell">
+        <!-- ==================== SIDEBAR ==================== -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-brand">
+                <span class="brand-mark" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 11 12 4l8 7"></path>
+                        <path d="M6 10v9h12v-9"></path>
+                        <circle cx="12" cy="14" r="2.4" fill="currentColor" stroke="none"></circle>
+                    </svg>
+                </span>
+                <span class="brand-text">
+                    <strong>SMART KOS</strong>
+                    <small>ROOM MONITOR</small>
+                </span>
+            </div>
+
+            <div class="sidebar-divider"></div>
+
+            <nav class="sidebar-nav" aria-label="Navigasi utama">
+                <a href="#dashboard" class="nav-item is-active" data-nav="dashboard">
+                    <span class="nav-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="7" height="9" rx="2"></rect>
+                            <rect x="14" y="3" width="7" height="5" rx="2"></rect>
+                            <rect x="14" y="12" width="7" height="9" rx="2"></rect>
+                            <rect x="3" y="16" width="7" height="5" rx="2"></rect>
+                        </svg>
+                    </span>
+                    <span>Overview</span>
+                </a>
+                <a href="#monitoring" class="nav-item" data-nav="monitoring">
+                    <span class="nav-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M2 12h4l3-8 4 16 3-8h6"></path>
+                        </svg>
+                    </span>
+                    <span>Monitoring</span>
+                </a>
+                <a href="#ai" class="nav-item" data-nav="ai">
+                    <span class="nav-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="7" y="7" width="10" height="10" rx="2"></rect>
+                            <rect x="10.5" y="10.5" width="3" height="3" rx="0.5" fill="currentColor"></rect>
+                            <path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path>
+                        </svg>
+                    </span>
+                    <span>AI Analysis</span>
+                </a>
+                <a href="#riwayat" class="nav-item" data-nav="riwayat">
+                    <span class="nav-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 12a9 9 0 1 0 3-6.7"></path>
+                            <path d="M3 4v4h4"></path>
+                            <path d="M12 8v4l3 2"></path>
+                        </svg>
+                    </span>
+                    <span>Sensor History</span>
+                </a>
+                <a href="#perangkat" class="nav-item" data-nav="perangkat">
+                    <span class="nav-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="7" y="7" width="10" height="10" rx="2"></rect>
+                            <path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"></path>
+                        </svg>
+                    </span>
+                    <span>Device Control</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-status">
+                <span class="sidebar-status-label">Local System</span>
+                <div class="device-chip status-disconnected" id="sidebar-device">
+                    <span class="device-dot"></span>
+                    <span id="sidebar-device-text">Menghubungkan...</span>
                 </div>
+                <span class="sidebar-status-note">Terakhir update: <strong id="sidebar-last-seen">-</strong></span>
             </div>
+        </aside>
 
-            <div class="header-status">
-                <div id="connection-pill" class="status-pill status-disconnected">
-                    <span class="status-dot"></span>
-                    <span id="connection-text">Menghubungkan...</span>
+        <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+        <!-- ==================== MAIN ==================== -->
+        <div class="main">
+            <!-- TOPBAR -->
+            <header class="topbar">
+                <button type="button" class="menu-toggle" id="menu-toggle" aria-label="Buka menu navigasi">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M3 6h18M3 12h18M3 18h18"></path>
+                    </svg>
+                </button>
+
+                <div class="topbar-heading">
+                    <h2 class="topbar-title" id="page-title">Overview</h2>
+                    <span class="topbar-breadcrumb">Smart Kamar Kos <span class="crumb-sep">/</span> <span id="breadcrumb-current">Overview</span></span>
                 </div>
-                <div class="header-time" id="header-clock">--:--:--</div>
-            </div>
-        </header>
 
-        <!-- ALERT BANNER -->
-        <section id="alert-banner" class="alert-banner alert-normal">
-            <div class="alert-icon" id="alert-icon">🛡️</div>
-            <div class="alert-content">
-                <h4 id="alert-title">Sistem Siap</h4>
-                <p id="alert-message">Menunggu data dari sensor ESP32...</p>
-            </div>
-            <div class="alert-timestamp" id="alert-time">-</div>
-        </section>
-
-        <!-- KONDISI KAMAR SAAT INI -->
-        <section class="card summary-card">
-            <div class="card-header">
-                <div class="card-title-group">
-                    <span class="section-icon">📋</span>
-                    <h2 class="card-title">Kondisi Kamar Saat Ini</h2>
+                <div class="topbar-actions">
+                    <div id="connection-pill" class="status-pill status-disconnected">
+                        <span class="status-dot"></span>
+                        <span id="connection-text">Menghubungkan...</span>
+                    </div>
+                    <div class="header-time" id="header-clock">--:--:--</div>
+                    <button type="button" id="btn-refresh" class="btn-sm" title="Refresh data sekarang">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
+                            <path d="M21 3v5h-5"></path>
+                            <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
+                            <path d="M3 21v-5h5"></path>
+                        </svg>
+                        <span class="btn-sm-text">Refresh</span>
+                    </button>
                 </div>
-                <span class="badge" id="summary-badge">Menganalisis...</span>
-            </div>
-            <div class="summary-body">
-                <p class="summary-lead" id="summary-lead">Memuat kesimpulan kondisi kamar...</p>
-                <div class="summary-details" id="summary-details"></div>
-            </div>
-        </section>
+            </header>
 
-        <!-- AI ANALYSIS & KALIBRASI -->
-        <section class="section-container ai-section-container">
-            <div class="section-header">
-                <h3 class="section-heading">AI Analysis & Kalibrasi</h3>
-                <span class="section-subheading">Isolation Forest • Analisis di server</span>
-            </div>
+            <main class="content">
+                <!-- ==================== DASHBOARD ==================== -->
+                <section class="page-section" id="dashboard">
+                    <!-- FEATURE BANNERS -->
+                    <div class="banners">
+                        <article class="banner banner-yellow">
+                            <span class="banner-pill">LIVE ROOM</span>
+                            <div class="banner-body">
+                                <h2 class="banner-title">Room Status</h2>
+                                <p class="banner-desc" id="banner-room-desc">Menunggu data sensor dari ESP32 untuk menampilkan kondisi kamar.</p>
+                            </div>
+                            <a href="#monitoring" class="banner-btn">Lihat Monitoring</a>
+                            <svg class="banner-art" viewBox="0 0 150 120" fill="none" aria-hidden="true">
+                                <path d="M8 100h134" stroke="#0d0c0b" stroke-width="3" stroke-linecap="round"></path>
+                                <path d="M28 100V56l32-24 32 24v44" stroke="#0d0c0b" stroke-width="3" stroke-linejoin="round"></path>
+                                <rect x="50" y="74" width="20" height="26" fill="none" stroke="#0d0c0b" stroke-width="3"></rect>
+                                <rect x="102" y="38" width="13" height="48" rx="6.5" fill="#fff7dc" stroke="#0d0c0b" stroke-width="3"></rect>
+                                <circle cx="108.5" cy="92" r="11" fill="#0d0c0b"></circle>
+                                <path d="M108.5 88V56" stroke="#0d0c0b" stroke-width="3" stroke-linecap="round"></path>
+                                <path d="M124 20l7-7M140 38h9M136 18l5-7" stroke="#0d0c0b" stroke-width="3" stroke-linecap="round"></path>
+                            </svg>
+                        </article>
 
-            <div class="ai-dashboard-grid">
-                <section class="card ai-analysis-card" aria-labelledby="ai-section-title">
-                    <div class="card-header">
-                        <div class="card-title-group">
-                            <span class="section-icon">🤖</span>
-                            <h3 class="card-title" id="ai-section-title">Analisis Pola Sensor</h3>
-                        </div>
-                        <span id="ai-status-badge" class="ai-status-pill ai-state-neutral">MENUNGGU DATA</span>
+                        <article class="banner banner-orange">
+                            <span class="banner-pill">SAFETY</span>
+                            <div class="banner-body">
+                                <h2 class="banner-title">Safety Monitor</h2>
+                                <p class="banner-desc" id="banner-safety-desc">Pantau gas dan ventilasi otomatis. Menunggu data sensor MQ-2.</p>
+                            </div>
+                            <a href="#perangkat" class="banner-btn">Cek Perangkat</a>
+                            <svg class="banner-art" viewBox="0 0 150 120" fill="none" aria-hidden="true">
+                                <circle cx="60" cy="60" r="30" fill="#ffe9e0" stroke="#0d0c0b" stroke-width="3"></circle>
+                                <circle cx="60" cy="60" r="6" fill="#0d0c0b"></circle>
+                                <path d="M60 54c4-13 15-15 17-8 2 8-9 9-17 8z" fill="#0d0c0b"></path>
+                                <path d="M66 64c13 4 15 15 8 17-8 2-9-9-8-17z" fill="#0d0c0b"></path>
+                                <path d="M54 64c-13 4-15 15-8 17 8 2 9-9 8-17z" fill="#0d0c0b"></path>
+                                <path d="M100 42h36M100 50h26" stroke="#0d0c0b" stroke-width="3" stroke-linecap="round"></path>
+                                <path d="M128 34l10 8-10 8" stroke="#0d0c0b" stroke-width="3" stroke-linejoin="round"></path>
+                                <path d="M112 100l13-22 13 22z" fill="#fff7ee" stroke="#0d0c0b" stroke-width="3" stroke-linejoin="round"></path>
+                                <path d="M125 84v7M125 95h.01" stroke="#0d0c0b" stroke-width="3" stroke-linecap="round"></path>
+                            </svg>
+                        </article>
                     </div>
 
-                    <div class="ai-status-main">
-                        <div class="ai-status-symbol" id="ai-status-symbol">🤖</div>
-                        <div class="ai-status-copy">
-                            <h4 id="ai-status-title">AI menunggu data</h4>
-                            <p id="ai-status-description">Menunggu pembacaan sensor dari ESP32.</p>
+                    <!-- SECTION HEADING -->
+                    <div class="section-heading-row">
+                        <div>
+                            <h3 class="section-heading">Room Overview</h3>
+                            <span class="section-subheading">Live environmental data from your smart room.</span>
+                        </div>
+                        <div class="hero-status status-disconnected" id="hero-status">
+                            <span class="hero-status-dot"></span>
+                            <span id="hero-status-text">Menghubungkan...</span>
                         </div>
                     </div>
 
-                    <div class="ai-metrics-grid">
-                        <div class="ai-metric">
-                            <span class="ai-metric-label">Skor keputusan</span>
-                            <strong class="ai-metric-value" id="ai-score-value">—</strong>
-                        </div>
-                        <div class="ai-metric">
-                            <span class="ai-metric-label">Sampel pelatihan</span>
-                            <strong class="ai-metric-value" id="ai-training-samples">—</strong>
-                        </div>
-                        <div class="ai-metric">
-                            <span class="ai-metric-label">Model terakhir dilatih</span>
-                            <strong class="ai-metric-value ai-metric-date" id="ai-model-date">—</strong>
-                        </div>
+                    <!-- SENSOR METRIC ROW -->
+                    <div class="stats-grid">
+                        <article class="stat-card tone-pink">
+                            <div class="stat-top">
+                                <span class="stat-label">Temperature</span>
+                                <span class="stat-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M14 4a2 2 0 1 0-4 0v9.5a4.5 4.5 0 1 0 4 0z"></path>
+                                        <path d="M12 9v4.2"></path>
+                                    </svg>
+                                </span>
+                            </div>
+                            <div class="stat-value"><span id="stat-suhu">--</span><small>°C</small></div>
+                            <span class="sensor-status-badge status-ok" id="stat-suhu-badge">Menunggu</span>
+                            <span class="stat-foot">Current room temperature</span>
+                            <svg class="stat-art" viewBox="0 0 90 60" fill="none" aria-hidden="true">
+                                <path d="M6 50c10-6 18 4 28-2s18 4 28-2 16 2 22-2" stroke="#0d0c0b" stroke-width="2.4" stroke-linecap="round" opacity="0.45"></path>
+                            </svg>
+                        </article>
+
+                        <article class="stat-card tone-turq">
+                            <div class="stat-top">
+                                <span class="stat-label">Humidity</span>
+                                <span class="stat-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M12 2.5s6.5 6.6 6.5 11.2a6.5 6.5 0 0 1-13 0C5.5 9.1 12 2.5 12 2.5z"></path>
+                                    </svg>
+                                </span>
+                            </div>
+                            <div class="stat-value"><span id="stat-kelembapan">--</span><small>%</small></div>
+                            <span class="sensor-status-badge status-ok" id="stat-kelembapan-badge">Menunggu</span>
+                            <span class="stat-foot">Current relative humidity</span>
+                            <svg class="stat-art" viewBox="0 0 90 60" fill="none" aria-hidden="true">
+                                <path d="M6 50c10-6 18 4 28-2s18 4 28-2 16 2 22-2" stroke="#0d0c0b" stroke-width="2.4" stroke-linecap="round" opacity="0.45"></path>
+                            </svg>
+                        </article>
+
+                        <article class="stat-card tone-flame">
+                            <div class="stat-top">
+                                <span class="stat-label">Gas / Smoke</span>
+                                <span class="stat-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M12 4 2.7 20h18.6z"></path>
+                                        <path d="M12 9.5V14"></path>
+                                        <path d="M12 17h.01"></path>
+                                    </svg>
+                                </span>
+                            </div>
+                            <div class="stat-value"><span id="stat-gas">--</span><small>ADC</small></div>
+                            <span class="sensor-status-badge status-ok" id="stat-gas-badge">Menunggu</span>
+                            <span class="stat-foot">Raw MQ-2 sensor reading</span>
+                            <svg class="stat-art" viewBox="0 0 90 60" fill="none" aria-hidden="true">
+                                <path d="M6 50c10-6 18 4 28-2s18 4 28-2 16 2 22-2" stroke="#0d0c0b" stroke-width="2.4" stroke-linecap="round" opacity="0.45"></path>
+                            </svg>
+                        </article>
+
+                        <article class="stat-card tone-yellow">
+                            <div class="stat-top">
+                                <span class="stat-label">Light Intensity</span>
+                                <span class="stat-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="12" r="4"></circle>
+                                        <path d="M12 2v2.2M12 19.8V22M2 12h2.2M19.8 12H22M4.3 4.3l1.6 1.6M18.1 18.1l1.6 1.6M19.7 4.3l-1.6 1.6M5.9 18.1l-1.6 1.6"></path>
+                                    </svg>
+                                </span>
+                            </div>
+                            <div class="stat-value"><span id="stat-cahaya">--</span><small>ADC</small></div>
+                            <span class="sensor-status-badge status-ok" id="stat-cahaya-badge">Menunggu</span>
+                            <span class="stat-foot">Raw LDR light reading</span>
+                            <svg class="stat-art" viewBox="0 0 90 60" fill="none" aria-hidden="true">
+                                <path d="M6 50c10-6 18 4 28-2s18 4 28-2 16 2 22-2" stroke="#0d0c0b" stroke-width="2.4" stroke-linecap="round" opacity="0.45"></path>
+                            </svg>
+                        </article>
                     </div>
 
-                    <p class="ai-disclaimer">ANOMALI berarti pola sensor berbeda dari pola normal yang dipelajari AI. Status ini bukan bukti pasti adanya bahaya. Otomatisasi ESP32 tetap berjalan secara terpisah.</p>
+                    <!-- ALERT BANNER -->
+                    <section id="alert-banner" class="alert-banner alert-normal">
+                        <div class="alert-icon" id="alert-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M12 3l7 2.8V10c0 4.6-3 8.4-7 10-4-1.6-7-5.4-7-10V5.8z"></path>
+                            </svg>
+                        </div>
+                        <div class="alert-content">
+                            <h4 id="alert-title">Sistem Siap</h4>
+                            <p id="alert-message">Menunggu data dari sensor ESP32...</p>
+                        </div>
+                        <div class="alert-timestamp" id="alert-time">-</div>
+                    </section>
+
+                    <!-- KONDISI KAMAR SAAT INI -->
+                    <section class="card summary-card">
+                        <div class="card-header">
+                            <div class="card-title-group">
+                                <span class="section-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <rect x="5" y="4" width="14" height="17" rx="2"></rect>
+                                        <path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"></path>
+                                        <path d="M9 10h6M9 14h6"></path>
+                                    </svg>
+                                </span>
+                                <h2 class="card-title">Kondisi Kamar Saat Ini</h2>
+                            </div>
+                            <span class="badge" id="summary-badge">Menganalisis...</span>
+                        </div>
+                        <div class="summary-body">
+                            <p class="summary-lead" id="summary-lead">Memuat kesimpulan kondisi kamar...</p>
+                            <div class="summary-details" id="summary-details"></div>
+                        </div>
+                    </section>
                 </section>
 
-                <section class="card calibration-card" aria-labelledby="calibration-title">
-                    <div class="card-header">
-                        <div class="card-title-group">
-                            <span class="section-icon">🧪</span>
-                            <h3 class="card-title" id="calibration-title">Kalibrasi Ruangan</h3>
-                        </div>
-                        <span id="calibration-status-badge" class="ai-status-pill ai-state-neutral">BELUM DIKALIBRASI</span>
-                    </div>
-
-                    <p class="calibration-description" id="calibration-message">Model yang tersimpan akan digunakan sampai kalibrasi baru berhasil.</p>
-
-                    <div class="calibration-progress-heading">
-                        <span>Progres sampel</span>
-                        <strong id="calibration-count">0 / 100</strong>
-                    </div>
-                    <div class="calibration-progress-track" role="progressbar" aria-label="Progres kalibrasi" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="calibration-progress-track">
-                        <div class="calibration-progress-fill" id="calibration-progress-fill"></div>
-                    </div>
-
-                    <div class="calibration-stats">
-                        <div class="calibration-stat">
-                            <span class="ai-metric-label">Sampel dilewati</span>
-                            <strong id="calibration-skipped">0</strong>
-                        </div>
-                        <div class="calibration-stat">
-                            <span class="ai-metric-label">Kalibrasi terakhir</span>
-                            <strong id="calibration-finished">Belum ada</strong>
-                        </div>
-                    </div>
-
-                    <div class="calibration-actions">
-                        <button type="button" id="btn-calibration-start" class="btn-calibration btn-calibration-primary" disabled>Mulai Kalibrasi</button>
-                        <button type="button" id="btn-calibration-cancel" class="btn-calibration btn-calibration-secondary" disabled>Batalkan</button>
-                    </div>
-
-                    <p class="calibration-hint">Sebelum mulai, nyalakan ESP32 dan tunggu sensor stabil (sekitar 10 menit sebagai panduan awal). Pastikan ruangan dalam kondisi normal dan aman. Pengumpulan mengambil 100 sampel, sekitar 17 menit. Jangan gunakan proses ini saat buzzer peringatan gas aktif.</p>
-                </section>
-            </div>
-        </section>
-
-        <!-- RINGKASAN SENSOR -->
-        <section class="section-container">
-            <div class="section-header">
-                <h3 class="section-heading">Ringkasan Sensor Lingkungan</h3>
-                <span class="section-subheading">Update Real-Time dari ESP32</span>
-            </div>
-            <div class="cards-grid">
-                <!-- SUHU -->
-                <div class="card sensor-card" id="card-suhu">
-                    <div class="card-top">
-                        <span class="sensor-name">Suhu Ruangan</span>
-                        <span class="sensor-icon">🌡️</span>
-                    </div>
-                    <div class="sensor-metric">
-                        <span class="sensor-value" id="val-suhu">--</span>
-                        <span class="sensor-unit">°C</span>
-                    </div>
-                    <div class="sensor-meta">
-                        <span class="sensor-status-badge" id="status-suhu">Normal</span>
-                        <span class="sensor-label">DHT11 (GPIO18)</span>
-                    </div>
-                    <div class="meter-bar">
-                        <div class="meter-fill" id="meter-suhu" style="width: 0%"></div>
-                    </div>
-                </div>
-
-                <!-- KELEMBAPAN -->
-                <div class="card sensor-card" id="card-kelembapan">
-                    <div class="card-top">
-                        <span class="sensor-name">Kelembapan Udara</span>
-                        <span class="sensor-icon">💧</span>
-                    </div>
-                    <div class="sensor-metric">
-                        <span class="sensor-value" id="val-kelembapan">--</span>
-                        <span class="sensor-unit">%</span>
-                    </div>
-                    <div class="sensor-meta">
-                        <span class="sensor-status-badge" id="status-kelembapan">Normal</span>
-                        <span class="sensor-label">Threshold: &ge; 60%</span>
-                    </div>
-                    <div class="meter-bar">
-                        <div class="meter-fill" id="meter-kelembapan" style="width: 0%"></div>
-                    </div>
-                </div>
-
-                <!-- CAHAYA (LDR) -->
-                <div class="card sensor-card" id="card-cahaya">
-                    <div class="card-top">
-                        <span class="sensor-name">Intensitas Cahaya</span>
-                        <span class="sensor-icon">☀️</span>
-                    </div>
-                    <div class="sensor-metric">
-                        <span class="sensor-value" id="val-cahaya">--</span>
-                        <span class="sensor-unit">ADC</span>
-                    </div>
-                    <div class="sensor-meta">
-                        <span class="sensor-status-badge" id="status-cahaya">Terang</span>
-                        <span class="sensor-label">Gelap jika &ge; 1800</span>
-                    </div>
-                    <div class="meter-bar">
-                        <div class="meter-fill" id="meter-cahaya" style="width: 0%"></div>
-                    </div>
-                </div>
-
-                <!-- GAS (MQ-2) -->
-                <div class="card sensor-card" id="card-gas">
-                    <div class="card-top">
-                        <span class="sensor-name">Sensor Gas MQ-2</span>
-                        <span class="sensor-icon">⚠️</span>
-                    </div>
-                    <div class="sensor-metric">
-                        <span class="sensor-value" id="val-gas">--</span>
-                        <span class="sensor-unit">ADC</span>
-                    </div>
-                    <div class="sensor-meta">
-                        <span class="sensor-status-badge" id="status-gas">Normal</span>
-                        <span class="sensor-label">Threshold: &ge; 1200</span>
-                    </div>
-                    <div class="meter-bar">
-                        <div class="meter-fill" id="meter-gas" style="width: 0%"></div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- STATUS PERANGKAT / OUTPUT -->
-        <section class="section-container">
-            <div class="section-header">
-                <h3 class="section-heading">Status Aktuator & Output</h3>
-                <span class="section-subheading">Status Aktual Terkendali ESP32</span>
-            </div>
-            <div class="outputs-grid">
-                <!-- LED -->
-                <div class="card output-card" id="card-actuator-led">
-                    <div class="output-header">
-                        <div class="output-icon-wrapper led-icon-wrapper" id="actuator-icon-led">
-                            <span class="output-icon">💡</span>
-                        </div>
+                <!-- ==================== MONITORING SENSOR ==================== -->
+                <section class="page-section" id="monitoring">
+                    <div class="section-header">
                         <div>
-                            <h4 class="output-name">LED Lampu Kamar</h4>
-                            <span class="output-pin">GPIO26 &bull; Otomatis</span>
+                            <h3 class="section-heading">Sensor Monitoring</h3>
+                            <span class="section-subheading">Real-time readings from the ESP32 sensor array.</span>
                         </div>
                     </div>
-                    <div class="output-state-row">
-                        <span class="output-state-text" id="state-text-led">OFF</span>
-                        <span class="output-state-pill pill-off" id="pill-led">PADAM</span>
-                    </div>
-                    <p class="output-desc">Menyala otomatis ketika ruangan gelap (LDR &ge; 1800).</p>
-                </div>
 
-                <!-- BUZZER -->
-                <div class="card output-card" id="card-actuator-buzzer">
-                    <div class="output-header">
-                        <div class="output-icon-wrapper buzzer-icon-wrapper" id="actuator-icon-buzzer">
-                            <span class="output-icon">🔔</span>
-                        </div>
-                        <div>
-                            <h4 class="output-name">Buzzer Alarm</h4>
-                            <span class="output-pin">GPIO25 &bull; Peringatan</span>
-                        </div>
-                    </div>
-                    <div class="output-state-row">
-                        <span class="output-state-text" id="state-text-buzzer">OFF</span>
-                        <span class="output-state-pill pill-off" id="pill-buzzer">HENING</span>
-                    </div>
-                    <p class="output-desc">Berbunyi saat nilai sensor gas MQ-2 terdeteksi &ge; 1200 ADC.</p>
-                </div>
-
-                <!-- EXHAUST FAN -->
-                <div class="card output-card" id="card-actuator-kipas">
-                    <div class="output-header">
-                        <div class="output-icon-wrapper fan-icon-wrapper" id="actuator-icon-kipas">
-                            <span class="output-icon fan-icon">🌀</span>
-                        </div>
-                        <div>
-                            <h4 class="output-name">Exhaust Fan</h4>
-                            <span class="output-pin">Relay GPIO27 &bull; Ventilasi</span>
-                        </div>
-                    </div>
-                    <div class="output-state-row">
-                        <span class="output-state-text" id="state-text-kipas">OFF</span>
-                        <span class="output-state-pill pill-off" id="pill-kipas">MATI</span>
-                    </div>
-                    <p class="output-desc">Aktif saat gas tinggi (&ge; 1200) atau kelembapan tinggi (&ge; 60%). Delay mati 10 detik.</p>
-                </div>
-            </div>
-        </section>
-
-        <!-- GRAFIK MONITORING & STATUS SISTEM -->
-        <div class="split-grid">
-            <!-- GRAFIK MONITORING -->
-            <section class="card chart-section">
-                <div class="chart-header">
-                    <div>
-                        <h3 class="card-title">Grafik Tren Sensor</h3>
-                        <span class="chart-subtitle" id="chart-data-count">Menampilkan 0 data riwayat</span>
-                    </div>
-                    <div class="chart-controls">
-                        <button type="button" class="chart-tab active" data-metric="all">Semua</button>
-                        <button type="button" class="chart-tab" data-metric="suhu">Suhu</button>
-                        <button type="button" class="chart-tab" data-metric="kelembapan">Kelembapan</button>
+                    <!-- FILTER CHIPS -->
+                    <div class="filter-chips" role="group" aria-label="Filter metrik grafik">
+                        <button type="button" class="chart-tab active" data-metric="all">All Sensors</button>
+                        <button type="button" class="chart-tab" data-metric="suhu">Temperature</button>
+                        <button type="button" class="chart-tab" data-metric="kelembapan">Humidity</button>
                         <button type="button" class="chart-tab" data-metric="gas">Gas</button>
-                        <button type="button" class="chart-tab" data-metric="cahaya">Cahaya</button>
+                        <button type="button" class="chart-tab" data-metric="cahaya">Light</button>
                     </div>
-                </div>
 
-                <div class="chart-legend" id="chart-legend">
-                    <span class="legend-item"><span class="legend-dot dot-suhu"></span> Suhu (°C)</span>
-                    <span class="legend-item"><span class="legend-dot dot-kelembapan"></span> Kelembapan (%)</span>
-                    <span class="legend-item"><span class="legend-dot dot-gas"></span> Gas (MQ-2)</span>
-                    <span class="legend-item"><span class="legend-dot dot-cahaya"></span> Cahaya (LDR)</span>
-                </div>
+                    <!-- SENSOR CARDS -->
+                    <div class="category-grid">
+                        <!-- SUHU -->
+                        <button type="button" class="category-tile tile-pink" data-metric="suhu">
+                            <span class="tile-head">
+                                <span class="tile-label">Temperature</span>
+                                <span class="tile-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M14 4a2 2 0 1 0-4 0v9.5a4.5 4.5 0 1 0 4 0z"></path>
+                                        <path d="M12 9v4.2"></path>
+                                    </svg>
+                                </span>
+                            </span>
+                            <span class="tile-value"><span id="tile-suhu">--</span><small>°C</small></span>
+                            <span class="sensor-status-badge status-ok" id="status-suhu">Menunggu</span>
+                            <span class="tile-meta">DHT11 (GPIO18)</span>
+                            <span class="tile-threshold">Normal 24–32 °C</span>
+                            <span class="tile-meter"><span class="meter-fill" id="meter-suhu" style="width: 0%"></span></span>
+                        </button>
 
-                <div class="canvas-wrapper">
-                    <canvas id="monitoring-chart"></canvas>
-                </div>
-            </section>
+                        <!-- KELEMBAPAN -->
+                        <button type="button" class="category-tile tile-turq" data-metric="kelembapan">
+                            <span class="tile-head">
+                                <span class="tile-label">Humidity</span>
+                                <span class="tile-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M12 2.5s6.5 6.6 6.5 11.2a6.5 6.5 0 0 1-13 0C5.5 9.1 12 2.5 12 2.5z"></path>
+                                    </svg>
+                                </span>
+                            </span>
+                            <span class="tile-value"><span id="tile-kelembapan">--</span><small>%</small></span>
+                            <span class="sensor-status-badge status-ok" id="status-kelembapan">Menunggu</span>
+                            <span class="tile-meta">DHT11 (GPIO18)</span>
+                            <span class="tile-threshold">Kipas ON ≥ 60%</span>
+                            <span class="tile-meter"><span class="meter-fill" id="meter-kelembapan" style="width: 0%"></span></span>
+                        </button>
 
-            <!-- STATUS SISTEM -->
-            <section class="card system-section">
-                <div class="card-header">
-                    <div class="card-title-group">
-                        <span class="section-icon">⚙️</span>
-                        <h3 class="card-title">Informasi Sistem</h3>
-                    </div>
-                    <button type="button" id="btn-refresh" class="btn-sm" title="Refresh Sekarang">🔄 Refresh</button>
-                </div>
+                        <!-- GAS (MQ-2) -->
+                        <button type="button" class="category-tile tile-flame" data-metric="gas">
+                            <span class="tile-head">
+                                <span class="tile-label">Gas / Smoke</span>
+                                <span class="tile-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M12 4 2.7 20h18.6z"></path>
+                                        <path d="M12 9.5V14"></path>
+                                        <path d="M12 17h.01"></path>
+                                    </svg>
+                                </span>
+                            </span>
+                            <span class="tile-value"><span id="tile-gas">--</span><small>ADC</small></span>
+                            <span class="sensor-status-badge status-ok" id="status-gas">Menunggu</span>
+                            <span class="tile-meta">MQ-2 · Sensor analog</span>
+                            <span class="tile-threshold">Bahaya ≥ 1200 ADC</span>
+                            <span class="tile-meter"><span class="meter-fill" id="meter-gas" style="width: 0%"></span></span>
+                        </button>
 
-                <div class="info-list">
-                    <div class="info-item">
-                        <span class="info-label">Status Server</span>
-                        <span class="info-val" id="sys-server-status">Menghubungkan...</span>
+                        <!-- CAHAYA (LDR) -->
+                        <button type="button" class="category-tile tile-yellow" data-metric="cahaya">
+                            <span class="tile-head">
+                                <span class="tile-label">Light</span>
+                                <span class="tile-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <circle cx="12" cy="12" r="4"></circle>
+                                        <path d="M12 2v2.2M12 19.8V22M2 12h2.2M19.8 12H22M4.3 4.3l1.6 1.6M18.1 18.1l1.6 1.6M19.7 4.3l-1.6 1.6M5.9 18.1l-1.6 1.6"></path>
+                                    </svg>
+                                </span>
+                            </span>
+                            <span class="tile-value"><span id="tile-cahaya">--</span><small>ADC</small></span>
+                            <span class="sensor-status-badge status-ok" id="status-cahaya">Menunggu</span>
+                            <span class="tile-meta">LDR · Sensor analog</span>
+                            <span class="tile-threshold">Gelap ≥ 1800 ADC</span>
+                            <span class="tile-meter"><span class="meter-fill" id="meter-cahaya" style="width: 0%"></span></span>
+                        </button>
                     </div>
-                    <div class="info-item">
-                        <span class="info-label">Koneksi ESP32</span>
-                        <span class="info-val" id="sys-esp-status">Menunggu Data</span>
+
+                    <!-- GRAFIK MONITORING -->
+                    <section class="card chart-section">
+                        <div class="chart-header">
+                            <div>
+                                <h3 class="card-title">Grafik Tren Sensor</h3>
+                                <span class="chart-subtitle" id="chart-data-count">Menampilkan 0 data riwayat</span>
+                            </div>
+                        </div>
+
+                        <div class="chart-legend" id="chart-legend">
+                            <span class="legend-item"><span class="legend-dot dot-suhu"></span> Suhu (°C)</span>
+                            <span class="legend-item"><span class="legend-dot dot-kelembapan"></span> Kelembapan (%)</span>
+                            <span class="legend-item"><span class="legend-dot dot-gas"></span> Gas (MQ-2)</span>
+                            <span class="legend-item"><span class="legend-dot dot-cahaya"></span> Cahaya (LDR)</span>
+                        </div>
+
+                        <div class="canvas-wrapper">
+                            <canvas id="monitoring-chart"></canvas>
+                        </div>
+                    </section>
+                </section>
+
+                <!-- ==================== ANALISIS AI ==================== -->
+                <section class="page-section" id="ai">
+                    <div class="section-header">
+                        <div>
+                            <h3 class="section-heading">AI Analysis &amp; Calibration</h3>
+                            <span class="section-subheading">Isolation Forest &bull; Analisis di server</span>
+                        </div>
                     </div>
-                    <div class="info-item">
-                        <span class="info-label">Update Terakhir</span>
-                        <span class="info-val" id="sys-last-update">-</span>
+
+                    <div class="ai-dashboard-grid">
+                        <section class="card ai-analysis-card" aria-labelledby="ai-section-title">
+                            <div class="card-header">
+                                <div class="card-title-group">
+                                    <span class="section-icon">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                            <rect x="7" y="7" width="10" height="10" rx="2"></rect>
+                                            <rect x="10.5" y="10.5" width="3" height="3" rx="0.5" fill="currentColor"></rect>
+                                            <path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path>
+                                        </svg>
+                                    </span>
+                                    <h3 class="card-title" id="ai-section-title">Analisis Pola Sensor</h3>
+                                </div>
+                                <span id="ai-status-badge" class="ai-status-pill ai-state-neutral">MENUNGGU DATA</span>
+                            </div>
+
+                            <div class="ai-status-main">
+                                <div class="ai-status-symbol" id="ai-status-symbol">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <rect x="7" y="7" width="10" height="10" rx="2"></rect>
+                                        <rect x="10.5" y="10.5" width="3" height="3" rx="0.5" fill="currentColor"></rect>
+                                        <path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path>
+                                    </svg>
+                                </div>
+                                <div class="ai-status-copy">
+                                    <h4 id="ai-status-title">AI menunggu data</h4>
+                                    <p id="ai-status-description">Menunggu pembacaan sensor dari ESP32.</p>
+                                </div>
+                            </div>
+
+                            <div class="ai-metrics-grid">
+                                <div class="ai-metric">
+                                    <span class="ai-metric-label">SKOR KEPUTUSAN</span>
+                                    <strong class="ai-metric-value" id="ai-score-value">—</strong>
+                                </div>
+                                <div class="ai-metric">
+                                    <span class="ai-metric-label">ANOMALI PADA JENDELA AI</span>
+                                    <strong class="ai-metric-value" id="ai-anomaly-count">—</strong>
+                                </div>
+                                <div class="ai-metric">
+                                    <span class="ai-metric-label">SAMPEL PELATIHAN</span>
+                                    <strong class="ai-metric-value" id="ai-training-samples">—</strong>
+                                </div>
+                                <div class="ai-metric">
+                                    <span class="ai-metric-label">MODEL TERAKHIR DILATIH</span>
+                                    <strong class="ai-metric-value ai-metric-date" id="ai-model-date">—</strong>
+                                </div>
+                            </div>
+
+                            <p class="ai-disclaimer">ANOMALI berarti pola sensor berbeda dari pola normal yang dipelajari AI. Status ini bukan bukti pasti adanya bahaya. Otomatisasi ESP32 tetap berjalan secara terpisah.</p>
+                        </section>
+
+                        <section class="card calibration-card" aria-labelledby="calibration-title">
+                            <div class="card-header">
+                                <div class="card-title-group">
+                                    <span class="section-icon">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                            <path d="M9 3h6"></path>
+                                            <path d="M10 3v5.2L5.6 16a3 3 0 0 0 2.6 4.5h7.6a3 3 0 0 0 2.6-4.5L14 8.2V3"></path>
+                                            <path d="M7.8 15h8.4"></path>
+                                        </svg>
+                                    </span>
+                                    <h3 class="card-title" id="calibration-title">Kalibrasi Ruangan</h3>
+                                </div>
+                                <span id="calibration-status-badge" class="ai-status-pill ai-state-neutral">BELUM DIKALIBRASI</span>
+                            </div>
+
+                            <p class="calibration-description" id="calibration-message">Model yang tersimpan akan digunakan sampai kalibrasi baru berhasil.</p>
+
+                            <div class="calibration-progress-heading">
+                                <span>PROGRES SAMPEL</span>
+                                <strong id="calibration-count">0 / 100</strong>
+                            </div>
+                            <div class="calibration-progress-track" role="progressbar" aria-label="Progres kalibrasi" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="calibration-progress-track">
+                                <div class="calibration-progress-fill" id="calibration-progress-fill"></div>
+                            </div>
+
+                            <div class="calibration-stats">
+                                <div class="calibration-stat">
+                                    <span class="ai-metric-label">SAMPEL DILEWATI</span>
+                                    <strong id="calibration-skipped">0</strong>
+                                </div>
+                                <div class="calibration-stat">
+                                    <span class="ai-metric-label">KALIBRASI TERAKHIR</span>
+                                    <strong id="calibration-finished">Belum ada</strong>
+                                </div>
+                            </div>
+
+                            <div class="calibration-actions">
+                                <button type="button" id="btn-calibration-start" class="btn-calibration btn-calibration-primary" disabled>Mulai Kalibrasi</button>
+                                <button type="button" id="btn-calibration-cancel" class="btn-calibration btn-calibration-secondary" disabled>Batalkan</button>
+                            </div>
+
+                            <p class="calibration-hint">Sebelum mulai, nyalakan ESP32 dan tunggu sensor stabil (sekitar 10 menit sebagai panduan awal). Pastikan ruangan dalam kondisi normal dan aman. Pengumpulan mengambil 100 sampel, sekitar 17 menit. Jangan gunakan proses ini saat buzzer peringatan gas aktif.</p>
+                        </section>
                     </div>
-                    <div class="info-item">
-                        <span class="info-label">Endpoint API</span>
-                        <span class="info-val code-font" id="sys-api-url">/api/data</span>
+                </section>
+
+                <!-- ==================== RIWAYAT DATA ==================== -->
+                <section class="page-section" id="riwayat">
+                    <div class="section-header">
+                        <div>
+                            <h3 class="section-heading">Riwayat Pembacaan Sensor</h3>
+                            <span class="section-subheading">Data sesi ini &bull; maksimal 40 pembacaan terakhir saat ESP32 online</span>
+                        </div>
                     </div>
-                    <div class="info-item">
-                        <span class="info-label">Interval Polling</span>
-                        <span class="info-val" id="sys-poll-rate">2.0 detik</span>
+
+                    <section class="card history-card">
+                        <div class="card-header">
+                            <div class="card-title-group">
+                                <span class="section-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M4 5h16M4 12h16M4 19h10"></path>
+                                    </svg>
+                                </span>
+                                <h3 class="card-title">Tabel Riwayat</h3>
+                            </div>
+                            <span class="badge" id="history-count">0 baris</span>
+                        </div>
+
+                        <div class="table-wrapper">
+                            <table class="history-table">
+                                <thead>
+                                    <tr>
+                                        <th>Waktu</th>
+                                        <th>Suhu (°C)</th>
+                                        <th>Kelembapan (%)</th>
+                                        <th>Cahaya (ADC)</th>
+                                        <th>Gas (ADC)</th>
+                                        <th>Exhaust Fan</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="history-tbody"></tbody>
+                            </table>
+                            <div class="empty-state" id="history-empty">
+                                <span class="empty-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M4 5h16M4 12h16M4 19h10"></path>
+                                    </svg>
+                                </span>
+                                <p>Belum ada riwayat pembacaan.</p>
+                                <span>Data akan muncul otomatis saat ESP32 mengirim data ke server.</span>
+                            </div>
+                        </div>
+                    </section>
+                </section>
+
+                <!-- ==================== PERANGKAT IOT ==================== -->
+                <section class="page-section" id="perangkat">
+                    <div class="section-header">
+                        <div>
+                            <h3 class="section-heading">Device Control</h3>
+                            <span class="section-subheading">Status aktuator aktual yang dikendalikan ESP32 secara otomatis.</span>
+                        </div>
                     </div>
-                </div>
-            </section>
+
+                    <div class="outputs-grid">
+                        <!-- LED -->
+                        <div class="card output-card" id="card-actuator-led">
+                            <div class="output-header">
+                                <div class="output-icon-wrapper led-icon-wrapper" id="actuator-icon-led">
+                                    <span class="output-icon">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                            <path d="M9 18h6M10 21h4"></path>
+                                            <path d="M12 2.5a6 6 0 0 0-3.4 10.9c.7.5 1.1 1.3 1.1 2.1h4.6c0-.8.4-1.6 1.1-2.1A6 6 0 0 0 12 2.5z"></path>
+                                        </svg>
+                                    </span>
+                                </div>
+                                <div>
+                                    <h4 class="output-name">LED Lampu Kamar</h4>
+                                    <span class="output-pin">GPIO26 &bull; Otomatis</span>
+                                </div>
+                            </div>
+                            <div class="output-state-row">
+                                <span class="output-state-text" id="state-text-led">OFF</span>
+                                <span class="output-state-pill pill-off" id="pill-led">PADAM</span>
+                            </div>
+                            <p class="output-desc">Menyala otomatis ketika ruangan gelap (LDR &ge; 1800).</p>
+                        </div>
+
+                        <!-- BUZZER -->
+                        <div class="card output-card" id="card-actuator-buzzer">
+                            <div class="output-header">
+                                <div class="output-icon-wrapper buzzer-icon-wrapper" id="actuator-icon-buzzer">
+                                    <span class="output-icon">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                            <path d="M18 10a6 6 0 1 0-12 0c0 4.6-2.1 5.8-2.1 5.8h16.2S18 14.6 18 10"></path>
+                                            <path d="M9.3 19a2.7 2.7 0 0 0 5.4 0"></path>
+                                        </svg>
+                                    </span>
+                                </div>
+                                <div>
+                                    <h4 class="output-name">Buzzer Alarm</h4>
+                                    <span class="output-pin">GPIO25 &bull; Peringatan</span>
+                                </div>
+                            </div>
+                            <div class="output-state-row">
+                                <span class="output-state-text" id="state-text-buzzer">OFF</span>
+                                <span class="output-state-pill pill-off" id="pill-buzzer">HENING</span>
+                            </div>
+                            <p class="output-desc">Berbunyi saat nilai sensor gas MQ-2 terdeteksi &ge; 1200 ADC.</p>
+                        </div>
+
+                        <!-- EXHAUST FAN -->
+                        <div class="card output-card" id="card-actuator-kipas">
+                            <div class="output-header">
+                                <div class="output-icon-wrapper fan-icon-wrapper" id="actuator-icon-kipas">
+                                    <span class="output-icon fan-icon">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                            <path d="M2 8.5h12.2a2.4 2.4 0 1 0-2.3-3"></path>
+                                            <path d="M2 12.5h14.5a2.4 2.4 0 1 1-2.3 3"></path>
+                                            <path d="M2 16.5h8.2a2.4 2.4 0 1 1-2.3 3"></path>
+                                        </svg>
+                                    </span>
+                                </div>
+                                <div>
+                                    <h4 class="output-name">Exhaust Fan</h4>
+                                    <span class="output-pin">Relay GPIO27 &bull; Ventilasi</span>
+                                </div>
+                            </div>
+                            <div class="output-state-row">
+                                <span class="output-state-text" id="state-text-kipas">OFF</span>
+                                <span class="output-state-pill pill-off" id="pill-kipas">MATI</span>
+                            </div>
+                            <p class="output-desc">Aktif saat gas tinggi (&ge; 1200) atau kelembapan tinggi (&ge; 60%). Delay mati 10 detik.</p>
+                        </div>
+                    </div>
+
+                    <!-- STATUS SISTEM -->
+                    <section class="card system-section">
+                        <div class="card-header">
+                            <div class="card-title-group">
+                                <span class="section-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <circle cx="12" cy="12" r="3"></circle>
+                                        <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3h.2a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.3a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.5 1z"></path>
+                                    </svg>
+                                </span>
+                                <h3 class="card-title">Informasi Sistem</h3>
+                            </div>
+                        </div>
+
+                        <div class="info-list">
+                            <div class="info-item">
+                                <span class="info-label">Status Server</span>
+                                <span class="info-val" id="sys-server-status">Menghubungkan...</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Koneksi ESP32</span>
+                                <span class="info-val" id="sys-esp-status">Menunggu Data</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Update Terakhir</span>
+                                <span class="info-val" id="sys-last-update">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Endpoint API</span>
+                                <span class="info-val code-font" id="sys-api-url">/api/data</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Interval Polling</span>
+                                <span class="info-val" id="sys-poll-rate">2.0 detik</span>
+                            </div>
+                        </div>
+                    </section>
+                </section>
+
+                <!-- FOOTER -->
+                <footer class="app-footer">
+                    <p>&copy; Project IoT Smart Kamar Kos &bull; ESP32 MicroPython &bull; Monitoring Dashboard</p>
+                </footer>
+            </main>
         </div>
-
-        <!-- FOOTER -->
-        <footer class="app-footer">
-            <p>&copy; Project IoT Smart Kamar Kos &bull; ESP32 MicroPython &bull; Monitoring Dashboard</p>
-        </footer>
     </div>
 
     <script src="script.js" defer></script>
