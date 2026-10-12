@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
     <div class="app-shell">
@@ -433,6 +433,18 @@
                                 <span id="ai-status-badge" class="ai-status-pill ai-state-neutral">MENUNGGU DATA</span>
                             </div>
 
+                            <!-- BANNER SLOT WAKTU AKTIF -->
+                            <div class="ai-active-slot-banner" id="ai-active-slot-banner">
+                                <span class="slot-banner-icon" id="ai-slot-banner-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>
+                                </span>
+                                <div class="slot-banner-info">
+                                    <span class="slot-banner-label">SLOT WAKTU AKTIF SAAT INI</span>
+                                    <strong id="ai-active-slot-name">SIANG (11:00 - 15:00)</strong>
+                                </div>
+                                <span class="slot-source-pill" id="ai-slot-source-pill">Memeriksa Model...</span>
+                            </div>
+
                             <div class="ai-status-main">
                                 <div class="ai-status-symbol" id="ai-status-symbol">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -449,7 +461,7 @@
 
                             <div class="ai-metrics-grid">
                                 <div class="ai-metric">
-                                    <span class="ai-metric-label">SKOR KEPUTUSAN</span>
+                                    <span class="ai-metric-label">SKOR KESELARASAN</span>
                                     <strong class="ai-metric-value" id="ai-score-value">—</strong>
                                 </div>
                                 <div class="ai-metric">
@@ -484,6 +496,82 @@
                                 <span id="calibration-status-badge" class="ai-status-pill ai-state-neutral">BELUM DIKALIBRASI</span>
                             </div>
 
+                            <!-- 4 TIME SLOTS RUANGAN -->
+                            <div class="time-slots-container">
+                                <div class="time-slots-header">
+                                    <span>DATASET 4 SLOT WAKTU HARIAN KOS</span>
+                                </div>
+                                <div class="time-slots-grid" id="time-slots-grid">
+                                    <!-- PAGI -->
+                                    <div class="time-slot-card" id="slot-card-pagi" data-slot="pagi" onclick="selectSlot('pagi')" role="button" tabindex="0">
+                                        <div class="time-slot-header">
+                                            <span class="time-slot-icon">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v4M4.93 10.93l2.83-2.83M19.07 10.93l-2.83-2.83M2 18h20M7 18a5 5 0 0 1 10 0"></path></svg>
+                                            </span>
+                                            <div class="time-slot-title-group">
+                                                <span class="time-slot-name">Pagi</span>
+                                                <span class="time-slot-hours">05:00 - 11:00</span>
+                                            </div>
+                                            <span class="time-slot-pill pill-default" id="slot-pill-pagi">DEFAULT</span>
+                                        </div>
+                                        <div class="time-slot-meta" id="slot-meta-pagi">Belum dikalibrasi</div>
+                                    </div>
+                                    <!-- SIANG -->
+                                    <div class="time-slot-card" id="slot-card-siang" data-slot="siang" onclick="selectSlot('siang')" role="button" tabindex="0">
+                                        <div class="time-slot-header">
+                                            <span class="time-slot-icon">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>
+                                            </span>
+                                            <div class="time-slot-title-group">
+                                                <span class="time-slot-name">Siang</span>
+                                                <span class="time-slot-hours">11:00 - 15:00</span>
+                                            </div>
+                                            <span class="time-slot-pill pill-calibrated" id="slot-pill-siang">TERKALIBRASI</span>
+                                        </div>
+                                        <div class="time-slot-meta" id="slot-meta-siang">100 sampel</div>
+                                    </div>
+                                    <!-- SORE -->
+                                    <div class="time-slot-card" id="slot-card-sore" data-slot="sore" onclick="selectSlot('sore')" role="button" tabindex="0">
+                                        <div class="time-slot-header">
+                                            <span class="time-slot-icon">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 18a5 5 0 0 0-10 0M12 9v7M9 13l3 3 3-3M2 18h20M4.93 7.93l1.41 1.41M19.07 7.93l-1.41 1.41"></path></svg>
+                                            </span>
+                                            <div class="time-slot-title-group">
+                                                <span class="time-slot-name">Sore</span>
+                                                <span class="time-slot-hours">15:00 - 18:30</span>
+                                            </div>
+                                            <span class="time-slot-pill pill-default" id="slot-pill-sore">DEFAULT</span>
+                                        </div>
+                                        <div class="time-slot-meta" id="slot-meta-sore">Belum dikalibrasi</div>
+                                    </div>
+                                    <!-- MALAM -->
+                                    <div class="time-slot-card" id="slot-card-malam" data-slot="malam" onclick="selectSlot('malam')" role="button" tabindex="0">
+                                        <div class="time-slot-header">
+                                            <span class="time-slot-icon">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8.7 8.7 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5z"></path></svg>
+                                            </span>
+                                            <div class="time-slot-title-group">
+                                                <span class="time-slot-name">Malam</span>
+                                                <span class="time-slot-hours">18:30 - 05:00</span>
+                                            </div>
+                                            <span class="time-slot-pill pill-default" id="slot-pill-malam">DEFAULT</span>
+                                        </div>
+                                        <div class="time-slot-meta" id="slot-meta-malam">Belum dikalibrasi</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="calibration-target-banner" id="calibration-target-banner">
+                                <span class="target-banner-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>
+                                </span>
+                                <div class="target-banner-text">
+                                    <span>Target Kalibrasi Sekarang:</span>
+                                    <strong id="calibration-target-name">Slot Siang (11:00 - 15:00)</strong>
+                                    <small id="calibration-target-note">&bull; Hanya menimpa dataset slot ini, slot lain tetap aman</small>
+                                </div>
+                            </div>
+
                             <p class="calibration-description" id="calibration-message">Model yang tersimpan akan digunakan sampai kalibrasi baru berhasil.</p>
 
                             <div class="calibration-progress-heading">
@@ -508,9 +596,10 @@
                             <div class="calibration-actions">
                                 <button type="button" id="btn-calibration-start" class="btn-calibration btn-calibration-primary" disabled>Mulai Kalibrasi</button>
                                 <button type="button" id="btn-calibration-cancel" class="btn-calibration btn-calibration-secondary" disabled>Batalkan</button>
+                                <button type="button" id="btn-calibration-reset" class="btn-calibration btn-calibration-reset" title="Reset dataset &amp; model slot aktif ke default">Reset Slot</button>
                             </div>
 
-                            <p class="calibration-hint">Sebelum mulai, nyalakan ESP32 dan tunggu sensor stabil (sekitar 10 menit sebagai panduan awal). Pastikan ruangan dalam kondisi normal dan aman. Pengumpulan mengambil 100 sampel, sekitar 17 menit. Jangan gunakan proses ini saat buzzer peringatan gas aktif.</p>
+                            <p class="calibration-hint">Sebelum mulai, pastikan sensor di miniatur kamar dalam kondisi tenang dan stabil. Pengumpulan mengambil 100 sampel (sekitar 3–4 menit). Kalibrasi akan disimpan otomatis sebagai patokan normal slot waktu saat ini.</p>
                         </section>
                     </div>
                 </section>
@@ -701,6 +790,6 @@
         </div>
     </div>
 
-    <script src="script.js" defer></script>
+    <script src="script.js?v=4" defer></script>
 </body>
 </html>

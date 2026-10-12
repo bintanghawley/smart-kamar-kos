@@ -39,7 +39,11 @@ const ICONS = {
     siren: `<svg viewBox="0 0 24 24" ${ICON_SVG}><path d="M7.9 2.5h8.2L21.5 7.9v8.2L16.1 21.5H7.9L2.5 16.1V7.9z"></path><path d="M12 8v4.5"></path><path d="M12 16h.01"></path></svg>`,
     wind: `<svg viewBox="0 0 24 24" ${ICON_SVG}><path d="M2 8.5h12.2a2.4 2.4 0 1 0-2.3-3"></path><path d="M2 12.5h14.5a2.4 2.4 0 1 1-2.3 3"></path><path d="M2 16.5h8.2a2.4 2.4 0 1 1-2.3 3"></path></svg>`,
     bulb: `<svg viewBox="0 0 24 24" ${ICON_SVG}><path d="M9 18h6M10 21h4"></path><path d="M12 2.5a6 6 0 0 0-3.4 10.9c.7.5 1.1 1.3 1.1 2.1h4.6c0-.8.4-1.6 1.1-2.1A6 6 0 0 0 12 2.5z"></path></svg>`,
-    moon: `<svg viewBox="0 0 24 24" ${ICON_SVG}><path d="M20 14.5A8.7 8.7 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5z"></path></svg>`
+    moon: `<svg viewBox="0 0 24 24" ${ICON_SVG}><path d="M20 14.5A8.7 8.7 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5z"></path></svg>`,
+    sunrise: `<svg viewBox="0 0 24 24" ${ICON_SVG}><path d="M12 2v4M4.93 10.93l2.83-2.83M19.07 10.93l-2.83-2.83M2 18h20M7 18a5 5 0 0 1 10 0"></path></svg>`,
+    sun: `<svg viewBox="0 0 24 24" ${ICON_SVG}><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>`,
+    sunset: `<svg viewBox="0 0 24 24" ${ICON_SVG}><path d="M17 18a5 5 0 0 0-10 0M12 9v7M9 13l3 3 3-3M2 18h20M4.93 7.93l1.41 1.41M19.07 7.93l-1.41 1.41"></path></svg>`,
+    target: `<svg viewBox="0 0 24 24" ${ICON_SVG}><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>`
 };
 
 const elClock = document.getElementById("header-clock");
@@ -131,6 +135,10 @@ const elAiAnomalyCount = document.getElementById("ai-anomaly-count");
 const elAiTrainingSamples = document.getElementById("ai-training-samples");
 const elAiModelDate = document.getElementById("ai-model-date");
 
+const elAiActiveSlotName = document.getElementById("ai-active-slot-name");
+const elAiSlotSourcePill = document.getElementById("ai-slot-source-pill");
+const elAiSlotBannerIcon = document.getElementById("ai-slot-banner-icon");
+
 const elCalibrationStatusBadge = document.getElementById("calibration-status-badge");
 const elCalibrationMessage = document.getElementById("calibration-message");
 const elCalibrationCount = document.getElementById("calibration-count");
@@ -138,10 +146,23 @@ const elCalibrationProgressTrack = document.getElementById("calibration-progress
 const elCalibrationProgressFill = document.getElementById("calibration-progress-fill");
 const elCalibrationSkipped = document.getElementById("calibration-skipped");
 const elCalibrationFinished = document.getElementById("calibration-finished");
+const elCalibrationTargetName = document.getElementById("calibration-target-name");
+const elCalibrationTargetNote = document.getElementById("calibration-target-note");
 const elBtnCalibrationStart = document.getElementById("btn-calibration-start");
 const elBtnCalibrationCancel = document.getElementById("btn-calibration-cancel");
+const elBtnCalibrationReset = document.getElementById("btn-calibration-reset");
 let calibrationActionInProgress = false;
 let calibrationActionNotice = "";
+const SLOT_METAS = {
+    pagi: { label: "Pagi", range: "05:00 - 11:00" },
+    siang: { label: "Siang", range: "11:00 - 15:00" },
+    sore: { label: "Sore", range: "15:00 - 18:30" },
+    malam: { label: "Malam", range: "18:30 - 05:00" }
+};
+let currentTargetSlotKey = "siang";
+let currentTargetSlotLabel = "Siang";
+let manualSelectedSlotKey = null;
+let latestServerData = null;
 
 const elBannerRoomDesc = document.getElementById("banner-room-desc");
 const elBannerSafetyDesc = document.getElementById("banner-safety-desc");
@@ -191,6 +212,7 @@ async function fetchSensorData() {
 }
 
 function handleDataSuccess(data) {
+    latestServerData = data;
     isServerConnected = true;
     isEsp32Online = Boolean(data.esp32_online);
     lastSeenTime = data.last_seen || "-";
@@ -301,20 +323,20 @@ function updateAIUI(data) {
         symbol = "gear";
         badgeClass = "ai-state-neutral";
     } else if (status === "NORMAL") {
-        title = "Pola sensor sesuai baseline";
-        description = "Pola sensor saat ini masih sesuai dengan pola normal yang dipelajari AI.";
+        title = "Pola normal terdeteksi";
+        description = data.ai_status_desc || "Pola sensor stabil dan selaras dengan patokan kalibrasi miniatur.";
         symbol = "check";
         badgeClass = "ai-state-normal";
     } else if (status === "ANOMALI") {
-        title = "Pola berbeda terdeteksi";
-        description = "Pola sensor berbeda dari pola normal yang dipelajari. Ini bukan bukti pasti adanya bahaya; periksa nilai sensor dan kondisi ruangan.";
-        symbol = "search";
+        title = "Perubahan pola terdeteksi";
+        description = data.ai_status_desc || "Pola sensor menyimpang dari patokan kalibrasi miniatur.";
+        symbol = "alert";
         badgeClass = "ai-state-anomaly";
     } else if (status === "MENGANALISIS" || status === "MENUNGGU DATA") {
-        title = status === "MENGANALISIS" ? "Mengumpulkan pola awal" : "AI menunggu data";
+        title = status === "MENGANALISIS" ? "Menganalisis pola sensor" : "AI menunggu data";
         description = status === "MENGANALISIS"
-            ? "AI menunggu beberapa prediksi agar status lebih stabil."
-            : "Model sudah tersedia dan menunggu pembacaan sensor.";
+            ? (data.ai_status_desc || "Mengumpulkan jendela sampel agar analisis stabil.")
+            : "Model siap dan menunggu data sensor miniatur.";
         symbol = "bot";
         badgeClass = "ai-state-neutral";
     } else {
@@ -329,10 +351,47 @@ function updateAIUI(data) {
     elAiStatusTitle.textContent = title;
     elAiStatusDescription.textContent = description;
 
+    // Render Banner Slot Waktu Aktif
+    if (elAiActiveSlotName) {
+        const slotLabel = data.ai_active_slot_label || "Siang";
+        const slotRange = data.ai_active_slot_range || "11:00 - 15:00";
+        elAiActiveSlotName.textContent = `${slotLabel.toUpperCase()} (${slotRange})`;
+    }
+    if (elAiSlotBannerIcon) {
+        const slotIcons = {
+            pagi: ICONS.sunrise,
+            siang: ICONS.sun,
+            sore: ICONS.sunset,
+            malam: ICONS.moon
+        };
+        const slotColors = {
+            pagi: "#f59e0b",
+            siang: "#eab308",
+            sore: "#f97316",
+            malam: "#818cf8"
+        };
+        elAiSlotBannerIcon.innerHTML = slotIcons[data.ai_active_slot] || ICONS.sun;
+        elAiSlotBannerIcon.style.color = slotColors[data.ai_active_slot] || "var(--yellow)";
+    }
+    if (elAiSlotSourcePill) {
+        const isCalibrated = Boolean(data.ai_is_slot_calibrated);
+        elAiSlotSourcePill.textContent = data.ai_model_source || (isCalibrated ? "Kalibrasi Ruangan" : "Model Default");
+        elAiSlotSourcePill.className = `slot-source-pill ${isCalibrated ? "" : "is-default"}`;
+    }
+
     if (data.ai_score === null || data.ai_score === undefined || !Number.isFinite(Number(data.ai_score))) {
         elAiScoreValue.textContent = "—";
+        elAiScoreValue.style.color = "";
     } else {
-        elAiScoreValue.textContent = Number(data.ai_score).toFixed(4);
+        const scoreVal = Number(data.ai_score);
+        elAiScoreValue.textContent = `${scoreVal.toFixed(1)}%`;
+        if (scoreVal >= 75) {
+            elAiScoreValue.style.color = "var(--color-success)";
+        } else if (scoreVal >= 60) {
+            elAiScoreValue.style.color = "var(--yellow)";
+        } else {
+            elAiScoreValue.style.color = "var(--color-danger)";
+        }
     }
 
     if (elAiAnomalyCount) {
@@ -395,9 +454,89 @@ function updateCalibrationUI(data) {
     elCalibrationSkipped.textContent = String(skipped);
     elCalibrationFinished.textContent = formatModelDate(data.calibration_finished_at);
 
+    // Update Target Slot (Otomatis berdasarkan waktu atau Manual jika diklik pengguna)
+    const serverActiveSlotKey = data.calibration_target_slot || data.ai_active_slot || "siang";
+    const serverActiveSlotLabel = data.calibration_target_slot_label || data.ai_active_slot_label || "Siang";
+
+    if (busy) {
+        manualSelectedSlotKey = null;
+    }
+
+    if (manualSelectedSlotKey && SLOT_METAS[manualSelectedSlotKey]) {
+        currentTargetSlotKey = manualSelectedSlotKey;
+        currentTargetSlotLabel = SLOT_METAS[manualSelectedSlotKey].label;
+    } else {
+        currentTargetSlotKey = serverActiveSlotKey;
+        currentTargetSlotLabel = serverActiveSlotLabel;
+    }
+
+    if (elCalibrationTargetName) {
+        const meta = SLOT_METAS[currentTargetSlotKey] || { range: "" };
+        const range = meta.range || data.calibration_target_slot_range || data.ai_active_slot_range || "";
+        const modeBadge = manualSelectedSlotKey ? " [Target Manual]" : " [Sesuai Jam Sekarang]";
+        elCalibrationTargetName.textContent = `Slot ${currentTargetSlotLabel} (${range})${modeBadge}`;
+    }
+
+    if (elCalibrationTargetNote) {
+        if (manualSelectedSlotKey) {
+            elCalibrationTargetNote.innerHTML = "&bull; Dipilih manual &bull; Kalibrasi/reset akan menargetkan slot " + currentTargetSlotLabel;
+        } else {
+            elCalibrationTargetNote.innerHTML = "&bull; Otomatis sesuai jam saat ini &bull; Slot lain tetap aman";
+        }
+    }
+
+    // Render 4 Kartu Slot Waktu
+    if (data.ai_slots) {
+        const slotsObj = data.ai_slots;
+        ["pagi", "siang", "sore", "malam"].forEach(slotKey => {
+            const cardEl = document.getElementById(`slot-card-${slotKey}`);
+            const pillEl = document.getElementById(`slot-pill-${slotKey}`);
+            const metaEl = document.getElementById(`slot-meta-${slotKey}`);
+            const slotData = slotsObj[slotKey];
+
+            if (cardEl && slotData) {
+                if (slotData.is_active_now) {
+                    cardEl.classList.add("is-active-slot");
+                } else {
+                    cardEl.classList.remove("is-active-slot");
+                }
+
+                if (slotKey === currentTargetSlotKey) {
+                    cardEl.classList.add("is-selected-target");
+                } else {
+                    cardEl.classList.remove("is-selected-target");
+                }
+            }
+
+            if (pillEl && slotData) {
+                if (slotData.is_calibrated) {
+                    pillEl.className = "time-slot-pill pill-calibrated";
+                    pillEl.textContent = "TERKALIBRASI";
+                } else {
+                    pillEl.className = "time-slot-pill pill-default";
+                    pillEl.textContent = "DEFAULT";
+                }
+            }
+
+            if (metaEl && slotData) {
+                if (slotData.is_calibrated) {
+                    const dateStr = slotData.trained_at ? formatModelDate(slotData.trained_at) : "";
+                    metaEl.textContent = `${slotData.samples || 100} sampel${dateStr ? " • " + dateStr : ""}`;
+                } else {
+                    metaEl.textContent = "Model bawaan umum";
+                }
+            }
+        });
+    }
+
     const canCancel = (status === "KALIBRASI BERLANGSUNG" || status === "COLLECTING") && !calibrationActionInProgress;
     elBtnCalibrationStart.disabled = calibrationActionInProgress || busy || !isServerConnected || !isEsp32Online;
     elBtnCalibrationCancel.disabled = !canCancel;
+
+    if (elBtnCalibrationReset) {
+        elBtnCalibrationReset.disabled = calibrationActionInProgress || busy || !isServerConnected;
+        elBtnCalibrationReset.textContent = `Reset Slot ${currentTargetSlotLabel}`;
+    }
 
     if (calibrationActionInProgress) {
         elBtnCalibrationStart.textContent = "Memproses...";
@@ -406,7 +545,7 @@ function updateCalibrationUI(data) {
     } else if (status === "MELATIH MODEL" || status === "TRAINING") {
         elBtnCalibrationStart.textContent = "Melatih Model...";
     } else {
-        elBtnCalibrationStart.textContent = "Mulai Kalibrasi";
+        elBtnCalibrationStart.textContent = `Mulai Kalibrasi (${currentTargetSlotLabel})`;
     }
 }
 
@@ -1049,13 +1188,19 @@ categoryTiles.forEach(tile => {
 });
 
 elBtnCalibrationStart.addEventListener("click", () => {
+    const slotName = currentTargetSlotLabel.toUpperCase();
     const confirmed = window.confirm(
-        "Pastikan ESP32 sudah menyala dan sensor telah diberi waktu untuk stabil. " +
-        "Pastikan ruangan dalam kondisi normal dan aman. Mulai kalibrasi 100 sampel?"
+        `Pastikan ESP32 menyala dan sensor telah stabil.\n\n` +
+        `Kalibrasi ini akan mengumpulkan 100 sampel untuk slot [${slotName}]. ` +
+        `Data baru HANYA akan memperbarui dataset slot ${slotName}, sedangkan dataset slot waktu lainnya tetap aman.\n\n` +
+        `Mulai kalibrasi slot ${slotName}?`
     );
 
     if (confirmed) {
-        sendCalibrationAction("/api/calibration/start", "Mulai kalibrasi");
+        sendCalibrationAction(
+            `/api/calibration/start?slot=${encodeURIComponent(currentTargetSlotKey)}`,
+            `Mulai kalibrasi (${currentTargetSlotLabel})`
+        );
     }
 });
 
@@ -1068,6 +1213,43 @@ elBtnCalibrationCancel.addEventListener("click", () => {
         sendCalibrationAction("/api/calibration/cancel", "Pembatalan kalibrasi");
     }
 });
+
+if (elBtnCalibrationReset) {
+    elBtnCalibrationReset.addEventListener("click", () => {
+        const slotName = currentTargetSlotLabel.toUpperCase();
+        const confirmed = window.confirm(
+            `Apakah Anda yakin ingin mereset dataset & model kalibrasi slot [${slotName}] kembali ke default bawaan umum?`
+        );
+
+        if (confirmed) {
+            sendCalibrationAction(
+                `/api/calibration/reset?slot=${encodeURIComponent(currentTargetSlotKey)}`,
+                `Reset slot ${currentTargetSlotLabel}`
+            );
+        }
+    });
+}
+
+window.selectSlot = function(slotKey) {
+    if (!slotKey || calibrationActionInProgress) return;
+
+    if (manualSelectedSlotKey === slotKey) {
+        manualSelectedSlotKey = null; // kembali ke auto jam sistem
+    } else {
+        manualSelectedSlotKey = slotKey;
+    }
+
+    if (latestServerData) {
+        updateCalibrationUI(latestServerData);
+    }
+};
+
+window.handleSlotKeydown = function(event, slotKey) {
+    if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        window.selectSlot(slotKey);
+    }
+};
 
 elBtnRefresh.addEventListener("click", () => {
     fetchSensorData();

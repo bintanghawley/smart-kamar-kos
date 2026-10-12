@@ -1371,6 +1371,277 @@ body {
     color: var(--text-secondary);
 }
 
+/* ==================== 4 TIME SLOTS & AI BANNER ==================== */
+.ai-active-slot-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, rgba(234, 179, 8, 0.12), rgba(14, 165, 233, 0.08));
+    border: 1px solid rgba(234, 179, 8, 0.28);
+}
+
+.slot-banner-icon {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--yellow);
+    flex-shrink: 0;
+}
+
+.slot-banner-icon svg {
+    width: 22px;
+    height: 22px;
+}
+
+.slot-banner-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+}
+
+.slot-banner-label {
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.slot-banner-info strong {
+    font-family: var(--font-display);
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--yellow);
+    letter-spacing: 0.01em;
+}
+
+.slot-source-pill {
+    padding: 4px 10px;
+    border-radius: var(--radius-pill);
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    background: rgba(34, 197, 94, 0.15);
+    color: var(--color-success);
+    border: 1px solid rgba(34, 197, 94, 0.25);
+    white-space: nowrap;
+}
+
+.slot-source-pill.is-default {
+    background: var(--surface-3);
+    color: var(--accent-blue);
+    border-color: rgba(14, 165, 233, 0.25);
+}
+
+.time-slots-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 2px;
+}
+
+.time-slots-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.66rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.time-slots-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+@media (max-width: 600px) {
+    .time-slots-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.time-slot-card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+    cursor: pointer;
+    user-select: none;
+}
+
+.time-slot-card:hover {
+    border-color: rgba(255, 255, 255, 0.25);
+    transform: translateY(-1px);
+}
+
+.time-slot-card.is-active-slot {
+    border-color: var(--yellow);
+    background: linear-gradient(145deg, rgba(234, 179, 8, 0.1), var(--surface-2));
+    box-shadow: 0 0 14px rgba(234, 179, 8, 0.18);
+}
+
+.time-slot-card.is-selected-target {
+    border-color: var(--accent-blue);
+    background: linear-gradient(145deg, rgba(14, 165, 233, 0.14), var(--surface-2));
+    box-shadow: 0 0 16px rgba(14, 165, 233, 0.28);
+}
+
+.time-slot-card.is-active-slot.is-selected-target {
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 16px rgba(14, 165, 233, 0.35);
+}
+
+.time-slot-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.time-slot-icon {
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--yellow);
+    flex-shrink: 0;
+}
+
+.time-slot-icon svg {
+    width: 18px;
+    height: 18px;
+}
+
+#slot-card-pagi .time-slot-icon {
+    color: #f59e0b;
+}
+
+#slot-card-siang .time-slot-icon {
+    color: #eab308;
+}
+
+#slot-card-sore .time-slot-icon {
+    color: #f97316;
+}
+
+#slot-card-malam .time-slot-icon {
+    color: #818cf8;
+}
+
+.time-slot-title-group {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    flex: 1;
+}
+
+.time-slot-name {
+    font-family: var(--font-display);
+    font-size: 0.86rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.time-slot-hours {
+    font-size: 0.66rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.time-slot-pill {
+    padding: 3px 8px;
+    border-radius: var(--radius-pill);
+    font-size: 0.58rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.time-slot-pill.pill-calibrated {
+    background: var(--color-success-soft);
+    color: var(--color-success);
+    border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.time-slot-pill.pill-default {
+    background: var(--surface-3);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+}
+
+.time-slot-meta {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.calibration-target-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: 10px;
+    background: rgba(14, 165, 233, 0.08);
+    border: 1px solid rgba(14, 165, 233, 0.2);
+    font-size: 0.76rem;
+    color: var(--text-secondary);
+}
+
+.target-banner-icon {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent-blue);
+    flex-shrink: 0;
+}
+
+.target-banner-icon svg {
+    width: 17px;
+    height: 17px;
+}
+
+.target-banner-text strong {
+    color: var(--accent-blue);
+    font-weight: 700;
+}
+
+.target-banner-text small {
+    color: var(--text-muted);
+    margin-left: 4px;
+}
+
+.btn-calibration-reset {
+    color: var(--text-secondary);
+    background: transparent;
+    border-color: var(--border);
+}
+
+.btn-calibration-reset:hover:not(:disabled) {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--color-danger);
+    border-color: rgba(239, 68, 68, 0.3);
+}
+
 /* ==================== RIWAYAT TABLE ==================== */
 .table-wrapper {
     width: 100%;
