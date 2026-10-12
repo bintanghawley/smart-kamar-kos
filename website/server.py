@@ -34,8 +34,8 @@ ESP32_TIMEOUT_SECONDS = 7
 CALIBRATION_TARGET = 100
 CALIBRATION_INTERVAL_SECONDS = 10
 CALIBRATION_CONTAMINATION = 0.02
-GAS_THRESHOLD = 1200
-LDR_THRESHOLD = 1800
+GAS_THRESHOLD = 2000
+LDR_THRESHOLD = 2000
 HUMIDITY_THRESHOLD = 60
 FAN_OFF_DELAY = 10000
 
@@ -53,6 +53,8 @@ AI_ANOMALY_REQUIRED = 3
 state_lock = threading.RLock()
 model_lock = threading.RLock()
 
+buzzer_muted = False
+
 sensor_data = {
     "suhu": 0,
     "kelembapan": 0,
@@ -60,7 +62,8 @@ sensor_data = {
     "gas": 0,
     "led": "OFF",
     "buzzer": "OFF",
-    "kipas": "OFF"
+    "kipas": "OFF",
+    "buzzer_muted": False
 }
 
 last_received_timestamp = 0
@@ -696,7 +699,7 @@ def predict_ai(data):
 
 
 class SmartKosServer(BaseHTTPRequestHandler):
-    def send_json(self, status_code, data):
+    def send_json(self, status_code, data, extra_headers=None):
         response = json.dumps(data).encode("utf-8")
 
         self.send_response(status_code)
@@ -706,6 +709,9 @@ class SmartKosServer(BaseHTTPRequestHandler):
         )
         self.send_header("Content-Length", str(len(response)))
         self.send_header("Cache-Control", "no-store")
+        if extra_headers:
+            for header_key, header_value in extra_headers.items():
+                self.send_header(header_key, header_value)
         self.end_headers()
 
         try:
@@ -715,12 +721,62 @@ class SmartKosServer(BaseHTTPRequestHandler):
 
     def do_POST(self):
         global sensor_data
+        global buzzer_muted
         global last_received_timestamp
         global last_received_time_str
         global ai_status
         global ai_raw_status
 
         clean_path = self.path.split("?")[0]
+
+        if clean_path == "/api/buzzer/mute":
+            with state_lock:
+                buzzer_muted = True
+                sensor_data["buzzer_muted"] = True
+                if sensor_data.get("gas", 0) >= GAS_THRESHOLD:
+                    sensor_data["buzzer"] = "MUTED"
+            print(
+                "[{}] Buzzer dimatikan manual via dashboard.".format(
+                    datetime.now().strftime("%H:%M:%S")
+                )
+            )
+            self.send_json(200, {
+                "status": "OK",
+                "message": "Buzzer berhasil dimatikan.",
+                "buzzer_muted": True
+            })
+            return
+
+        if clean_path == "/api/buzzer/unmute":
+            with state_lock:
+                buzzer_muted = False
+                sensor_data["buzzer_muted"] = False
+                if sensor_data.get("gas", 0) >= GAS_THRESHOLD:
+                    sensor_data["buzzer"] = "ON"
+            print(
+                "[{}] Buzzer diaktifkan kembali manual via dashboard.".format(
+                    datetime.now().strftime("%H:%M:%S")
+                )
+            )
+            self.send_json(200, {
+                "status": "OK",
+                "message": "Buzzer diaktifkan kembali.",
+                "buzzer_muted": False
+            })
+            return
+
+        if clean_path == "/api/buzzer/toggle":
+            with state_lock:
+                buzzer_muted = not buzzer_muted
+                sensor_data["buzzer_muted"] = buzzer_muted
+                if sensor_data.get("gas", 0) >= GAS_THRESHOLD:
+                    sensor_data["buzzer"] = "MUTED" if buzzer_muted else "ON"
+                current_state = buzzer_muted
+            self.send_json(200, {
+                "status": "OK",
+                "buzzer_muted": current_state
+            })
+            return
 
         if clean_path == "/api/calibration/start":
             status_code, response = start_calibration()
@@ -757,6 +813,10 @@ class SmartKosServer(BaseHTTPRequestHandler):
                 return
 
             with state_lock:
+                gas_val = payload.get("gas", 0)
+                if isinstance(gas_val, (int, float)) and gas_val < GAS_THRESHOLD:
+                    buzzer_muted = False
+
                 for key in ("suhu", "kelembapan", "cahaya", "gas"):
                     if key in payload:
                         sensor_data[key] = payload[key]
@@ -765,12 +825,18 @@ class SmartKosServer(BaseHTTPRequestHandler):
                     if key in payload:
                         sensor_data[key] = str(payload[key]).upper()
 
+                if sensor_data.get("gas", 0) >= GAS_THRESHOLD and buzzer_muted:
+                    sensor_data["buzzer"] = "MUTED"
+
+                sensor_data["buzzer_muted"] = buzzer_muted
+
                 last_received_timestamp = time.time()
                 last_received_time_str = (
                     datetime.now().strftime("%H:%M:%S")
                 )
 
                 current_data = dict(sensor_data)
+                current_mute = buzzer_muted
                 samples_to_train = None
 
                 if calibration_state["status"] == STATUS_KALIBRASI_BERLANGSUNG:
@@ -801,15 +867,20 @@ class SmartKosServer(BaseHTTPRequestHandler):
                 current_ai_score = ai_score
 
             print(
-                "[{}] Data ESP32 diterima | AI: {} | Skor: {}".format(
+                "[{}] Data ESP32 diterima | AI: {} | Skor: {} | Mute: {}".format(
                     last_received_time_str,
                     current_ai_status,
                     "{:.4f}".format(current_ai_score)
-                    if current_ai_score is not None else "-"
+                    if current_ai_score is not None else "-",
+                    "YA" if current_mute else "TIDAK"
                 )
             )
 
-            self.send_json(200, {"status": "OK"})
+            self.send_json(
+                200,
+                {"status": "OK", "buzzer_mute": current_mute},
+                extra_headers={"X-Buzzer-Mute": "1" if current_mute else "0"}
+            )
 
         except json.JSONDecodeError:
             self.send_json(400, {"error": "Format JSON Invalid"})
@@ -838,6 +909,9 @@ class SmartKosServer(BaseHTTPRequestHandler):
                 response = dict(sensor_data)
                 response["esp32_online"] = online
                 response["last_seen"] = last_received_time_str
+                response["buzzer_muted"] = buzzer_muted
+                response["gas_threshold"] = GAS_THRESHOLD
+                response["ldr_threshold"] = LDR_THRESHOLD
 
             response.update(get_ai_payload())
             response.update(get_calibration_payload())

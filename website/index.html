@@ -363,7 +363,7 @@
                             <span class="tile-value"><span id="tile-gas">--</span><small>ADC</small></span>
                             <span class="sensor-status-badge status-ok" id="status-gas">Menunggu</span>
                             <span class="tile-meta">MQ-2 · Sensor analog</span>
-                            <span class="tile-threshold">Bahaya ≥ 1200 ADC</span>
+                            <span class="tile-threshold">Bahaya ≥ 2000 ADC</span>
                             <span class="tile-meter"><span class="meter-fill" id="meter-gas" style="width: 0%"></span></span>
                         </button>
 
@@ -381,7 +381,7 @@
                             <span class="tile-value"><span id="tile-cahaya">--</span><small>ADC</small></span>
                             <span class="sensor-status-badge status-ok" id="status-cahaya">Menunggu</span>
                             <span class="tile-meta">LDR · Sensor analog</span>
-                            <span class="tile-threshold">Gelap ≥ 1800 ADC</span>
+                            <span class="tile-threshold">Gelap ≥ 2000 ADC</span>
                             <span class="tile-meter"><span class="meter-fill" id="meter-cahaya" style="width: 0%"></span></span>
                         </button>
                     </div>
@@ -594,7 +594,7 @@
                                 <span class="output-state-text" id="state-text-led">OFF</span>
                                 <span class="output-state-pill pill-off" id="pill-led">PADAM</span>
                             </div>
-                            <p class="output-desc">Menyala otomatis ketika ruangan gelap (LDR &ge; 1800).</p>
+                            <p class="output-desc">Menyala otomatis ketika ruangan gelap (LDR &ge; 2000).</p>
                         </div>
 
                         <!-- BUZZER -->
@@ -617,7 +617,17 @@
                                 <span class="output-state-text" id="state-text-buzzer">OFF</span>
                                 <span class="output-state-pill pill-off" id="pill-buzzer">HENING</span>
                             </div>
-                            <p class="output-desc">Berbunyi saat nilai sensor gas MQ-2 terdeteksi &ge; 1200 ADC.</p>
+                            <p class="output-desc">Berbunyi saat nilai sensor gas MQ-2 terdeteksi &ge; 2000 ADC.</p>
+                            <div class="output-action-row">
+                                <button type="button" class="btn-buzzer-mute" id="btn-buzzer-mute" title="Matikan alarm buzzer jika berbunyi">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon" aria-hidden="true">
+                                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                                        <line x1="23" y1="9" x2="17" y2="15"></line>
+                                        <line x1="17" y1="9" x2="23" y2="15"></line>
+                                    </svg>
+                                    <span id="btn-buzzer-mute-text">Matikan Buzzer</span>
+                                </button>
+                            </div>
                         </div>
 
                         <!-- EXHAUST FAN -->
@@ -641,7 +651,7 @@
                                 <span class="output-state-text" id="state-text-kipas">OFF</span>
                                 <span class="output-state-pill pill-off" id="pill-kipas">MATI</span>
                             </div>
-                            <p class="output-desc">Aktif saat gas tinggi (&ge; 1200) atau kelembapan tinggi (&ge; 60%). Delay mati 10 detik.</p>
+                            <p class="output-desc">Aktif saat gas tinggi (&ge; 2000) atau kelembapan tinggi (&ge; 60%). Delay mati 10 detik.</p>
                         </div>
                     </div>
 

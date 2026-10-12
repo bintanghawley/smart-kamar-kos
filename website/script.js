@@ -2,8 +2,8 @@ const API_URL = "/api/data";
 const POLLING_INTERVAL = 2000;
 const MAX_HISTORY = 40;
 
-const GAS_THRESHOLD = 1200;
-const LDR_THRESHOLD = 1800;
+const GAS_THRESHOLD = 2000;
+const LDR_THRESHOLD = 2000;
 const HUMIDITY_THRESHOLD = 60;
 
 const CHART_COLORS = {
@@ -75,6 +75,9 @@ const elPillLed = document.getElementById("pill-led");
 const elCardBuzzer = document.getElementById("card-actuator-buzzer");
 const elStateBuzzer = document.getElementById("state-text-buzzer");
 const elPillBuzzer = document.getElementById("pill-buzzer");
+const elBtnBuzzerMute = document.getElementById("btn-buzzer-mute");
+const elBtnBuzzerMuteText = document.getElementById("btn-buzzer-mute-text");
+let isBuzzerMuting = false;
 
 const elCardKipas = document.getElementById("card-actuator-kipas");
 const elStateKipas = document.getElementById("state-text-kipas");
@@ -656,16 +659,46 @@ function updateActuatorCards(data) {
         elPillLed.className = "output-state-pill pill-off";
     }
 
+    const isMuted = Boolean(data.buzzer_muted) || data.buzzer === "MUTED";
+    const isAlarmActive = Number(data.gas) >= GAS_THRESHOLD;
+
     if (data.buzzer === "ON") {
+        elCardBuzzer.classList.remove("state-buzzer-muted");
         elCardBuzzer.classList.add("state-buzzer-on");
         elStateBuzzer.textContent = "ON";
         elPillBuzzer.textContent = "BERBUNYI";
         elPillBuzzer.className = "output-state-pill pill-danger-on";
-    } else {
+
+        if (elBtnBuzzerMute) {
+            elBtnBuzzerMute.classList.remove("is-muted");
+            elBtnBuzzerMute.classList.add("active-alarm");
+            elBtnBuzzerMute.disabled = false;
+            if (elBtnBuzzerMuteText) elBtnBuzzerMuteText.textContent = "Matikan Buzzer";
+        }
+    } else if (isMuted && isAlarmActive) {
         elCardBuzzer.classList.remove("state-buzzer-on");
+        elCardBuzzer.classList.add("state-buzzer-muted");
+        elStateBuzzer.textContent = "MUTED";
+        elPillBuzzer.textContent = "DISENYAPKAN";
+        elPillBuzzer.className = "output-state-pill pill-muted";
+
+        if (elBtnBuzzerMute) {
+            elBtnBuzzerMute.classList.remove("active-alarm");
+            elBtnBuzzerMute.classList.add("is-muted");
+            elBtnBuzzerMute.disabled = false;
+            if (elBtnBuzzerMuteText) elBtnBuzzerMuteText.textContent = "Buzzer Disenyapkan";
+        }
+    } else {
+        elCardBuzzer.classList.remove("state-buzzer-on", "state-buzzer-muted");
         elStateBuzzer.textContent = "OFF";
         elPillBuzzer.textContent = "HENING";
         elPillBuzzer.className = "output-state-pill pill-off";
+
+        if (elBtnBuzzerMute) {
+            elBtnBuzzerMute.classList.remove("active-alarm", "is-muted");
+            elBtnBuzzerMute.disabled = false;
+            if (elBtnBuzzerMuteText) elBtnBuzzerMuteText.textContent = "Matikan Buzzer";
+        }
     }
 
     if (data.kipas === "ON") {
@@ -693,10 +726,13 @@ function updateAlertBanner(data) {
     }
 
     if (data.gas >= GAS_THRESHOLD) {
-        elAlertBanner.className = "alert-banner alert-danger";
+        const isMuted = Boolean(data.buzzer_muted) || data.buzzer === "MUTED";
+        elAlertBanner.className = isMuted ? "alert-banner alert-warning" : "alert-banner alert-danger";
         elAlertIcon.innerHTML = ICONS.siren;
-        elAlertTitle.textContent = "Peringatan: Nilai gas tinggi";
-        elAlertMessage.textContent = `Nilai MQ-2 mencapai ${data.gas} ADC (ambang batas >= ${GAS_THRESHOLD}). Buzzer dan exhaust fan aktif.`;
+        elAlertTitle.textContent = isMuted ? "Peringatan: Nilai gas tinggi (Buzzer Disenyapkan)" : "Peringatan: Nilai gas tinggi";
+        elAlertMessage.textContent = isMuted
+            ? `Nilai MQ-2 mencapai ${data.gas} ADC (ambang batas >= ${GAS_THRESHOLD}). Buzzer disenyapkan via dashboard, exhaust fan tetap aktif.`
+            : `Nilai MQ-2 mencapai ${data.gas} ADC (ambang batas >= ${GAS_THRESHOLD}). Buzzer dan exhaust fan aktif.`;
         return;
     }
 
@@ -849,7 +885,7 @@ function drawChart() {
     } else if (activeMetric === "kelembapan") {
         minY = 20; maxY = 100; unitLabel = "%";
     } else if (activeMetric === "gas") {
-        minY = 200; maxY = 2200; unitLabel = "";
+        minY = 200; maxY = 2600; unitLabel = "";
     } else if (activeMetric === "cahaya") {
         minY = 0; maxY = 4095; unitLabel = "";
     }
@@ -864,11 +900,11 @@ function drawChart() {
     }
 
     if (activeMetric === "gas") {
-        drawThresholdLine(GAS_THRESHOLD, minY, maxY, padding, chartW, chartH, CHART_COLORS.gas, "Ambang Gas (1200)");
+        drawThresholdLine(GAS_THRESHOLD, minY, maxY, padding, chartW, chartH, CHART_COLORS.gas, "Ambang Gas (2000)");
     } else if (activeMetric === "kelembapan") {
         drawThresholdLine(HUMIDITY_THRESHOLD, minY, maxY, padding, chartW, chartH, CHART_COLORS.warning, "Ambang Kipas ON (60%)");
     } else if (activeMetric === "cahaya") {
-        drawThresholdLine(LDR_THRESHOLD, minY, maxY, padding, chartW, chartH, CHART_COLORS.cahaya, "Ambang Gelap (1800)");
+        drawThresholdLine(LDR_THRESHOLD, minY, maxY, padding, chartW, chartH, CHART_COLORS.cahaya, "Ambang Gelap (2000)");
     }
 
     const getX = (index) => padding.left + (index / (historyData.length - 1)) * chartW;
@@ -1094,6 +1130,33 @@ if ("IntersectionObserver" in window && pageSections.length) {
     }, { rootMargin: "-45% 0px -50% 0px", threshold: 0 });
 
     pageSections.forEach(section => navObserver.observe(section));
+}
+
+if (elBtnBuzzerMute) {
+    elBtnBuzzerMute.addEventListener("click", async () => {
+        if (isBuzzerMuting) return;
+        isBuzzerMuting = true;
+        const originalText = elBtnBuzzerMuteText ? elBtnBuzzerMuteText.textContent : "Matikan Buzzer";
+        if (elBtnBuzzerMuteText) elBtnBuzzerMuteText.textContent = "Memproses...";
+        elBtnBuzzerMute.disabled = true;
+
+        try {
+            const response = await fetch("/api/buzzer/toggle", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" }
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+        } catch (err) {
+            console.error("Gagal mengubah status buzzer:", err);
+            if (elBtnBuzzerMuteText) elBtnBuzzerMuteText.textContent = originalText;
+        } finally {
+            isBuzzerMuting = false;
+            elBtnBuzzerMute.disabled = false;
+            await fetchSensorData();
+        }
+    });
 }
 
 renderHistoryTable();
