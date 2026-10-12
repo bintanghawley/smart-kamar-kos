@@ -1,4 +1,3 @@
-
 from machine import Pin, ADC
 import dht
 import time
@@ -10,8 +9,8 @@ WIFI_SSID = "NAMA_WIFI"
 WIFI_PASSWORD = "PASSWORD_WIFI"
 SERVER_URL = "http://IP_KOMPUTER:5000/data"
 
-GAS_THRESHOLD = 1200
-LDR_THRESHOLD = 1800
+GAS_THRESHOLD = 2000
+LDR_THRESHOLD = 2000
 HUMIDITY_THRESHOLD = 60
 FAN_OFF_DELAY = 10000
 
@@ -38,6 +37,7 @@ relay.value(0)
 suhu = 0
 kelembapan = 0
 
+buzzer_muted = False
 fan_running = False
 fan_off_timer = None
 wifi_logged = False
@@ -102,6 +102,7 @@ except Exception as e:
 
 
 def kirim_data(payload):
+    global buzzer_muted
     s = None
 
     try:
@@ -125,11 +126,15 @@ def kirim_data(payload):
         s.connect(SERVER_ADDR)
         s.write(request)
 
-        response = s.recv(64)
+        response = s.recv(256)
 
         if response.startswith(b"HTTP/1.0 200") or response.startswith(
             b"HTTP/1.1 200"
         ):
+            if b"X-Buzzer-Mute: 1" in response or b'"buzzer_mute": true' in response or b'"buzzer_mute":true' in response:
+                buzzer_muted = True
+            elif b"X-Buzzer-Mute: 0" in response or b'"buzzer_mute": false' in response or b'"buzzer_mute":false' in response:
+                buzzer_muted = False
             print("Data terkirim ke server")
             return True
 
@@ -168,10 +173,14 @@ while True:
     udara_lembap = kelembapan >= HUMIDITY_THRESHOLD
     kondisi_fan = gas_warning or udara_lembap
 
-    if gas_warning:
-        buzzer.value(0)
-    else:
+    if not gas_warning:
+        buzzer_muted = False
         buzzer.value(1)
+    else:
+        if buzzer_muted:
+            buzzer.value(1)
+        else:
+            buzzer.value(0)
 
     if nilai_ldr >= LDR_THRESHOLD:
         led.value(1)
@@ -218,14 +227,20 @@ while True:
                 print("Wi-Fi connected:", wlan.ifconfig()[0])
                 wifi_logged = True
 
+            status_buzzer = (
+                "MUTED" if (gas_warning and buzzer_muted)
+                else ("ON" if buzzer.value() == 0 else "OFF")
+            )
+
             payload = {
                 "suhu": suhu,
                 "kelembapan": kelembapan,
                 "cahaya": nilai_ldr,
                 "gas": nilai_gas,
                 "led": "ON" if led.value() == 1 else "OFF",
-                "buzzer": "ON" if buzzer.value() == 0 else "OFF",
-                "kipas": "ON" if relay.value() == 1 else "OFF"
+                "buzzer": status_buzzer,
+                "kipas": "ON" if relay.value() == 1 else "OFF",
+                "buzzer_muted": buzzer_muted
             }
 
             kirim_data(payload)

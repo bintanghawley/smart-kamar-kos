@@ -79,6 +79,12 @@ const elBtnBuzzerMute = document.getElementById("btn-buzzer-mute");
 const elBtnBuzzerMuteText = document.getElementById("btn-buzzer-mute-text");
 let isBuzzerMuting = false;
 
+const ICONS_BUZZER_BTN = {
+    mute: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>`,
+    unmute: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>`,
+    idle: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>`
+};
+
 const elCardKipas = document.getElementById("card-actuator-kipas");
 const elStateKipas = document.getElementById("state-text-kipas");
 const elPillKipas = document.getElementById("pill-kipas");
@@ -662,7 +668,7 @@ function updateActuatorCards(data) {
     const isMuted = Boolean(data.buzzer_muted) || data.buzzer === "MUTED";
     const isAlarmActive = Number(data.gas) >= GAS_THRESHOLD;
 
-    if (data.buzzer === "ON") {
+    if (data.buzzer === "ON" || (isAlarmActive && !isMuted)) {
         elCardBuzzer.classList.remove("state-buzzer-muted");
         elCardBuzzer.classList.add("state-buzzer-on");
         elStateBuzzer.textContent = "ON";
@@ -670,10 +676,10 @@ function updateActuatorCards(data) {
         elPillBuzzer.className = "output-state-pill pill-danger-on";
 
         if (elBtnBuzzerMute) {
-            elBtnBuzzerMute.classList.remove("is-muted");
-            elBtnBuzzerMute.classList.add("active-alarm");
+            elBtnBuzzerMute.className = "btn-buzzer-mute state-alarm";
             elBtnBuzzerMute.disabled = false;
-            if (elBtnBuzzerMuteText) elBtnBuzzerMuteText.textContent = "Matikan Buzzer";
+            elBtnBuzzerMute.innerHTML = `${ICONS_BUZZER_BTN.mute} <span id="btn-buzzer-mute-text">Senyapkan Buzzer</span>`;
+            elBtnBuzzerMute.setAttribute("title", "Klik untuk mematikan suara buzzer");
         }
     } else if (isMuted && isAlarmActive) {
         elCardBuzzer.classList.remove("state-buzzer-on");
@@ -683,10 +689,10 @@ function updateActuatorCards(data) {
         elPillBuzzer.className = "output-state-pill pill-muted";
 
         if (elBtnBuzzerMute) {
-            elBtnBuzzerMute.classList.remove("active-alarm");
-            elBtnBuzzerMute.classList.add("is-muted");
+            elBtnBuzzerMute.className = "btn-buzzer-mute state-muted";
             elBtnBuzzerMute.disabled = false;
-            if (elBtnBuzzerMuteText) elBtnBuzzerMuteText.textContent = "Buzzer Disenyapkan";
+            elBtnBuzzerMute.innerHTML = `${ICONS_BUZZER_BTN.unmute} <span id="btn-buzzer-mute-text">Nyalakan Buzzer</span>`;
+            elBtnBuzzerMute.setAttribute("title", "Klik untuk mengaktifkan kembali suara buzzer");
         }
     } else {
         elCardBuzzer.classList.remove("state-buzzer-on", "state-buzzer-muted");
@@ -695,9 +701,10 @@ function updateActuatorCards(data) {
         elPillBuzzer.className = "output-state-pill pill-off";
 
         if (elBtnBuzzerMute) {
-            elBtnBuzzerMute.classList.remove("active-alarm", "is-muted");
+            elBtnBuzzerMute.className = "btn-buzzer-mute state-idle";
             elBtnBuzzerMute.disabled = false;
-            if (elBtnBuzzerMuteText) elBtnBuzzerMuteText.textContent = "Matikan Buzzer";
+            elBtnBuzzerMute.innerHTML = `${ICONS_BUZZER_BTN.idle} <span id="btn-buzzer-mute-text">Buzzer Siaga</span>`;
+            elBtnBuzzerMute.setAttribute("title", "Buzzer dalam kondisi siaga (gas normal)");
         }
     }
 
@@ -1136,25 +1143,28 @@ if (elBtnBuzzerMute) {
     elBtnBuzzerMute.addEventListener("click", async () => {
         if (isBuzzerMuting) return;
         isBuzzerMuting = true;
-        const originalText = elBtnBuzzerMuteText ? elBtnBuzzerMuteText.textContent : "Matikan Buzzer";
-        if (elBtnBuzzerMuteText) elBtnBuzzerMuteText.textContent = "Memproses...";
+
+        const isCurrentlyMuted = elBtnBuzzerMute.classList.contains("state-muted");
+        const targetEndpoint = isCurrentlyMuted ? "/api/buzzer/unmute" : "/api/buzzer/mute";
+
         elBtnBuzzerMute.disabled = true;
+        elBtnBuzzerMute.innerHTML = `<span class="btn-spinner"></span> <span>Memproses...</span>`;
 
         try {
-            const response = await fetch("/api/buzzer/toggle", {
+            const response = await fetch(targetEndpoint, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" }
             });
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
+            await fetchSensorData();
         } catch (err) {
             console.error("Gagal mengubah status buzzer:", err);
-            if (elBtnBuzzerMuteText) elBtnBuzzerMuteText.textContent = originalText;
+            await fetchSensorData();
         } finally {
             isBuzzerMuting = false;
-            elBtnBuzzerMute.disabled = false;
-            await fetchSensorData();
+            if (elBtnBuzzerMute) elBtnBuzzerMute.disabled = false;
         }
     });
 }

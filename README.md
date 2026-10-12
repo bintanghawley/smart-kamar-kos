@@ -116,16 +116,18 @@ Konfigurasi pin yang digunakan pada mikrokontroler ESP32:
 
 Sistem bekerja berdasarkan nilai ambang batas (*threshold*) yang telah ditentukan di dalam program:
 
-- **Threshold Gas**: `1200` (nilai ADC)
-- **Threshold Cahaya**: `1800` (nilai ADC)
+- **Threshold Gas**: `2000` (nilai ADC)
+- **Threshold Cahaya**: `2000` (nilai ADC)
 - **Threshold Kelembapan**: `60%`
 
 ### 1. Sensor Gas (MQ-2)
-- Jika nilai sensor gas **$\ge$ 1200**:
+- Jika nilai sensor gas **$\ge$ 2000**:
   - Buzzer aktif (berbunyi nyaring).
   - Exhaust fan langsung aktif berputar untuk membuang gas keluar ruangan.
-- Jika nilai sensor gas **< 1200**:
-  - Buzzer mati (kembali hening).
+  - **Fitur Tombol Mute di Dashboard**: Pengguna dapat mematikan suara buzzer langsung melalui tombol di dashboard website. Buzzer akan tetap mati selama nilai gas masih di atas *threshold*.
+  - **Otomatis Aktif Kembali (Re-arm)**: Apabila nilai gas sudah turun kembali ke kondisi normal (< 2000) dan nantinya naik lagi $\ge$ 2000, alarm buzzer akan otomatis kembali berbunyi.
+- Jika nilai sensor gas **< 2000**:
+  - Buzzer mati (kembali hening) dan status mute disetel ulang (*auto-reset*).
 
 ### 2. Sensor Kelembapan (DHT11)
 - Jika kelembapan **$\ge$ 60%**:
@@ -135,16 +137,16 @@ Sistem bekerja berdasarkan nilai ambang batas (*threshold*) yang telah ditentuka
 
 ### 3. Exhaust Fan (Relay)
 Exhaust fan memiliki dua kondisi pemicu:
-$$\text{Kipas ON} \iff (\text{Gas} \ge 1200) \lor (\text{Kelembapan} \ge 60\%)$$
+$$\text{Kipas ON} \iff (\text{Gas} \ge 2000) \lor (\text{Kelembapan} \ge 60\%)$$
 
 - **Fitur Delay 10 Detik**: Ketika gas sudah normal dan kelembapan sudah di bawah 60%, kipas tetap menyala selama **10 detik (10.000 ms)**. Setelah durasi 10 detik terpenuhi tanpa ada kenaikan gas/kelembapan, barulah kipas dimatikan.
-- Jika sebelum 10 detik berakhir nilai gas kembali $\ge$ 1200 atau kelembapan kembali $\ge$ 60%, timer pemadaman dibatalkan dan kipas terus menyala.
+- Jika sebelum 10 detik berakhir nilai gas kembali $\ge$ 2000 atau kelembapan kembali $\ge$ 60%, timer pemadaman dibatalkan dan kipas terus menyala.
 
 ### 4. Sensor Cahaya (LDR)
-- Jika nilai LDR **$\ge$ 1800**:
+- Jika nilai LDR **$\ge$ 2000**:
   - Ruangan dinyatakan **GELAP**.
   - LED menyala secara otomatis untuk memberikan penerangan.
-- Jika nilai LDR **< 1800**:
+- Jika nilai LDR **< 2000**:
   - Ruangan dinyatakan **TERANG**.
   - LED dimatikan untuk menghemat energi.
 
@@ -305,15 +307,15 @@ Backend `server.py` menyediakan dua endpoint utama:
 
 Nilai ambang batas yang digunakan dalam kode program:
 ```python
-GAS_THRESHOLD = 1200
-LDR_THRESHOLD = 1800
+GAS_THRESHOLD = 2000
+LDR_THRESHOLD = 2000
 HUMIDITY_THRESHOLD = 60
 FAN_OFF_DELAY = 10000  # 10 detik
 ```
 
 - Nilai ambang batas di atas ditentukan untuk keperluan purwarupa dan simulasi project sekolah.
 - Pada penerapan nyata, nilai dapat disesuaikan dengan karakteristik ruangan dan intensitas cahaya kamar masing-masing.
-- **Penting mengenai Sensor MQ-2**: Nilai `1200` pada MQ-2 merupakan nilai mentah pembacaan ADC (rentang 0–4095), **bukan nilai konsentrasi ppm**, karena modul sensor ini belum melalui kalibrasi laboratorium gas spesifik.
+- **Penting mengenai Sensor MQ-2**: Nilai `2000` pada MQ-2 merupakan nilai mentah pembacaan ADC (rentang 0–4095), **bukan nilai konsentrasi ppm**, karena modul sensor ini belum melalui kalibrasi laboratorium gas spesifik.
 
 ---
 

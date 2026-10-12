@@ -821,12 +821,15 @@ class SmartKosServer(BaseHTTPRequestHandler):
                     if key in payload:
                         sensor_data[key] = payload[key]
 
-                for key in ("led", "buzzer", "kipas"):
+                for key in ("led", "kipas"):
                     if key in payload:
                         sensor_data[key] = str(payload[key]).upper()
 
-                if sensor_data.get("gas", 0) >= GAS_THRESHOLD and buzzer_muted:
-                    sensor_data["buzzer"] = "MUTED"
+                current_gas = sensor_data.get("gas", 0)
+                if isinstance(current_gas, (int, float)) and current_gas >= GAS_THRESHOLD:
+                    sensor_data["buzzer"] = "MUTED" if buzzer_muted else "ON"
+                else:
+                    sensor_data["buzzer"] = "OFF"
 
                 sensor_data["buzzer_muted"] = buzzer_muted
 
@@ -890,7 +893,49 @@ class SmartKosServer(BaseHTTPRequestHandler):
             self.send_json(500, {"error": "Internal Server Error"})
 
     def do_GET(self):
+        global sensor_data
+        global buzzer_muted
+
         clean_path = self.path.split("?")[0]
+
+        if clean_path == "/api/buzzer/mute":
+            with state_lock:
+                buzzer_muted = True
+                sensor_data["buzzer_muted"] = True
+                if sensor_data.get("gas", 0) >= GAS_THRESHOLD:
+                    sensor_data["buzzer"] = "MUTED"
+            self.send_json(200, {
+                "status": "OK",
+                "message": "Buzzer berhasil dimatikan.",
+                "buzzer_muted": True
+            })
+            return
+
+        if clean_path == "/api/buzzer/unmute":
+            with state_lock:
+                buzzer_muted = False
+                sensor_data["buzzer_muted"] = False
+                if sensor_data.get("gas", 0) >= GAS_THRESHOLD:
+                    sensor_data["buzzer"] = "ON"
+            self.send_json(200, {
+                "status": "OK",
+                "message": "Buzzer diaktifkan kembali.",
+                "buzzer_muted": False
+            })
+            return
+
+        if clean_path == "/api/buzzer/toggle":
+            with state_lock:
+                buzzer_muted = not buzzer_muted
+                sensor_data["buzzer_muted"] = buzzer_muted
+                if sensor_data.get("gas", 0) >= GAS_THRESHOLD:
+                    sensor_data["buzzer"] = "MUTED" if buzzer_muted else "ON"
+                current_state = buzzer_muted
+            self.send_json(200, {
+                "status": "OK",
+                "buzzer_muted": current_state
+            })
+            return
 
         if clean_path == "/api/calibration":
             response = get_calibration_payload()
