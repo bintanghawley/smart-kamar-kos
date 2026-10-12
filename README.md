@@ -30,6 +30,9 @@ Pada project ini:
 - **Dashboard Web Modern**: Menampilkan seluruh data metrik sensor dan status aktuator dalam kartu monitoring yang jelas.
 - **Grafik Tren Sensor Real-Time**: Visualisasi data historis sensor menggunakan HTML5 Canvas dengan pilihan tab sensor (Suhu, Kelembapan, Gas, Cahaya).
 - **Indikator Status Koneksi**: Menampilkan status keterhubungan sistem antara dashboard, server, dan ESP32.
+- **AI Anomaly Detection & Skor Keselarasan Pola**: Analisis pola sensor miniatur kamar secara cerdas berbasis arsitektur *Baseline Adaptive Envelope + Isolation Forest* dengan skor dinamis 0%–100%.
+- **Kalibrasi 4 Slot Waktu (Pagi, Siang, Sore, Malam)**: Fleksibel mengambil 100 sampel saat sensor stabil sesuai waktu (atau dipilih manual via kartu slot) tanpa mengganggu slot waktu lain.
+- **Senyapkan / Mute Buzzer dari Web**: Tombol kontrol remote untuk membisukan suara buzzer saat pengujian atau alarm aktif tanpa menghentikan exhaust fan.
 - **Mode Demo / Simulasi**: Fitur bawaan pada website untuk mensimulasikan pergerakan data sensor saat perangkat keras sedang offline (sangat berguna untuk presentasi di kelas).
 
 ---
