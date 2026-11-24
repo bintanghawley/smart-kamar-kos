@@ -43,8 +43,9 @@ systemctl enable --now docker
 systemctl enable --now nginx
 
 echo "=== [3/5] Konfigurasi Firewall UFW Secara Aman ==="
-# PENTING: Buka port SSH non-standar terlebih dahulu agar koneksi SSH tidak terputus
-ufw allow 20220/tcp comment 'SSH Port Custom'
+# PENTING: Buka port 22 (internal SSH pada NAT VPS) dan 20220 (external custom) agar koneksi SSH tidak terputus
+ufw allow 22/tcp comment 'SSH Port Default/Internal NAT'
+ufw allow 20220/tcp comment 'SSH Port Custom External'
 ufw allow 80/tcp comment 'HTTP Nginx Web'
 ufw allow 443/tcp comment 'HTTPS Nginx Web'
 ufw allow 5000/tcp comment 'HTTP API ESP32'
