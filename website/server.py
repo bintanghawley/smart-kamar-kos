@@ -5,6 +5,7 @@ import json
 import time
 import math
 import shutil
+import decimal
 import threading
 import joblib
 import numpy as np
@@ -1104,7 +1105,14 @@ def predict_ai(data):
 
 class SmartKosServer(BaseHTTPRequestHandler):
     def send_json(self, status_code, data, extra_headers=None):
-        response = json.dumps(data).encode("utf-8")
+        def default_serializer(obj):
+            if isinstance(obj, decimal.Decimal):
+                return float(obj)
+            if hasattr(obj, "isoformat"):
+                return obj.isoformat()
+            return str(obj)
+
+        response = json.dumps(data, default=default_serializer).encode("utf-8")
 
         self.send_response(status_code)
         self.send_header(
@@ -1118,10 +1126,21 @@ class SmartKosServer(BaseHTTPRequestHandler):
                 self.send_header(header_key, header_value)
         self.end_headers()
 
-        try:
-            self.wfile.write(response)
-        except (BrokenPipeError, ConnectionResetError):
-            pass
+        if self.command != "HEAD":
+            try:
+                self.wfile.write(response)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+
+    def do_HEAD(self):
+        self.do_GET()
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, HEAD")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Device-Token")
+        self.end_headers()
 
     def do_POST(self):
         global sensor_data
