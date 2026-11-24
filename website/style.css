@@ -1828,8 +1828,10 @@ body {
 }
 
 .pill-danger-on {
-    background: var(--color-danger-soft);
-    color: var(--color-danger);
+    background: #ff4d5e;
+    color: #ffffff;
+    font-weight: 800;
+    letter-spacing: 0.05em;
     animation: alarmFlicker 1s ease-in-out infinite;
 }
 
@@ -1978,10 +1980,21 @@ body {
 .state-buzzer-on .buzzer-icon-wrapper {
     background: var(--color-danger-soft);
     color: var(--color-danger);
-    animation: alarmFlicker 1s ease-in-out infinite;
+    animation: alarmIconGlow 1s ease-in-out infinite;
 }
 .state-buzzer-on .output-state-text {
     color: var(--color-danger);
+}
+
+@keyframes alarmIconGlow {
+    0%, 100% {
+        background: rgba(255, 77, 94, 0.32);
+        color: #ffffff;
+    }
+    50% {
+        background: rgba(255, 77, 94, 0.14);
+        color: var(--color-danger);
+    }
 }
 
 .state-buzzer-muted {
@@ -3166,11 +3179,20 @@ body {
 }
 
 .act-icon {
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
     border-radius: 9px;
-    display: grid;
-    place-items: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.act-icon svg {
+    width: 20px;
+    height: 20px;
+    display: block;
     flex-shrink: 0;
 }
 
@@ -3207,24 +3229,42 @@ body {
     color: var(--text-secondary);
 }
 
+.fan-icon-svg,
 .fan-spin-icon {
-    transform-origin: 12px 12px;
-    transform-box: view-box;
+    width: 20px;
+    height: 20px;
     display: block;
+    transform-origin: center center;
+    will-change: transform;
 }
 
+.state-kipas-on .fan-icon-svg,
 .state-kipas-on .fan-spin-icon {
     animation: fanSpin 1.2s linear infinite;
 }
 
 @keyframes fanSpin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 @keyframes alarmFlicker {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.3; }
+    0%, 100% {
+        background: #ff4d5e;
+        color: #ffffff;
+        box-shadow: 0 0 10px rgba(255, 77, 94, 0.55);
+        opacity: 1;
+    }
+    50% {
+        background: rgba(255, 77, 94, 0.22);
+        color: #ff4d5e;
+        box-shadow: 0 0 2px rgba(255, 77, 94, 0.2);
+        opacity: 0.85;
+    }
 }
 
 .mute-button-wrap {
