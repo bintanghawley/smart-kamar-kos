@@ -57,21 +57,49 @@ const VIEW_PRESETS = {
     }
 };
 
+function easeInOutCubic(t) {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
 function easeOutCubic(t) {
     return 1 - Math.pow(1 - t, 3);
 }
 
-function animateCameraTo(targetCam, targetTarget, duration = 450, onComplete = null) {
+function animateCameraSpherical(targetCam, targetTarget, duration = 1600, onComplete = null) {
     if (!camera || !controls) return;
+
+    const startTarget = controls.target.clone();
+    const endTarget = targetTarget.clone();
+
+    const startOffset = new THREE.Vector3().subVectors(camera.position, startTarget);
+    const endOffset = new THREE.Vector3().subVectors(targetCam, endTarget);
+
+    const startSph = new THREE.Spherical().setFromVector3(startOffset);
+    const endSph = new THREE.Spherical().setFromVector3(endOffset);
+
+    // Ambil jalur rotasi theta terpendek pada sumbu horizontal
+    let dTheta = (endSph.theta - startSph.theta) % (2 * Math.PI);
+    if (dTheta > Math.PI) dTheta -= 2 * Math.PI;
+    if (dTheta < -Math.PI) dTheta += 2 * Math.PI;
+
     activeCameraTween = {
-        startCam: camera.position.clone(),
-        endCam: targetCam.clone(),
-        startTarget: controls.target.clone(),
-        endTarget: targetTarget.clone(),
+        type: 'spherical',
+        startTarget,
+        endTarget,
+        startRadius: startSph.radius,
+        endRadius: endSph.radius,
+        startPhi: startSph.phi,
+        endPhi: endSph.phi,
+        startTheta: startSph.theta,
+        dTheta,
         startTime: performance.now(),
         duration,
         onComplete
     };
+}
+
+function animateCameraTo(targetCam, targetTarget, duration = 1600, onComplete = null) {
+    animateCameraSpherical(targetCam, targetTarget, duration, onComplete);
 }
 
 function createSignTexture() {
@@ -232,10 +260,7 @@ function buildModel() {
     floorGlowMesh.position.set(0, 0.02, 0);
     houseGroup.add(floorGlowMesh);
 
-    // ========================================================
-    // DINDING DEPAN (+Z = 1.80) — 1 BIDANG UTUH VIA THREE.Shape
-    // Pintu di kiri, jendela di kanan, ventilasi, zero celah bolong!
-    // ========================================================
+    // Dinding depan (+Z = 1.80) via THREE.Shape utuh dengan lubang pintu, jendela, dan ventilasi
     const frontShape = new THREE.Shape();
     frontShape.moveTo(-houseW / 2, 0);
     frontShape.lineTo(houseW / 2, 0);
@@ -347,11 +372,7 @@ function buildModel() {
     signMesh.position.set(0, 2.05, houseD / 2 + 0.02);
     houseGroup.add(signMesh);
 
-    // ========================================================
-    // DINDING BELAKANG (-Z = -1.80) — 1 BIDANG UTUH
-    // Lubang ventilasi tengah, exhaust fan di kanan pandangan (-X),
-    // sensor DHT11 & modul biru di kiri pandangan (+X)
-    // ========================================================
+    // Dinding belakang (-Z = -1.80) utuh dengan ventilasi tengah, kipas, dan sensor DHT11
     const backShape = new THREE.Shape();
     backShape.moveTo(-houseW / 2, 0);
     backShape.lineTo(houseW / 2, 0);
@@ -388,10 +409,7 @@ function buildModel() {
     backWallMesh.receiveShadow = true;
     houseGroup.add(backWallMesh);
 
-    // ========================================================
-    // DETAIL 3D EXHAUST FAN DI DINDING BELAKANG KANAN (X = -1.15)
-    // 7 Bilah melengkung berputar nyata, housing menonjol, hub logo
-    // ========================================================
+    // Exhaust fan di dinding belakang (X = -1.15) dengan bilah berputar dan housing
     fanHousing = new THREE.Group();
     fanHousing.position.set(-1.15, 1.45, -houseD / 2);
 
@@ -461,10 +479,7 @@ function buildModel() {
     fanHousing.add(fanOuterFrame, fanTunnel, b1, b2, b3, b4, fanImpeller, ringGuard);
     houseGroup.add(fanHousing);
 
-    // ========================================================
-    // SENSOR BELAKANG KIRI PANDANGAN (+X): DHT11 & MODUL BIRU
-    // Sesuai foto maket tampak belakang
-    // ========================================================
+    // Sensor belakang (+X): DHT11 dan modul biru
     const pcbMat = new THREE.MeshStandardMaterial({ color: 0x0b5fa5, roughness: 0.5 });
     const tapeMat = new THREE.MeshStandardMaterial({ color: 0xf0ede6, roughness: 0.9 });
 
@@ -498,10 +513,7 @@ function buildModel() {
     blueModTape.position.set(1.40, 1.28, -houseD / 2 - 0.04);
     houseGroup.add(blueModPcb, blueModPot, blueModTape);
 
-    // ========================================================
-    // DINDING SAMPING KIRI (-X) & KANAN (+X) — SEGILIMA PELANA
-    // Bentuk: persegi bawah (y: 0 s/d 2.4) + segitiga atas puncak (z:0, y:3.52)
-    // ========================================================
+    // Dinding samping kiri (-X) dan kanan (+X) dengan bentuk segilima pelana
     const sideGableShape = new THREE.Shape();
     // 2D Coordinates: X represents Z (depth -1.8 s/d +1.8), Y represents Y (height 0 s/d 3.52)
     sideGableShape.moveTo(-houseD / 2, 0);
@@ -525,12 +537,17 @@ function buildModel() {
     wallLeft.receiveShadow = true;
     houseGroup.add(wallLeft);
 
-    // Modul Sensor Samping Kiri (Sesuai foto maket sisi kiri)
+    // Modul Sensor Gas MQ-2 di Dinding Samping Kiri Atas (-X = -2.0, Y = 1.85, Z = -0.80)
     const leftSensorPcb = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.38, 0.24), pcbMat);
-    leftSensorPcb.position.set(-houseW / 2 - 0.02, 0.65, -0.90);
+    leftSensorPcb.position.set(-houseW / 2 - 0.02, 1.85, -0.80);
     const leftSensorTape = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.12, 0.28), tapeMat);
-    leftSensorTape.position.set(-houseW / 2 - 0.036, 0.46, -0.90);
-    houseGroup.add(leftSensorPcb, leftSensorTape);
+    leftSensorTape.position.set(-houseW / 2 - 0.036, 1.66, -0.80);
+
+    const mqCapMat = new THREE.MeshStandardMaterial({ color: 0xb0b0b8, metalness: 0.75, roughness: 0.35 });
+    const mqCap = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.06, 16), mqCapMat);
+    mqCap.rotation.z = Math.PI / 2;
+    mqCap.position.set(-houseW / 2 - 0.05, 1.88, -0.80);
+    houseGroup.add(leftSensorPcb, leftSensorTape, mqCap);
 
     // Dinding Samping Kanan (+X = +2.0)
     const wallRight = new THREE.Mesh(sideGableGeo, wallMat);
@@ -547,10 +564,7 @@ function buildModel() {
     rightSensorTape.position.set(houseW / 2 + 0.036, 0.46, -0.90);
     houseGroup.add(rightSensorPcb, rightSensorTape);
 
-    // ========================================================
-    // KOTAK KONTROL ESP32 DI BELAKANG RUMAH
-    // Memanjang horizontal di belakang dinding pada alas maket
-    // ========================================================
+    // Kotak kontrol ESP32 di belakang rumah
     const espBoxMat = new THREE.MeshStandardMaterial({
         color: 0x785338,
         roughness: 0.8,
@@ -578,9 +592,7 @@ function buildModel() {
     espLedLight.position.set(0.9, 1.05, -2.85);
     houseGroup.add(espLedLight);
 
-    // ========================================================
-    // PERABOT INTERIOR KAMAR KOS (Untuk Mode Dalam Kamar)
-    // ========================================================
+    // Interior kamar kos: tempat tidur, meja, laptop, dan lampu plafon
     interiorGroup = new THREE.Group();
     houseGroup.add(interiorGroup);
 
@@ -664,11 +676,7 @@ function buildModel() {
     roomLight.castShadow = true;
     interiorGroup.add(roomLight);
 
-    // ========================================================
-    // ATAP PELANA BERGELOMBANG (ARAH BENAR SESUAI MAKET ASLI!)
-    // Bubungan membentang horizontal dari -X ke +X.
-    // 2 Bidang miring turun ke arah Depan (+Z) dan Belakang (-Z).
-    // ========================================================
+    // Atap pelana bergelombang: ridge membentang -X ke +X, lereng ke depan (+Z) dan belakang (-Z)
     roofGroup = new THREE.Group();
     houseGroup.add(roofGroup);
 
@@ -769,53 +777,49 @@ function createParticleSystems() {
     }
 }
 
-// ========================================================
-// SISTEM TITIK HOTSPOT 3D DUA LAPIS (ZERO PENTALAN KE (0,0))
-// Elemen luar: .hotspot-anchor (Three.js transform murni)
-// Elemen dalam: .hotspot-dot (styling, hover scale, click)
-// ========================================================
+// Definisi titik hotspot 3D dengan transform anchor dan dot interaktif
 const HOTSPOT_DEFINITIONS = [
     {
         id: 'lamp',
         name: 'Lampu Kamar & Sensor Cahaya',
         pinText: '💡',
-        pos: new THREE.Vector3(1.0, 1.25, 1.8 + 0.18),
-        normal: new THREE.Vector3(0, 0, 1) // Menghadap Depan
+        pos: new THREE.Vector3(0, 2.05, 0),
+        normal: new THREE.Vector3(0, 1, 0)
     },
     {
         id: 'left_sensor',
         name: 'Sensor Samping Kiri (MQ-2)',
         pinText: '⚠️',
-        pos: new THREE.Vector3(-2.0 - 0.18, 0.65, -0.90),
-        normal: new THREE.Vector3(-1, 0, 0) // Menghadap Sisi Kiri
+        pos: new THREE.Vector3(-2.0 - 0.18, 1.85, -0.80),
+        normal: new THREE.Vector3(-1, 0, 0)
     },
     {
         id: 'right_sensor',
         name: 'Sensor Samping Kanan (LDR)',
         pinText: '☀️',
         pos: new THREE.Vector3(2.0 + 0.18, 0.65, -0.90),
-        normal: new THREE.Vector3(1, 0, 0) // Menghadap Sisi Kanan
+        normal: new THREE.Vector3(1, 0, 0)
     },
     {
         id: 'temp',
         name: 'Sensor Suhu & Kelembapan (DHT11)',
         pinText: '🌡️',
         pos: new THREE.Vector3(0.85, 1.50, -1.8 - 0.18),
-        normal: new THREE.Vector3(0, 0, -1) // Menghadap Belakang
+        normal: new THREE.Vector3(0, 0, -1)
     },
     {
         id: 'fan',
         name: 'Exhaust Fan (GPIO 27)',
         pinText: '🌀',
         pos: new THREE.Vector3(-1.15, 1.45, -1.8 - 0.18),
-        normal: new THREE.Vector3(0, 0, -1) // Menghadap Belakang
+        normal: new THREE.Vector3(0, 0, -1)
     },
     {
         id: 'esp',
         name: 'Boks Kontroler ESP32',
         pinText: '⚙️',
         pos: new THREE.Vector3(0.0, 0.95, -2.85),
-        normal: new THREE.Vector3(0, 0.7, -0.7).normalize() // Menghadap Belakang/Atas
+        normal: new THREE.Vector3(0, 0.7, -0.7).normalize()
     }
 ];
 
@@ -876,8 +880,13 @@ function updateHotspotsOcclusion() {
         toCam.subVectors(camPos, h.worldPos).normalize();
         const dot = toCam.dot(h.normal);
 
-        // Backface Culling: hanya tampil jika sisi menghadap kamera (dot > 0.15)
-        const isFacing = dot > 0.15;
+        let isFacing = false;
+        if (h.id === 'lamp') {
+            isFacing = isRoofOpen ? (camPos.y > 0.5) : (camPos.z > 2.0 && camPos.y > 0.8);
+        } else {
+            isFacing = dot > 0.12;
+        }
+
         if (isFacing) {
             h.anchor.style.opacity = '1';
             h.anchor.style.visibility = 'visible';
@@ -1102,6 +1111,9 @@ export function init(containerElement) {
         btnResetCam.addEventListener('click', resetCamera);
     }
 
+    updateAutoFocusButtonUI();
+    updateRoofButtonUI();
+
     isInitialized = true;
     lastTime = performance.now();
     animate();
@@ -1199,7 +1211,7 @@ export function updateAutoFocusButtonUI() {
 }
 
 export function resetCamera() {
-    animateCameraTo(VIEW_PRESETS.outside.cam, VIEW_PRESETS.outside.target, 450);
+    animateCameraSpherical(VIEW_PRESETS.outside.cam, VIEW_PRESETS.outside.target, 1400);
     closeInspector();
 }
 
@@ -1212,11 +1224,55 @@ export function setViewMode(modeName) {
         roofGroup.visible = (modeName !== 'inside');
     }
 
-    animateCameraTo(preset.cam, preset.target, 450);
+    animateCameraSpherical(preset.cam, preset.target, 1400);
 }
 
 export function resetView() {
     resetCamera();
+}
+
+export function focusScenario(scenario) {
+    if (!isAutoFocusEnabled) return;
+
+    if (scenario === 'dark' || scenario === 'lamp') {
+        if (!isRoofOpen) toggleRoof();
+        animateCameraSpherical(
+            new THREE.Vector3(2.2, 4.4, 3.6),
+            new THREE.Vector3(0, 1.85, 0),
+            1600,
+            () => inspectHotspot('lamp')
+        );
+        showAutoHighlightBadge('Auto-Fokus: Lampu Kamar Menyala');
+    } else if (scenario === 'humid' || scenario === 'fan') {
+        animateCameraSpherical(
+            new THREE.Vector3(-1.15, 2.2, -5.8),
+            new THREE.Vector3(-1.15, 1.45, -1.8),
+            1600,
+            () => inspectHotspot('fan')
+        );
+        showAutoHighlightBadge('Auto-Fokus: Sirkulasi Kipas Aktif');
+    } else if (scenario === 'gas') {
+        animateCameraSpherical(
+            new THREE.Vector3(-4.8, 3.2, -3.8),
+            new THREE.Vector3(-1.5, 1.85, -1.2),
+            1600,
+            () => inspectHotspot('left_sensor')
+        );
+        showAutoHighlightBadge('Auto-Fokus: Deteksi Gas & Kipas Aktif');
+    } else if (scenario === 'normal') {
+        animateCameraSpherical(
+            VIEW_PRESETS.outside.cam,
+            VIEW_PRESETS.outside.target,
+            1600,
+            () => closeInspector()
+        );
+    } else if (scenario === 'anomaly') {
+        animateCameraSpherical(
+            new THREE.Vector3(5.5, 4.8, 6.5),
+            new THREE.Vector3(0, 1.2, 0),
+            1600
+        );
+    }
 }
 
 function checkAutoHighlight(data) {
@@ -1239,42 +1295,27 @@ function checkAutoHighlight(data) {
     }
 
     const now = performance.now();
-    const canTrigger = isAutoFocusEnabled && !isUserInteracting && (now - lastAutoHighlightTime > 3500);
+    const canTrigger = isAutoFocusEnabled && !isUserInteracting && (now - lastAutoHighlightTime > 1600);
 
     // Prioritas 1: Bahaya gas atau buzzer aktif
     if (gasDanger && !prevLiveState.gasDanger) {
         if (canTrigger) {
             lastAutoHighlightTime = now;
-            const targetCam = new THREE.Vector3(-4.5, 3.2, -4.5);
-            const targetLook = new THREE.Vector3(-1.4, 1.3, -1.3);
-            animateCameraTo(targetCam, targetLook, 550, () => {
-                inspectHotspot('left_sensor');
-            });
-            showAutoHighlightBadge('Auto-Fokus: Deteksi Gas & Kipas Aktif');
+            focusScenario('gas');
         }
     }
     // Prioritas 2: Exhaust fan menyala karena kelembapan
     else if (fanOn && !prevLiveState.fanOn && !gasDanger) {
         if (canTrigger) {
             lastAutoHighlightTime = now;
-            const targetCam = new THREE.Vector3(-1.15, 2.4, -6.0);
-            const targetLook = new THREE.Vector3(-1.15, 1.45, -1.8);
-            animateCameraTo(targetCam, targetLook, 550, () => {
-                inspectHotspot('fan');
-            });
-            showAutoHighlightBadge('Auto-Fokus: Sirkulasi Kipas Aktif');
+            focusScenario('humid');
         }
     }
     // Prioritas 3: Lampu otomatis menyala
     else if (ledOn && !prevLiveState.ledOn) {
         if (canTrigger) {
             lastAutoHighlightTime = now;
-            const targetCam = new THREE.Vector3(3.4, 2.6, 5.6);
-            const targetLook = new THREE.Vector3(0.5, 1.3, 0.6);
-            animateCameraTo(targetCam, targetLook, 550, () => {
-                inspectHotspot('lamp');
-            });
-            showAutoHighlightBadge('Auto-Fokus: Lampu Kamar Menyala');
+            focusScenario('dark');
         }
     }
 
@@ -1367,18 +1408,32 @@ function animate() {
     const delta = Math.min((now - lastTime) / 1000, 0.1);
     lastTime = now;
 
-    // 1. Kamera Tweening Cepat
+    // Kamera Tweening Cinematic Spherical Glide
     if (activeCameraTween) {
         const elapsed = now - activeCameraTween.startTime;
         const p = Math.min(1.0, elapsed / activeCameraTween.duration);
-        const ease = easeOutCubic(p);
+        const ease = easeInOutCubic(p);
 
-        camera.position.lerpVectors(activeCameraTween.startCam, activeCameraTween.endCam, ease);
-        controls.target.lerpVectors(activeCameraTween.startTarget, activeCameraTween.endTarget, ease);
+        if (activeCameraTween.type === 'spherical') {
+            const currentTarget = new THREE.Vector3().lerpVectors(
+                activeCameraTween.startTarget,
+                activeCameraTween.endTarget,
+                ease
+            );
+            const r = THREE.MathUtils.lerp(activeCameraTween.startRadius, activeCameraTween.endRadius, ease);
+            const phi = THREE.MathUtils.lerp(activeCameraTween.startPhi, activeCameraTween.endPhi, ease);
+            const theta = activeCameraTween.startTheta + activeCameraTween.dTheta * ease;
+
+            const offset = new THREE.Vector3().setFromSphericalCoords(r, phi, theta);
+            camera.position.copy(currentTarget).add(offset);
+            controls.target.copy(currentTarget);
+        } else {
+            camera.position.lerpVectors(activeCameraTween.startCam, activeCameraTween.endCam, ease);
+            controls.target.lerpVectors(activeCameraTween.startTarget, activeCameraTween.endTarget, ease);
+        }
 
         if (p >= 1.0) {
-            camera.position.copy(activeCameraTween.endCam);
-            controls.target.copy(activeCameraTween.endTarget);
+            controls.target.copy(activeCameraTween.endTarget || activeCameraTween.startTarget);
             const cb = activeCameraTween.onComplete;
             activeCameraTween = null;
             if (cb) cb();
@@ -1476,6 +1531,7 @@ window.Room3D = {
     resetCamera,
     inspectHotspot,
     closeInspector,
+    focusScenario,
     setViewMode,
     resetView
 };

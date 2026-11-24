@@ -330,23 +330,23 @@ function updateHumanVerdicts(norm, raw) {
     const online = norm.esp32_online || isSimulationMode;
 
     if (!online) {
-        elHumanVerdictTitle.textContent = "Perangkat Belum Terhubung : Aktifkan Mode Simulasi";
-        elHumanVerdictSub.textContent = "ESP32 belum terdeteksi. Aktifkan mode simulasi untuk mencoba visualisasi 3D.";
+        elHumanVerdictTitle.textContent = "Perangkat Belum Terhubung · Coba Mode Simulasi";
+        elHumanVerdictSub.textContent = "ESP32 belum terdeteksi. Aktifkan simulasi untuk mencoba visualisasi 3D.";
         elHumanVerdictDot.className = "verdict-dot status-offline";
         if (elOfflineHelperBanner) elOfflineHelperBanner.style.display = "flex";
     } else if (isGasDanger) {
-        elHumanVerdictTitle.textContent = "Waspada! Asap atau Gas Terdeteksi : Kipas & Alarm Aktif";
-        elHumanVerdictSub.textContent = `Nilai MQ-2 mencapai ${norm.gas} ADC. Sistem otomatis menyedot udara dan membunyikan alarm.`;
+        elHumanVerdictTitle.textContent = "Waspada! Asap / Gas Terdeteksi · Kipas & Alarm Aktif";
+        elHumanVerdictSub.textContent = `Nilai MQ-2 mencapai ${norm.gas} ADC. Exhaust fan dan alarm otomatis merespons.`;
         elHumanVerdictDot.className = "verdict-dot status-danger";
         if (elOfflineHelperBanner) elOfflineHelperBanner.style.display = "none";
     } else if (isHumid) {
-        elHumanVerdictTitle.textContent = "Udara Terasa Lembap : Kipas Otomatis Menyejukkan";
-        elHumanVerdictSub.textContent = `Kelembapan kamar mencapai ${norm.kelembapan}%. Exhaust fan otomatis aktif menyedot udara.`;
+        elHumanVerdictTitle.textContent = "Udara Terasa Lembap · Kipas Menyejukkan";
+        elHumanVerdictSub.textContent = `Kelembapan kamar ${norm.kelembapan}%. Exhaust fan otomatis menyedot udara.`;
         elHumanVerdictDot.className = "verdict-dot status-warn";
         if (elOfflineHelperBanner) elOfflineHelperBanner.style.display = "none";
     } else if (isAnomaly) {
-        elHumanVerdictTitle.textContent = "Ada Pola Kondisi Kamar yang Tidak Biasa : Sebaiknya Dicek";
-        elHumanVerdictSub.textContent = "AI mendeteksi kombinasi sensor yang berbeda dari kebiasaan normal slot waktu aktif.";
+        elHumanVerdictTitle.textContent = "Pola Kamar Tidak Biasa · Perlu Pemeriksaan";
+        elHumanVerdictSub.textContent = "AI mendeteksi kombinasi sensor menyimpang dari patokan normal slot aktif.";
         elHumanVerdictDot.className = "verdict-dot status-warn";
         if (elOfflineHelperBanner) elOfflineHelperBanner.style.display = "none";
     } else {
@@ -1339,7 +1339,7 @@ if (elBtnBuzzerMute) {
     });
 }
 
-// ==================== MODE SIMULASI / DEMO INTERAKTIF ====================
+// Mode simulasi dan demo interaktif
 const SIM_SCENARIOS = {
     normal: {
         suhu: 26.5,
@@ -1482,6 +1482,9 @@ document.querySelectorAll(".sim-preset-btn[data-sim]").forEach(btn => {
         btn.classList.add("is-active");
         simulationScenario = btn.dataset.sim;
         applySimulationStep();
+        if (window.Room3D && typeof window.Room3D.focusScenario === "function") {
+            window.Room3D.focusScenario(simulationScenario);
+        }
     });
 });
 

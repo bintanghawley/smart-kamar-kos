@@ -2390,19 +2390,28 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 18px;
-    background: rgba(21, 19, 18, 0.88);
-    backdrop-filter: blur(10px);
+    padding: 0 18px;
+    height: 64px;
+    min-height: 64px;
+    max-height: 64px;
+    background: rgba(21, 19, 18, 0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border);
     z-index: 12;
-    gap: 12px;
-    flex-wrap: wrap;
+    gap: 14px;
+    flex-wrap: nowrap;
+    box-sizing: border-box;
+    overflow: hidden;
 }
 
 .human-verdict {
     display: flex;
     align-items: center;
     gap: 12px;
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
 }
 
 .verdict-dot {
@@ -2439,19 +2448,29 @@ body {
 .verdict-texts {
     display: flex;
     flex-direction: column;
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    gap: 2px;
 }
 
 .verdict-title {
     font-family: var(--font-display);
-    font-size: 14.5px;
+    font-size: 13.5px;
     font-weight: 700;
     color: var(--text-primary);
     line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .verdict-subtitle {
     font-size: 11px;
     color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* 3D STAGE CONTROLS GROUP (BUKA ATAP, AUTO-FOKUS, RESET) */
@@ -2459,6 +2478,8 @@ body {
     display: flex;
     align-items: center;
     gap: 7px;
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .btn-stage-action {
