@@ -1830,7 +1830,7 @@ body {
 .pill-danger-on {
     background: var(--color-danger-soft);
     color: var(--color-danger);
-    animation: pulse 1.2s infinite;
+    animation: alarmFlicker 1s ease-in-out infinite;
 }
 
 .pill-muted {
@@ -1900,7 +1900,6 @@ body {
     color: #ffffff;
     border-color: rgba(255, 97, 63, 0.7);
     box-shadow: 0 4px 16px rgba(255, 97, 63, 0.35);
-    animation: pulseMuteAlarm 1.2s infinite alternate ease-in-out;
 }
 
 .btn-buzzer-mute.state-alarm:hover:not(:disabled),
@@ -1975,10 +1974,11 @@ body {
 .state-buzzer-on {
     border-color: rgba(255, 77, 94, 0.5);
 }
+.state-buzzer-on .act-icon-buzzer,
 .state-buzzer-on .buzzer-icon-wrapper {
     background: var(--color-danger-soft);
     color: var(--color-danger);
-    animation: buzzerRinging 0.5s infinite alternate;
+    animation: alarmFlicker 1s ease-in-out infinite;
 }
 .state-buzzer-on .output-state-text {
     color: var(--color-danger);
@@ -3208,16 +3208,23 @@ body {
 }
 
 .fan-spin-icon {
-    transition: transform 0.2s linear;
+    transform-origin: 12px 12px;
+    transform-box: view-box;
+    display: block;
 }
 
 .state-kipas-on .fan-spin-icon {
-    animation: spin 1s linear infinite;
+    animation: fanSpin 1.2s linear infinite;
 }
 
-@keyframes spin {
+@keyframes fanSpin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+@keyframes alarmFlicker {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
 }
 
 .mute-button-wrap {
@@ -3255,7 +3262,6 @@ body {
     color: #ffffff;
     border: 1px solid rgba(255, 97, 63, 0.7);
     box-shadow: 0 4px 14px rgba(255, 97, 63, 0.35);
-    animation: pulseMuteAlarm 1.2s infinite alternate ease-in-out;
 }
 
 .btn-buzzer-mute.state-alarm:hover:not(:disabled) {

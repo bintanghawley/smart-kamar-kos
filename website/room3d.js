@@ -1320,6 +1320,15 @@ export function focusScenario(scenario) {
 function checkAutoHighlight(data) {
     if (!data) return;
 
+    const isOnline = Boolean(data.esp32_online) || Boolean(window.isSimulationModeActive);
+    if (!isOnline) {
+        prevLiveState.hasBaseline = true;
+        prevLiveState.fanOn = false;
+        prevLiveState.ledOn = false;
+        prevLiveState.gasDanger = false;
+        return;
+    }
+
     const gas = Number(data.gas ?? 0);
     const ledOn = String(data.led ?? 'OFF').toUpperCase() === 'ON';
     const fanOn = String(data.kipas ?? 'OFF').toUpperCase() === 'ON';

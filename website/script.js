@@ -26,6 +26,7 @@ let is3DInitialized = false;
 
 // Mode Simulasi
 let isSimulationMode = false;
+window.isSimulationModeActive = false;
 let simulationScenario = "normal";
 let simulationInterval = null;
 
@@ -1481,6 +1482,7 @@ const SIM_SCENARIOS = {
 
 function toggleSimulationMode() {
     isSimulationMode = !isSimulationMode;
+    window.isSimulationModeActive = isSimulationMode;
 
     if (isSimulationMode) {
         elBtnToggleDemo.classList.add("is-active");
