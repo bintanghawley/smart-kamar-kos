@@ -1361,23 +1361,29 @@ class SmartKosServer(BaseHTTPRequestHandler):
             "/script.js": "script.js"
         }
 
-        if clean_path not in path_map:
+        rel_path = path_map.get(clean_path, clean_path.lstrip("/"))
+        filepath = os.path.abspath(os.path.join(BASE_DIR, rel_path))
+
+        # Keamanan: pastikan file berada di dalam BASE_DIR dan bertipe file reguler
+        if not filepath.startswith(BASE_DIR) or not os.path.isfile(filepath):
             self.send_error(404)
             return
 
-        filename = path_map[clean_path]
-        filepath = os.path.join(BASE_DIR, filename)
-
-        if not os.path.exists(filepath):
-            self.send_error(404)
-            return
-
-        if filename.endswith(".html"):
+        lower_path = filepath.lower()
+        if lower_path.endswith(".html"):
             content_type = "text/html; charset=utf-8"
-        elif filename.endswith(".css"):
+        elif lower_path.endswith(".css"):
             content_type = "text/css; charset=utf-8"
-        elif filename.endswith(".js"):
+        elif lower_path.endswith(".js") or lower_path.endswith(".mjs"):
             content_type = "application/javascript; charset=utf-8"
+        elif lower_path.endswith(".json"):
+            content_type = "application/json; charset=utf-8"
+        elif lower_path.endswith(".svg"):
+            content_type = "image/svg+xml"
+        elif lower_path.endswith(".png"):
+            content_type = "image/png"
+        elif lower_path.endswith(".ico"):
+            content_type = "image/x-icon"
         else:
             content_type = "application/octet-stream"
 

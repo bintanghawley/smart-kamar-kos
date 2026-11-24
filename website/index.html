@@ -3,12 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Dashboard Monitoring Smart Kamar Kos berbasis IoT ESP32">
-    <title>Smart Kamar Kos - Dashboard Monitoring</title>
+    <meta name="description" content="Dashboard Monitoring Smart Kamar Kos 01 berbasis IoT ESP32 & 3D Digital Twin Interaktif">
+    <title>Smart Kamar Kos 01 - 3D Digital Twin & Monitoring</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=4">
+    <link rel="stylesheet" href="style.css?v=5">
+
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three/three.module.js",
+        "three/addons/": "./vendor/three/"
+      }
+    }
+    </script>
+    <script type="module" src="room3d.js"></script>
 </head>
 <body>
     <div class="app-shell">
@@ -23,8 +33,8 @@
                     </svg>
                 </span>
                 <span class="brand-text">
-                    <strong>SMART KOS</strong>
-                    <small>ROOM MONITOR</small>
+                    <strong>KAMAR KOS 01</strong>
+                    <small>3D DIGITAL TWIN</small>
                 </span>
             </div>
 
@@ -40,7 +50,7 @@
                             <rect x="3" y="16" width="7" height="5" rx="2"></rect>
                         </svg>
                     </span>
-                    <span>Overview</span>
+                    <span>Digital Twin</span>
                 </a>
                 <a href="#monitoring" class="nav-item" data-nav="monitoring">
                     <span class="nav-icon" aria-hidden="true">
@@ -68,7 +78,7 @@
                             <path d="M12 8v4l3 2"></path>
                         </svg>
                     </span>
-                    <span>Sensor History</span>
+                    <span>Riwayat Sensor</span>
                 </a>
                 <a href="#perangkat" class="nav-item" data-nav="perangkat">
                     <span class="nav-icon" aria-hidden="true">
@@ -77,7 +87,7 @@
                             <path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"></path>
                         </svg>
                     </span>
-                    <span>Device Control</span>
+                    <span>Kendali Aktuator</span>
                 </a>
             </nav>
 
@@ -87,7 +97,7 @@
                     <span class="device-dot"></span>
                     <span id="sidebar-device-text">Menghubungkan...</span>
                 </div>
-                <span class="sidebar-status-note">Terakhir update: <strong id="sidebar-last-seen">-</strong></span>
+                <span class="sidebar-status-note">Update: <strong id="sidebar-last-seen">-</strong></span>
             </div>
         </aside>
 
@@ -104,8 +114,11 @@
                 </button>
 
                 <div class="topbar-heading">
-                    <h2 class="topbar-title" id="page-title">Overview</h2>
-                    <span class="topbar-breadcrumb">Smart Kamar Kos <span class="crumb-sep">/</span> <span id="breadcrumb-current">Overview</span></span>
+                    <div class="topbar-title-wrap">
+                        <h1 class="topbar-title" id="page-title">Smart Kamar Kos 01</h1>
+                        <span class="badge-twin">3D DIGITAL TWIN</span>
+                    </div>
+                    <span class="topbar-breadcrumb">Miniatur Fisik &bull; AI Isolation Forest &bull; Slot <span id="breadcrumb-current">Siang</span></span>
                 </div>
 
                 <div class="topbar-actions">
@@ -114,6 +127,10 @@
                         <span id="connection-text">Menghubungkan...</span>
                     </div>
                     <div class="header-time" id="header-clock">--:--:--</div>
+                    <button type="button" id="btn-toggle-demo" class="btn-demo-mode" title="Aktifkan/Nonaktifkan Mode Simulasi">
+                        <span class="demo-icon">⚡</span>
+                        <span id="btn-demo-text">Mode Simulasi</span>
+                    </button>
                     <button type="button" id="btn-refresh" class="btn-sm" title="Refresh data sekarang">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
@@ -127,66 +144,277 @@
             </header>
 
             <main class="content">
-                <!-- ==================== DASHBOARD ==================== -->
+                <!-- ==================== DASHBOARD & 3D DIGITAL TWIN ==================== -->
                 <section class="page-section" id="dashboard">
-                    <!-- FEATURE BANNERS -->
-                    <div class="banners">
-                        <article class="banner banner-yellow">
-                            <span class="banner-pill">LIVE ROOM</span>
-                            <div class="banner-body">
-                                <h2 class="banner-title">Room Status</h2>
-                                <p class="banner-desc" id="banner-room-desc">Menunggu data sensor dari ESP32 untuk menampilkan kondisi kamar.</p>
+                    <!-- HERO DIGITAL TWIN GRID -->
+                    <div class="twin-hero-grid">
+                        <!-- LEFT: 3D STAGE (~65%) -->
+                        <div class="stage-3d-card" id="room-3d-stage">
+                            <!-- 3D Header Controls & Human Banner -->
+                            <div class="stage-header">
+                                <div class="human-verdict" id="human-status-banner">
+                                    <span class="verdict-dot" id="human-verdict-dot"></span>
+                                    <div class="verdict-texts">
+                                        <h2 class="verdict-title" id="human-verdict-title">Kamar Kos 01 Nyaman &amp; Aman</h2>
+                                        <p class="verdict-subtitle" id="human-verdict-sub">Suhu, kelembapan, dan sirkulasi udara terpantau stabil.</p>
+                                    </div>
+                                </div>
+                                <div class="stage-view-controls" role="group" aria-label="Mode Tampilan 3D">
+                                    <button type="button" class="btn-view is-active" data-view="outside" id="btn-view-outside">
+                                        <span>Tampak Luar</span>
+                                    </button>
+                                    <button type="button" class="btn-view" data-view="inside" id="btn-view-inside">
+                                        <span>Dalam Kamar</span>
+                                    </button>
+                                    <button type="button" class="btn-view" data-view="sensors" id="btn-view-sensors">
+                                        <span>Sisi Kipas &amp; Sensor</span>
+                                    </button>
+                                    <button type="button" class="btn-view btn-view-reset" data-view="reset" id="btn-view-reset" title="Kembalikan kamera awal">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
+                                    </button>
+                                </div>
                             </div>
-                            <a href="#monitoring" class="banner-btn">Lihat Monitoring</a>
-                            <svg class="banner-art" viewBox="0 0 150 120" fill="none" aria-hidden="true">
-                                <path d="M8 100h134" stroke="#0d0c0b" stroke-width="3" stroke-linecap="round"></path>
-                                <path d="M28 100V56l32-24 32 24v44" stroke="#0d0c0b" stroke-width="3" stroke-linejoin="round"></path>
-                                <rect x="50" y="74" width="20" height="26" fill="none" stroke="#0d0c0b" stroke-width="3"></rect>
-                                <rect x="102" y="38" width="13" height="48" rx="6.5" fill="#fff7dc" stroke="#0d0c0b" stroke-width="3"></rect>
-                                <circle cx="108.5" cy="92" r="11" fill="#0d0c0b"></circle>
-                                <path d="M108.5 88V56" stroke="#0d0c0b" stroke-width="3" stroke-linecap="round"></path>
-                                <path d="M124 20l7-7M140 38h9M136 18l5-7" stroke="#0d0c0b" stroke-width="3" stroke-linecap="round"></path>
-                            </svg>
-                        </article>
 
-                        <article class="banner banner-orange">
-                            <span class="banner-pill">SAFETY</span>
-                            <div class="banner-body">
-                                <h2 class="banner-title">Safety Monitor</h2>
-                                <p class="banner-desc" id="banner-safety-desc">Pantau gas dan ventilasi otomatis. Menunggu data sensor MQ-2.</p>
+                            <!-- 3D Canvas Mount Point -->
+                            <div class="stage-canvas-wrapper" id="room-3d-container">
+                                <!-- Three.js WebGL & CSS2D mounted here -->
                             </div>
-                            <a href="#perangkat" class="banner-btn">Cek Perangkat</a>
-                            <svg class="banner-art" viewBox="0 0 150 120" fill="none" aria-hidden="true">
-                                <circle cx="60" cy="60" r="30" fill="#ffe9e0" stroke="#0d0c0b" stroke-width="3"></circle>
-                                <circle cx="60" cy="60" r="6" fill="#0d0c0b"></circle>
-                                <path d="M60 54c4-13 15-15 17-8 2 8-9 9-17 8z" fill="#0d0c0b"></path>
-                                <path d="M66 64c13 4 15 15 8 17-8 2-9-9-8-17z" fill="#0d0c0b"></path>
-                                <path d="M54 64c-13 4-15 15-8 17 8 2 9-9 8-17z" fill="#0d0c0b"></path>
-                                <path d="M100 42h36M100 50h26" stroke="#0d0c0b" stroke-width="3" stroke-linecap="round"></path>
-                                <path d="M128 34l10 8-10 8" stroke="#0d0c0b" stroke-width="3" stroke-linejoin="round"></path>
-                                <path d="M112 100l13-22 13 22z" fill="#fff7ee" stroke="#0d0c0b" stroke-width="3" stroke-linejoin="round"></path>
-                                <path d="M125 84v7M125 95h.01" stroke="#0d0c0b" stroke-width="3" stroke-linecap="round"></path>
-                            </svg>
-                        </article>
+
+                            <!-- Simulation Preset Bar (Active when Simulation Mode ON) -->
+                            <div class="simulation-bar" id="simulation-bar" style="display: none;">
+                                <div class="sim-bar-label">
+                                    <span class="sim-badge">SIMULASI AKTIF</span>
+                                    <span>Pilih Skenario Pengujian:</span>
+                                </div>
+                                <div class="sim-presets">
+                                    <button type="button" class="sim-preset-btn is-active" data-sim="normal">1. Nyaman &amp; Normal</button>
+                                    <button type="button" class="sim-preset-btn" data-sim="dark">2. Malam Gelap (Lampu ON)</button>
+                                    <button type="button" class="sim-preset-btn" data-sim="humid">3. Lembap (Kipas ON)</button>
+                                    <button type="button" class="sim-preset-btn" data-sim="gas">4. Bahaya Gas (Alarm &amp; Kipas)</button>
+                                    <button type="button" class="sim-preset-btn" data-sim="anomaly">5. Anomali AI</button>
+                                </div>
+                            </div>
+
+                            <!-- Offline Helper Prompt -->
+                            <div class="offline-helper" id="offline-helper-banner">
+                                <span class="offline-helper-icon">📡</span>
+                                <div class="offline-helper-info">
+                                    <strong>Perangkat Belum Terhubung</strong>
+                                    <span>ESP32 belum mengirim data. Aktifkan mode simulasi untuk mencoba visualisasi 3D secara interaktif.</span>
+                                </div>
+                                <button type="button" class="btn-activate-sim" id="btn-activate-sim">Coba Mode Simulasi</button>
+                            </div>
+
+                            <!-- Stage Footer Hint -->
+                            <div class="stage-footer">
+                                <span class="stage-hint">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="hint-icon"><circle cx="12" cy="12" r="10"></circle><path d="m10 15 5-3-5-3v6z"></path></svg>
+                                    Geser mouse untuk rotasi 360&deg; &bull; Scroll untuk zoom &bull; Tombol atas untuk tampak dalam
+                                </span>
+                                <span class="twin-tag" id="stage-actuator-tag">Aktuator: Kipas Siaga &bull; Lampu Siaga</span>
+                            </div>
+                        </div>
+
+                        <!-- RIGHT: QUICK SUMMARY & CONTROLS (~35%) -->
+                        <div class="twin-quick-panel">
+                            <!-- CARD 1: AI Health & Solar-Style Progress Ring -->
+                            <article class="card quick-card card-ai-ring">
+                                <div class="card-header">
+                                    <div class="card-title-group">
+                                        <span class="section-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="7" width="10" height="10" rx="2"></rect><rect x="10.5" y="10.5" width="3" height="3" rx="0.5" fill="currentColor"></rect><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path></svg>
+                                        </span>
+                                        <h3 class="card-title">Kecerdasan Buatan (AI)</h3>
+                                    </div>
+                                    <span id="ai-status-badge" class="ai-status-pill ai-state-neutral">MENUNGGU DATA</span>
+                                </div>
+
+                                <div class="ai-ring-content">
+                                    <div class="donut-chart-wrap">
+                                        <svg class="donut-svg" viewBox="0 0 100 100">
+                                            <circle class="donut-bg" cx="50" cy="50" r="40"></circle>
+                                            <circle class="donut-fg" id="ai-donut-progress" cx="50" cy="50" r="40" stroke-dasharray="251.2" stroke-dashoffset="25.1"></circle>
+                                        </svg>
+                                        <div class="donut-text-center">
+                                            <span class="donut-number" id="ai-score-value">—</span>
+                                            <span class="donut-sublabel">Selaras</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="ai-ring-info">
+                                        <h4 class="ai-human-title" id="ai-human-title">Pola Kamar Normal</h4>
+                                        <p class="ai-human-sub" id="ai-human-sub">Kondisi sensor sesuai dengan kebiasaan normal ruangan kos.</p>
+                                        <div class="ai-meta-pills">
+                                            <span class="pill-mini" id="ai-slot-name-pill">Slot Siang</span>
+                                            <span class="pill-mini" id="ai-slot-source-pill">Kalibrasi Ruangan</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="ai-extra-metrics">
+                                    <div class="extra-metric-item">
+                                        <span>Anomali AI</span>
+                                        <strong id="ai-anomaly-count">—</strong>
+                                    </div>
+                                    <div class="extra-metric-item">
+                                        <span>Sampel Model</span>
+                                        <strong id="ai-training-samples">100</strong>
+                                    </div>
+                                    <div class="extra-metric-item">
+                                        <span>Dilatih Pada</span>
+                                        <strong id="ai-model-date" class="text-truncate">—</strong>
+                                    </div>
+                                </div>
+                            </article>
+
+                            <!-- CARD 2: Actuators & Latching Mute Button -->
+                            <article class="card quick-card card-actuators-quick">
+                                <div class="card-header">
+                                    <div class="card-title-group">
+                                        <span class="section-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10a6 6 0 1 0-12 0c0 4.6-2.1 5.8-2.1 5.8h16.2S18 14.6 18 10"></path><path d="M9.3 19a2.7 2.7 0 0 0 5.4 0"></path></svg>
+                                        </span>
+                                        <h3 class="card-title">Status Aktuator Kamar</h3>
+                                    </div>
+                                    <span class="badge">Otomatis ESP32</span>
+                                </div>
+
+                                <div class="actuator-rows">
+                                    <!-- Lampu -->
+                                    <div class="actuator-row" id="card-actuator-led">
+                                        <div class="act-icon act-icon-lamp">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4"></path><path d="M12 2.5a6 6 0 0 0-3.4 10.9c.7.5 1.1 1.3 1.1 2.1h4.6c0-.8.4-1.6 1.1-2.1A6 6 0 0 0 12 2.5z"></path></svg>
+                                        </div>
+                                        <div class="act-details">
+                                            <strong>Lampu Kamar (GPIO 26)</strong>
+                                            <span class="act-human-status" id="human-status-led">Padam (Hemat Daya)</span>
+                                            <small id="state-text-led" style="display:none;">OFF</small>
+                                        </div>
+                                        <span class="output-state-pill pill-off" id="pill-led">PADAM</span>
+                                    </div>
+
+                                    <!-- Exhaust Fan -->
+                                    <div class="actuator-row" id="card-actuator-kipas">
+                                        <div class="act-icon act-icon-fan">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="fan-spin-icon"><path d="M2 8.5h12.2a2.4 2.4 0 1 0-2.3-3"></path><path d="M2 12.5h14.5a2.4 2.4 0 1 1-2.3 3"></path><path d="M2 16.5h8.2a2.4 2.4 0 1 1-2.3 3"></path></svg>
+                                        </div>
+                                        <div class="act-details">
+                                            <strong>Exhaust Fan (GPIO 27)</strong>
+                                            <span class="act-human-status" id="human-status-kipas">Siaga (Mati)</span>
+                                            <small id="state-text-kipas" style="display:none;">OFF</small>
+                                        </div>
+                                        <span class="output-state-pill pill-off" id="pill-kipas">MATI</span>
+                                    </div>
+
+                                    <!-- Buzzer Alarm -->
+                                    <div class="actuator-row" id="card-actuator-buzzer">
+                                        <div class="act-icon act-icon-buzzer">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                                        </div>
+                                        <div class="act-details">
+                                            <strong>Alarm Bahaya (GPIO 25)</strong>
+                                            <span class="act-human-status" id="human-status-buzzer">Tenang / Siaga</span>
+                                            <small id="state-text-buzzer" style="display:none;">OFF</small>
+                                        </div>
+                                        <span class="output-state-pill pill-off" id="pill-buzzer">HENING</span>
+                                    </div>
+
+                                    <!-- Buzzer Mute Action Button -->
+                                    <div class="mute-button-wrap">
+                                        <button type="button" class="btn-buzzer-mute state-idle" id="btn-buzzer-mute" title="Buzzer dalam kondisi siaga">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon" aria-hidden="true">
+                                                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                                                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                                            </svg>
+                                            <span id="btn-buzzer-mute-text">Buzzer Siaga</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </article>
+
+                            <!-- CARD 3: 4 Time Slots Calibration Quick Control -->
+                            <article class="card quick-card card-calibration-quick">
+                                <div class="card-header">
+                                    <div class="card-title-group">
+                                        <span class="section-icon">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6"></path><path d="M10 3v5.2L5.6 16a3 3 0 0 0 2.6 4.5h7.6a3 3 0 0 0 2.6-4.5L14 8.2V3"></path><path d="M7.8 15h8.4"></path></svg>
+                                        </span>
+                                        <h3 class="card-title">Kalibrasi 4 Slot Waktu</h3>
+                                    </div>
+                                    <span id="calibration-status-badge" class="ai-status-pill ai-state-neutral">BELUM DIKALIBRASI</span>
+                                </div>
+
+                                <div class="mini-slots-grid">
+                                    <!-- PAGI -->
+                                    <div class="mini-slot-card" id="slot-card-pagi" data-slot="pagi" onclick="selectSlot('pagi')" role="button" tabindex="0">
+                                        <div class="slot-row-top">
+                                            <span class="slot-name">Pagi</span>
+                                            <span class="time-slot-pill pill-default" id="slot-pill-pagi">DEFAULT</span>
+                                        </div>
+                                        <span class="slot-hours">05:00 - 11:00</span>
+                                        <div class="slot-meta" id="slot-meta-pagi">Belum dikalibrasi</div>
+                                    </div>
+
+                                    <!-- SIANG -->
+                                    <div class="mini-slot-card" id="slot-card-siang" data-slot="siang" onclick="selectSlot('siang')" role="button" tabindex="0">
+                                        <div class="slot-row-top">
+                                            <span class="slot-name">Siang</span>
+                                            <span class="time-slot-pill pill-calibrated" id="slot-pill-siang">TERKALIBRASI</span>
+                                        </div>
+                                        <span class="slot-hours">11:00 - 15:00</span>
+                                        <div class="slot-meta" id="slot-meta-siang">100 sampel</div>
+                                    </div>
+
+                                    <!-- SORE -->
+                                    <div class="mini-slot-card" id="slot-card-sore" data-slot="sore" onclick="selectSlot('sore')" role="button" tabindex="0">
+                                        <div class="slot-row-top">
+                                            <span class="slot-name">Sore</span>
+                                            <span class="time-slot-pill pill-default" id="slot-pill-sore">DEFAULT</span>
+                                        </div>
+                                        <span class="slot-hours">15:00 - 18:30</span>
+                                        <div class="slot-meta" id="slot-meta-sore">Belum dikalibrasi</div>
+                                    </div>
+
+                                    <!-- MALAM -->
+                                    <div class="mini-slot-card" id="slot-card-malam" data-slot="malam" onclick="selectSlot('malam')" role="button" tabindex="0">
+                                        <div class="slot-row-top">
+                                            <span class="slot-name">Malam</span>
+                                            <span class="time-slot-pill pill-default" id="slot-pill-malam">DEFAULT</span>
+                                        </div>
+                                        <span class="slot-hours">18:30 - 05:00</span>
+                                        <div class="slot-meta" id="slot-meta-malam">Belum dikalibrasi</div>
+                                    </div>
+                                </div>
+
+                                <div class="calib-progress-section">
+                                    <div class="calib-prog-header">
+                                        <span id="calibration-target-name">Target: Slot Siang (11:00 - 15:00)</span>
+                                        <strong id="calibration-count">0 / 100</strong>
+                                    </div>
+                                    <div class="calibration-progress-track" role="progressbar" aria-label="Progres kalibrasi" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="calibration-progress-track">
+                                        <div class="calibration-progress-fill" id="calibration-progress-fill"></div>
+                                    </div>
+                                    <p class="calibration-message-text" id="calibration-message">Model yang tersimpan akan digunakan sampai kalibrasi baru berhasil.</p>
+                                    <small id="calibration-target-note" style="display:none;"></small>
+                                    <span id="calibration-skipped" style="display:none;">0</span>
+                                    <span id="calibration-finished" style="display:none;">Belum ada</span>
+                                </div>
+
+                                <div class="calibration-actions">
+                                    <button type="button" id="btn-calibration-start" class="btn-calibration btn-calibration-primary" disabled>Mulai Kalibrasi</button>
+                                    <button type="button" id="btn-calibration-cancel" class="btn-calibration btn-calibration-secondary" disabled>Batalkan</button>
+                                    <button type="button" id="btn-calibration-reset" class="btn-calibration btn-calibration-reset" title="Reset dataset &amp; model slot aktif">Reset Slot</button>
+                                </div>
+                            </article>
+                        </div>
                     </div>
 
-                    <!-- SECTION HEADING -->
-                    <div class="section-heading-row">
-                        <div>
-                            <h3 class="section-heading">Room Overview</h3>
-                            <span class="section-subheading">Live environmental data from your smart room.</span>
-                        </div>
-                        <div class="hero-status status-disconnected" id="hero-status">
-                            <span class="hero-status-dot"></span>
-                            <span id="hero-status-text">Menghubungkan...</span>
-                        </div>
-                    </div>
-
-                    <!-- SENSOR METRIC ROW -->
+                    <!-- 4 HUMAN SENSOR METRIC CARDS -->
                     <div class="stats-grid">
+                        <!-- SUHU -->
                         <article class="stat-card tone-pink">
                             <div class="stat-top">
-                                <span class="stat-label">Temperature</span>
+                                <span class="stat-label">Suhu Kamar</span>
                                 <span class="stat-icon" aria-hidden="true">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M14 4a2 2 0 1 0-4 0v9.5a4.5 4.5 0 1 0 4 0z"></path>
@@ -194,17 +422,16 @@
                                     </svg>
                                 </span>
                             </div>
-                            <div class="stat-value"><span id="stat-suhu">--</span><small>°C</small></div>
+                            <div class="stat-value"><span id="stat-suhu">--</span><small>&deg;C</small></div>
                             <span class="sensor-status-badge status-ok" id="stat-suhu-badge">Menunggu</span>
-                            <span class="stat-foot">Current room temperature</span>
-                            <svg class="stat-art" viewBox="0 0 90 60" fill="none" aria-hidden="true">
-                                <path d="M6 50c10-6 18 4 28-2s18 4 28-2 16 2 22-2" stroke="#0d0c0b" stroke-width="2.4" stroke-linecap="round" opacity="0.45"></path>
-                            </svg>
+                            <span class="stat-foot" id="foot-suhu">Suhu terasa nyaman untuk beristirahat</span>
+                            <div class="card-mini-meter"><span class="meter-fill" id="meter-suhu" style="width: 0%"></span></div>
                         </article>
 
+                        <!-- KELEMBAPAN -->
                         <article class="stat-card tone-turq">
                             <div class="stat-top">
-                                <span class="stat-label">Humidity</span>
+                                <span class="stat-label">Kelembapan Udara</span>
                                 <span class="stat-icon" aria-hidden="true">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M12 2.5s6.5 6.6 6.5 11.2a6.5 6.5 0 0 1-13 0C5.5 9.1 12 2.5 12 2.5z"></path>
@@ -213,15 +440,14 @@
                             </div>
                             <div class="stat-value"><span id="stat-kelembapan">--</span><small>%</small></div>
                             <span class="sensor-status-badge status-ok" id="stat-kelembapan-badge">Menunggu</span>
-                            <span class="stat-foot">Current relative humidity</span>
-                            <svg class="stat-art" viewBox="0 0 90 60" fill="none" aria-hidden="true">
-                                <path d="M6 50c10-6 18 4 28-2s18 4 28-2 16 2 22-2" stroke="#0d0c0b" stroke-width="2.4" stroke-linecap="round" opacity="0.45"></path>
-                            </svg>
+                            <span class="stat-foot" id="foot-kelembapan">Udara segar &bull; Ambang batas kipas &ge; 60%</span>
+                            <div class="card-mini-meter"><span class="meter-fill" id="meter-kelembapan" style="width: 0%"></span></div>
                         </article>
 
+                        <!-- GAS / ASAP -->
                         <article class="stat-card tone-flame">
                             <div class="stat-top">
-                                <span class="stat-label">Gas / Smoke</span>
+                                <span class="stat-label">Kualitas Udara &amp; Gas</span>
                                 <span class="stat-icon" aria-hidden="true">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M12 4 2.7 20h18.6z"></path>
@@ -232,15 +458,14 @@
                             </div>
                             <div class="stat-value"><span id="stat-gas">--</span><small>ADC</small></div>
                             <span class="sensor-status-badge status-ok" id="stat-gas-badge">Menunggu</span>
-                            <span class="stat-foot">Raw MQ-2 sensor reading</span>
-                            <svg class="stat-art" viewBox="0 0 90 60" fill="none" aria-hidden="true">
-                                <path d="M6 50c10-6 18 4 28-2s18 4 28-2 16 2 22-2" stroke="#0d0c0b" stroke-width="2.4" stroke-linecap="round" opacity="0.45"></path>
-                            </svg>
+                            <span class="stat-foot" id="foot-gas">Sensor MQ-2 &bull; Udara bersih &amp; aman</span>
+                            <div class="card-mini-meter"><span class="meter-fill" id="meter-gas" style="width: 0%"></span></div>
                         </article>
 
+                        <!-- PENCAHAYAAN -->
                         <article class="stat-card tone-yellow">
                             <div class="stat-top">
-                                <span class="stat-label">Light Intensity</span>
+                                <span class="stat-label">Pencahayaan Kamar</span>
                                 <span class="stat-icon" aria-hidden="true">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <circle cx="12" cy="12" r="4"></circle>
@@ -250,10 +475,8 @@
                             </div>
                             <div class="stat-value"><span id="stat-cahaya">--</span><small>ADC</small></div>
                             <span class="sensor-status-badge status-ok" id="stat-cahaya-badge">Menunggu</span>
-                            <span class="stat-foot">Raw LDR light reading</span>
-                            <svg class="stat-art" viewBox="0 0 90 60" fill="none" aria-hidden="true">
-                                <path d="M6 50c10-6 18 4 28-2s18 4 28-2 16 2 22-2" stroke="#0d0c0b" stroke-width="2.4" stroke-linecap="round" opacity="0.45"></path>
-                            </svg>
+                            <span class="stat-foot" id="foot-cahaya">Sensor LDR &bull; Kamar cukup terang</span>
+                            <div class="card-mini-meter"><span class="meter-fill" id="meter-cahaya" style="width: 0%"></span></div>
                         </article>
                     </div>
 
@@ -271,7 +494,7 @@
                         <div class="alert-timestamp" id="alert-time">-</div>
                     </section>
 
-                    <!-- KONDISI KAMAR SAAT INI -->
+                    <!-- KONDISI KAMAR SAAT INI (SUMMARY CARD) -->
                     <section class="card summary-card">
                         <div class="card-header">
                             <div class="card-title-group">
@@ -282,7 +505,7 @@
                                         <path d="M9 10h6M9 14h6"></path>
                                     </svg>
                                 </span>
-                                <h2 class="card-title">Kondisi Kamar Saat Ini</h2>
+                                <h3 class="card-title">Kesimpulan Kondisi Kamar Saat Ini</h3>
                             </div>
                             <span class="badge" id="summary-badge">Menganalisis...</span>
                         </div>
@@ -293,315 +516,43 @@
                     </section>
                 </section>
 
-                <!-- ==================== MONITORING SENSOR ==================== -->
+                <!-- ==================== MONITORING & GRAFIK TREN ==================== -->
                 <section class="page-section" id="monitoring">
                     <div class="section-header">
                         <div>
-                            <h3 class="section-heading">Sensor Monitoring</h3>
-                            <span class="section-subheading">Real-time readings from the ESP32 sensor array.</span>
+                            <h3 class="section-heading">Grafik Tren &amp; Metrik Sensor</h3>
+                            <span class="section-subheading">Pembacaan sensor analog &amp; digital secara kontinu dari ESP32.</span>
                         </div>
                     </div>
 
                     <!-- FILTER CHIPS -->
                     <div class="filter-chips" role="group" aria-label="Filter metrik grafik">
-                        <button type="button" class="chart-tab active" data-metric="all">All Sensors</button>
-                        <button type="button" class="chart-tab" data-metric="suhu">Temperature</button>
-                        <button type="button" class="chart-tab" data-metric="kelembapan">Humidity</button>
-                        <button type="button" class="chart-tab" data-metric="gas">Gas</button>
-                        <button type="button" class="chart-tab" data-metric="cahaya">Light</button>
-                    </div>
-
-                    <!-- SENSOR CARDS -->
-                    <div class="category-grid">
-                        <!-- SUHU -->
-                        <button type="button" class="category-tile tile-pink" data-metric="suhu">
-                            <span class="tile-head">
-                                <span class="tile-label">Temperature</span>
-                                <span class="tile-icon">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                        <path d="M14 4a2 2 0 1 0-4 0v9.5a4.5 4.5 0 1 0 4 0z"></path>
-                                        <path d="M12 9v4.2"></path>
-                                    </svg>
-                                </span>
-                            </span>
-                            <span class="tile-value"><span id="tile-suhu">--</span><small>°C</small></span>
-                            <span class="sensor-status-badge status-ok" id="status-suhu">Menunggu</span>
-                            <span class="tile-meta">DHT11 (GPIO18)</span>
-                            <span class="tile-threshold">Normal 24–32 °C</span>
-                            <span class="tile-meter"><span class="meter-fill" id="meter-suhu" style="width: 0%"></span></span>
-                        </button>
-
-                        <!-- KELEMBAPAN -->
-                        <button type="button" class="category-tile tile-turq" data-metric="kelembapan">
-                            <span class="tile-head">
-                                <span class="tile-label">Humidity</span>
-                                <span class="tile-icon">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                        <path d="M12 2.5s6.5 6.6 6.5 11.2a6.5 6.5 0 0 1-13 0C5.5 9.1 12 2.5 12 2.5z"></path>
-                                    </svg>
-                                </span>
-                            </span>
-                            <span class="tile-value"><span id="tile-kelembapan">--</span><small>%</small></span>
-                            <span class="sensor-status-badge status-ok" id="status-kelembapan">Menunggu</span>
-                            <span class="tile-meta">DHT11 (GPIO18)</span>
-                            <span class="tile-threshold">Kipas ON ≥ 60%</span>
-                            <span class="tile-meter"><span class="meter-fill" id="meter-kelembapan" style="width: 0%"></span></span>
-                        </button>
-
-                        <!-- GAS (MQ-2) -->
-                        <button type="button" class="category-tile tile-flame" data-metric="gas">
-                            <span class="tile-head">
-                                <span class="tile-label">Gas / Smoke</span>
-                                <span class="tile-icon">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                        <path d="M12 4 2.7 20h18.6z"></path>
-                                        <path d="M12 9.5V14"></path>
-                                        <path d="M12 17h.01"></path>
-                                    </svg>
-                                </span>
-                            </span>
-                            <span class="tile-value"><span id="tile-gas">--</span><small>ADC</small></span>
-                            <span class="sensor-status-badge status-ok" id="status-gas">Menunggu</span>
-                            <span class="tile-meta">MQ-2 · Sensor analog</span>
-                            <span class="tile-threshold">Bahaya ≥ 2000 ADC</span>
-                            <span class="tile-meter"><span class="meter-fill" id="meter-gas" style="width: 0%"></span></span>
-                        </button>
-
-                        <!-- CAHAYA (LDR) -->
-                        <button type="button" class="category-tile tile-yellow" data-metric="cahaya">
-                            <span class="tile-head">
-                                <span class="tile-label">Light</span>
-                                <span class="tile-icon">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                        <circle cx="12" cy="12" r="4"></circle>
-                                        <path d="M12 2v2.2M12 19.8V22M2 12h2.2M19.8 12H22M4.3 4.3l1.6 1.6M18.1 18.1l1.6 1.6M19.7 4.3l-1.6 1.6M5.9 18.1l-1.6 1.6"></path>
-                                    </svg>
-                                </span>
-                            </span>
-                            <span class="tile-value"><span id="tile-cahaya">--</span><small>ADC</small></span>
-                            <span class="sensor-status-badge status-ok" id="status-cahaya">Menunggu</span>
-                            <span class="tile-meta">LDR · Sensor analog</span>
-                            <span class="tile-threshold">Gelap ≥ 2000 ADC</span>
-                            <span class="tile-meter"><span class="meter-fill" id="meter-cahaya" style="width: 0%"></span></span>
-                        </button>
+                        <button type="button" class="chart-tab active" data-metric="all">Semua Sensor</button>
+                        <button type="button" class="chart-tab" data-metric="suhu">Suhu (&deg;C)</button>
+                        <button type="button" class="chart-tab" data-metric="kelembapan">Kelembapan (%)</button>
+                        <button type="button" class="chart-tab" data-metric="gas">Gas (MQ-2)</button>
+                        <button type="button" class="chart-tab" data-metric="cahaya">Cahaya (LDR)</button>
                     </div>
 
                     <!-- GRAFIK MONITORING -->
                     <section class="card chart-section">
                         <div class="chart-header">
                             <div>
-                                <h3 class="card-title">Grafik Tren Sensor</h3>
+                                <h3 class="card-title">Grafik Tren Sensor Real-Time</h3>
                                 <span class="chart-subtitle" id="chart-data-count">Menampilkan 0 data riwayat</span>
                             </div>
-                        </div>
-
-                        <div class="chart-legend" id="chart-legend">
-                            <span class="legend-item"><span class="legend-dot dot-suhu"></span> Suhu (°C)</span>
-                            <span class="legend-item"><span class="legend-dot dot-kelembapan"></span> Kelembapan (%)</span>
-                            <span class="legend-item"><span class="legend-dot dot-gas"></span> Gas (MQ-2)</span>
-                            <span class="legend-item"><span class="legend-dot dot-cahaya"></span> Cahaya (LDR)</span>
+                            <div class="chart-legend" id="chart-legend">
+                                <span class="legend-item"><span class="legend-dot dot-suhu"></span> Suhu (&deg;C)</span>
+                                <span class="legend-item"><span class="legend-dot dot-kelembapan"></span> Kelembapan (%)</span>
+                                <span class="legend-item"><span class="legend-dot dot-gas"></span> Gas (MQ-2)</span>
+                                <span class="legend-item"><span class="legend-dot dot-cahaya"></span> Cahaya (LDR)</span>
+                            </div>
                         </div>
 
                         <div class="canvas-wrapper">
                             <canvas id="monitoring-chart"></canvas>
                         </div>
                     </section>
-                </section>
-
-                <!-- ==================== ANALISIS AI ==================== -->
-                <section class="page-section" id="ai">
-                    <div class="section-header">
-                        <div>
-                            <h3 class="section-heading">AI Analysis &amp; Calibration</h3>
-                            <span class="section-subheading">Isolation Forest &bull; Analisis di server</span>
-                        </div>
-                    </div>
-
-                    <div class="ai-dashboard-grid">
-                        <section class="card ai-analysis-card" aria-labelledby="ai-section-title">
-                            <div class="card-header">
-                                <div class="card-title-group">
-                                    <span class="section-icon">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                            <rect x="7" y="7" width="10" height="10" rx="2"></rect>
-                                            <rect x="10.5" y="10.5" width="3" height="3" rx="0.5" fill="currentColor"></rect>
-                                            <path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path>
-                                        </svg>
-                                    </span>
-                                    <h3 class="card-title" id="ai-section-title">Analisis Pola Sensor</h3>
-                                </div>
-                                <span id="ai-status-badge" class="ai-status-pill ai-state-neutral">MENUNGGU DATA</span>
-                            </div>
-
-                            <!-- BANNER SLOT WAKTU AKTIF -->
-                            <div class="ai-active-slot-banner" id="ai-active-slot-banner">
-                                <span class="slot-banner-icon" id="ai-slot-banner-icon">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>
-                                </span>
-                                <div class="slot-banner-info">
-                                    <span class="slot-banner-label">SLOT WAKTU AKTIF SAAT INI</span>
-                                    <strong id="ai-active-slot-name">SIANG (11:00 - 15:00)</strong>
-                                </div>
-                                <span class="slot-source-pill" id="ai-slot-source-pill">Memeriksa Model...</span>
-                            </div>
-
-                            <div class="ai-status-main">
-                                <div class="ai-status-symbol" id="ai-status-symbol">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                        <rect x="7" y="7" width="10" height="10" rx="2"></rect>
-                                        <rect x="10.5" y="10.5" width="3" height="3" rx="0.5" fill="currentColor"></rect>
-                                        <path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path>
-                                    </svg>
-                                </div>
-                                <div class="ai-status-copy">
-                                    <h4 id="ai-status-title">AI menunggu data</h4>
-                                    <p id="ai-status-description">Menunggu pembacaan sensor dari ESP32.</p>
-                                </div>
-                            </div>
-
-                            <div class="ai-metrics-grid">
-                                <div class="ai-metric">
-                                    <span class="ai-metric-label">SKOR KESELARASAN</span>
-                                    <strong class="ai-metric-value" id="ai-score-value">—</strong>
-                                </div>
-                                <div class="ai-metric">
-                                    <span class="ai-metric-label">ANOMALI PADA JENDELA AI</span>
-                                    <strong class="ai-metric-value" id="ai-anomaly-count">—</strong>
-                                </div>
-                                <div class="ai-metric">
-                                    <span class="ai-metric-label">SAMPEL PELATIHAN</span>
-                                    <strong class="ai-metric-value" id="ai-training-samples">—</strong>
-                                </div>
-                                <div class="ai-metric">
-                                    <span class="ai-metric-label">MODEL TERAKHIR DILATIH</span>
-                                    <strong class="ai-metric-value ai-metric-date" id="ai-model-date">—</strong>
-                                </div>
-                            </div>
-
-                            <p class="ai-disclaimer">ANOMALI berarti pola sensor berbeda dari pola normal yang dipelajari AI. Status ini bukan bukti pasti adanya bahaya. Otomatisasi ESP32 tetap berjalan secara terpisah.</p>
-                        </section>
-
-                        <section class="card calibration-card" aria-labelledby="calibration-title">
-                            <div class="card-header">
-                                <div class="card-title-group">
-                                    <span class="section-icon">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                            <path d="M9 3h6"></path>
-                                            <path d="M10 3v5.2L5.6 16a3 3 0 0 0 2.6 4.5h7.6a3 3 0 0 0 2.6-4.5L14 8.2V3"></path>
-                                            <path d="M7.8 15h8.4"></path>
-                                        </svg>
-                                    </span>
-                                    <h3 class="card-title" id="calibration-title">Kalibrasi Ruangan</h3>
-                                </div>
-                                <span id="calibration-status-badge" class="ai-status-pill ai-state-neutral">BELUM DIKALIBRASI</span>
-                            </div>
-
-                            <!-- 4 TIME SLOTS RUANGAN -->
-                            <div class="time-slots-container">
-                                <div class="time-slots-header">
-                                    <span>DATASET 4 SLOT WAKTU HARIAN KOS</span>
-                                </div>
-                                <div class="time-slots-grid" id="time-slots-grid">
-                                    <!-- PAGI -->
-                                    <div class="time-slot-card" id="slot-card-pagi" data-slot="pagi" onclick="selectSlot('pagi')" role="button" tabindex="0">
-                                        <div class="time-slot-header">
-                                            <span class="time-slot-icon">
-                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v4M4.93 10.93l2.83-2.83M19.07 10.93l-2.83-2.83M2 18h20M7 18a5 5 0 0 1 10 0"></path></svg>
-                                            </span>
-                                            <div class="time-slot-title-group">
-                                                <span class="time-slot-name">Pagi</span>
-                                                <span class="time-slot-hours">05:00 - 11:00</span>
-                                            </div>
-                                            <span class="time-slot-pill pill-default" id="slot-pill-pagi">DEFAULT</span>
-                                        </div>
-                                        <div class="time-slot-meta" id="slot-meta-pagi">Belum dikalibrasi</div>
-                                    </div>
-                                    <!-- SIANG -->
-                                    <div class="time-slot-card" id="slot-card-siang" data-slot="siang" onclick="selectSlot('siang')" role="button" tabindex="0">
-                                        <div class="time-slot-header">
-                                            <span class="time-slot-icon">
-                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>
-                                            </span>
-                                            <div class="time-slot-title-group">
-                                                <span class="time-slot-name">Siang</span>
-                                                <span class="time-slot-hours">11:00 - 15:00</span>
-                                            </div>
-                                            <span class="time-slot-pill pill-calibrated" id="slot-pill-siang">TERKALIBRASI</span>
-                                        </div>
-                                        <div class="time-slot-meta" id="slot-meta-siang">100 sampel</div>
-                                    </div>
-                                    <!-- SORE -->
-                                    <div class="time-slot-card" id="slot-card-sore" data-slot="sore" onclick="selectSlot('sore')" role="button" tabindex="0">
-                                        <div class="time-slot-header">
-                                            <span class="time-slot-icon">
-                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 18a5 5 0 0 0-10 0M12 9v7M9 13l3 3 3-3M2 18h20M4.93 7.93l1.41 1.41M19.07 7.93l-1.41 1.41"></path></svg>
-                                            </span>
-                                            <div class="time-slot-title-group">
-                                                <span class="time-slot-name">Sore</span>
-                                                <span class="time-slot-hours">15:00 - 18:30</span>
-                                            </div>
-                                            <span class="time-slot-pill pill-default" id="slot-pill-sore">DEFAULT</span>
-                                        </div>
-                                        <div class="time-slot-meta" id="slot-meta-sore">Belum dikalibrasi</div>
-                                    </div>
-                                    <!-- MALAM -->
-                                    <div class="time-slot-card" id="slot-card-malam" data-slot="malam" onclick="selectSlot('malam')" role="button" tabindex="0">
-                                        <div class="time-slot-header">
-                                            <span class="time-slot-icon">
-                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8.7 8.7 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5z"></path></svg>
-                                            </span>
-                                            <div class="time-slot-title-group">
-                                                <span class="time-slot-name">Malam</span>
-                                                <span class="time-slot-hours">18:30 - 05:00</span>
-                                            </div>
-                                            <span class="time-slot-pill pill-default" id="slot-pill-malam">DEFAULT</span>
-                                        </div>
-                                        <div class="time-slot-meta" id="slot-meta-malam">Belum dikalibrasi</div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="calibration-target-banner" id="calibration-target-banner">
-                                <span class="target-banner-icon">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>
-                                </span>
-                                <div class="target-banner-text">
-                                    <span>Target Kalibrasi Sekarang:</span>
-                                    <strong id="calibration-target-name">Slot Siang (11:00 - 15:00)</strong>
-                                    <small id="calibration-target-note">&bull; Hanya menimpa dataset slot ini, slot lain tetap aman</small>
-                                </div>
-                            </div>
-
-                            <p class="calibration-description" id="calibration-message">Model yang tersimpan akan digunakan sampai kalibrasi baru berhasil.</p>
-
-                            <div class="calibration-progress-heading">
-                                <span>PROGRES SAMPEL</span>
-                                <strong id="calibration-count">0 / 100</strong>
-                            </div>
-                            <div class="calibration-progress-track" role="progressbar" aria-label="Progres kalibrasi" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="calibration-progress-track">
-                                <div class="calibration-progress-fill" id="calibration-progress-fill"></div>
-                            </div>
-
-                            <div class="calibration-stats">
-                                <div class="calibration-stat">
-                                    <span class="ai-metric-label">SAMPEL DILEWATI</span>
-                                    <strong id="calibration-skipped">0</strong>
-                                </div>
-                                <div class="calibration-stat">
-                                    <span class="ai-metric-label">KALIBRASI TERAKHIR</span>
-                                    <strong id="calibration-finished">Belum ada</strong>
-                                </div>
-                            </div>
-
-                            <div class="calibration-actions">
-                                <button type="button" id="btn-calibration-start" class="btn-calibration btn-calibration-primary" disabled>Mulai Kalibrasi</button>
-                                <button type="button" id="btn-calibration-cancel" class="btn-calibration btn-calibration-secondary" disabled>Batalkan</button>
-                                <button type="button" id="btn-calibration-reset" class="btn-calibration btn-calibration-reset" title="Reset dataset &amp; model slot aktif ke default">Reset Slot</button>
-                            </div>
-
-                            <p class="calibration-hint">Sebelum mulai, pastikan sensor di miniatur kamar dalam kondisi tenang dan stabil. Pengumpulan mengambil 100 sampel (sekitar 3–4 menit). Kalibrasi akan disimpan otomatis sebagai patokan normal slot waktu saat ini.</p>
-                        </section>
-                    </div>
                 </section>
 
                 <!-- ==================== RIWAYAT DATA ==================== -->
@@ -621,7 +572,7 @@
                                         <path d="M4 5h16M4 12h16M4 19h10"></path>
                                     </svg>
                                 </span>
-                                <h3 class="card-title">Tabel Riwayat</h3>
+                                <h3 class="card-title">Tabel Riwayat Pembacaan</h3>
                             </div>
                             <span class="badge" id="history-count">0 baris</span>
                         </div>
@@ -631,7 +582,7 @@
                                 <thead>
                                     <tr>
                                         <th>Waktu</th>
-                                        <th>Suhu (°C)</th>
+                                        <th>Suhu (&deg;C)</th>
                                         <th>Kelembapan (%)</th>
                                         <th>Cahaya (ADC)</th>
                                         <th>Gas (ADC)</th>
@@ -653,97 +604,15 @@
                     </section>
                 </section>
 
-                <!-- ==================== PERANGKAT IOT ==================== -->
+                <!-- ==================== INFORMASI SISTEM ==================== -->
                 <section class="page-section" id="perangkat">
                     <div class="section-header">
                         <div>
-                            <h3 class="section-heading">Device Control</h3>
-                            <span class="section-subheading">Status aktuator aktual yang dikendalikan ESP32 secara otomatis.</span>
+                            <h3 class="section-heading">Informasi Sistem &amp; Koneksi</h3>
+                            <span class="section-subheading">Status server, endpoint API, dan siklus transmisi data ESP32.</span>
                         </div>
                     </div>
 
-                    <div class="outputs-grid">
-                        <!-- LED -->
-                        <div class="card output-card" id="card-actuator-led">
-                            <div class="output-header">
-                                <div class="output-icon-wrapper led-icon-wrapper" id="actuator-icon-led">
-                                    <span class="output-icon">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                            <path d="M9 18h6M10 21h4"></path>
-                                            <path d="M12 2.5a6 6 0 0 0-3.4 10.9c.7.5 1.1 1.3 1.1 2.1h4.6c0-.8.4-1.6 1.1-2.1A6 6 0 0 0 12 2.5z"></path>
-                                        </svg>
-                                    </span>
-                                </div>
-                                <div>
-                                    <h4 class="output-name">LED Lampu Kamar</h4>
-                                    <span class="output-pin">GPIO26 &bull; Otomatis</span>
-                                </div>
-                            </div>
-                            <div class="output-state-row">
-                                <span class="output-state-text" id="state-text-led">OFF</span>
-                                <span class="output-state-pill pill-off" id="pill-led">PADAM</span>
-                            </div>
-                            <p class="output-desc">Menyala otomatis ketika ruangan gelap (LDR &ge; 2000).</p>
-                        </div>
-
-                        <!-- BUZZER -->
-                        <div class="card output-card" id="card-actuator-buzzer">
-                            <div class="output-header">
-                                <div class="output-icon-wrapper buzzer-icon-wrapper" id="actuator-icon-buzzer">
-                                    <span class="output-icon">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                            <path d="M18 10a6 6 0 1 0-12 0c0 4.6-2.1 5.8-2.1 5.8h16.2S18 14.6 18 10"></path>
-                                            <path d="M9.3 19a2.7 2.7 0 0 0 5.4 0"></path>
-                                        </svg>
-                                    </span>
-                                </div>
-                                <div>
-                                    <h4 class="output-name">Buzzer Alarm</h4>
-                                    <span class="output-pin">GPIO25 &bull; Peringatan</span>
-                                </div>
-                            </div>
-                            <div class="output-state-row">
-                                <span class="output-state-text" id="state-text-buzzer">OFF</span>
-                                <span class="output-state-pill pill-off" id="pill-buzzer">HENING</span>
-                            </div>
-                            <p class="output-desc">Berbunyi saat nilai sensor gas MQ-2 terdeteksi &ge; 2000 ADC.</p>
-                            <div class="output-action-row">
-                                <button type="button" class="btn-buzzer-mute state-idle" id="btn-buzzer-mute" title="Buzzer dalam kondisi siaga (gas normal)">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon" aria-hidden="true">
-                                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-                                        <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-                                    </svg>
-                                    <span id="btn-buzzer-mute-text">Buzzer Siaga</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- EXHAUST FAN -->
-                        <div class="card output-card" id="card-actuator-kipas">
-                            <div class="output-header">
-                                <div class="output-icon-wrapper fan-icon-wrapper" id="actuator-icon-kipas">
-                                    <span class="output-icon fan-icon">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                            <path d="M2 8.5h12.2a2.4 2.4 0 1 0-2.3-3"></path>
-                                            <path d="M2 12.5h14.5a2.4 2.4 0 1 1-2.3 3"></path>
-                                            <path d="M2 16.5h8.2a2.4 2.4 0 1 1-2.3 3"></path>
-                                        </svg>
-                                    </span>
-                                </div>
-                                <div>
-                                    <h4 class="output-name">Exhaust Fan</h4>
-                                    <span class="output-pin">Relay GPIO27 &bull; Ventilasi</span>
-                                </div>
-                            </div>
-                            <div class="output-state-row">
-                                <span class="output-state-text" id="state-text-kipas">OFF</span>
-                                <span class="output-state-pill pill-off" id="pill-kipas">MATI</span>
-                            </div>
-                            <p class="output-desc">Aktif saat gas tinggi (&ge; 2000) atau kelembapan tinggi (&ge; 60%). Delay mati 10 detik.</p>
-                        </div>
-                    </div>
-
-                    <!-- STATUS SISTEM -->
                     <section class="card system-section">
                         <div class="card-header">
                             <div class="card-title-group">
@@ -753,7 +622,7 @@
                                         <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3h.2a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.3a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.5 1z"></path>
                                     </svg>
                                 </span>
-                                <h3 class="card-title">Informasi Sistem</h3>
+                                <h3 class="card-title">Informasi Sistem Lokal</h3>
                             </div>
                         </div>
 
@@ -784,12 +653,34 @@
 
                 <!-- FOOTER -->
                 <footer class="app-footer">
-                    <p>&copy; Project IoT Smart Kamar Kos &bull; ESP32 MicroPython &bull; Monitoring Dashboard</p>
+                    <p>&copy; Project Smart Kamar Kos 01 &bull; 3D Digital Twin &amp; IoT Anomaly Detection</p>
                 </footer>
             </main>
         </div>
     </div>
 
-    <script src="script.js?v=4" defer></script>
+    <!-- Hidden hook for legacy script.js elements -->
+    <div style="display:none;" aria-hidden="true">
+        <span id="hero-status"></span>
+        <span id="hero-status-text"></span>
+        <span id="banner-room-desc"></span>
+        <span id="banner-safety-desc"></span>
+        <span id="tile-suhu"></span>
+        <span id="tile-kelembapan"></span>
+        <span id="tile-gas"></span>
+        <span id="tile-cahaya"></span>
+        <span id="status-suhu"></span>
+        <span id="status-kelembapan"></span>
+        <span id="status-gas"></span>
+        <span id="status-cahaya"></span>
+        <span id="ai-active-slot-banner"></span>
+        <span id="ai-slot-banner-icon"></span>
+        <span id="ai-active-slot-name"></span>
+        <span id="ai-status-symbol"></span>
+        <span id="ai-status-title"></span>
+        <span id="ai-status-description"></span>
+    </div>
+
+    <script src="script.js?v=5" defer></script>
 </body>
 </html>
