@@ -32,7 +32,6 @@ services:
       db:
         condition: service_healthy
     ports:
-      - "80:5000"
       - "5000:5000"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-smartkos}:${POSTGRES_PASSWORD:-SmartKosSecure2026!}@db:5432/${POSTGRES_DB:-smartkos}

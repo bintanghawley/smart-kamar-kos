@@ -8,8 +8,10 @@ import ujson
 WIFI_SSID = "NAMA_WIFI"
 WIFI_PASSWORD = "PASSWORD_WIFI"
 
-# Target Server: default ke VPS publik, ganti ke IP laptop saat pengujian offline (misal "http://192.168.1.50:5000/data")
-SERVER_URL = "http://103.119.237.30:5000/data"
+# Target Server: Subdomain skk.kradev.my.id (Port 5000 HTTP polos untuk ESP32)
+# Fallback jika DNS bermasalah: "http://103.119.237.30:5000/data"
+# Contoh IP laptop saat pengujian offline: "http://192.168.1.50:5000/data"
+SERVER_URL = "http://skk.kradev.my.id:5000/data"
 DEVICE_ID = "esp32-kamar-01"
 DEVICE_TOKEN = ""
 
@@ -100,6 +102,10 @@ def connect_wifi():
 
 def resolve_server():
     global SERVER_ADDR
+
+    if not wlan.isconnected():
+        SERVER_ADDR = None
+        return False
 
     try:
         result = usocket.getaddrinfo(
@@ -289,6 +295,7 @@ while True:
         if not wlan.isconnected():
             wifi_logged = False
             server_logged = False
+            SERVER_ADDR = None
 
             if time.ticks_diff(
                 sekarang, last_wifi_retry
