@@ -33,8 +33,8 @@
                     </svg>
                 </span>
                 <span class="brand-text">
-                    <strong>KAMAR KOS 01</strong>
-                    <small>3D DIGITAL TWIN</small>
+                    <strong>SMART KOS</strong>
+                    <small>ROOM MONITOR</small>
                 </span>
             </div>
 
@@ -50,7 +50,7 @@
                             <rect x="3" y="16" width="7" height="5" rx="2"></rect>
                         </svg>
                     </span>
-                    <span>Digital Twin</span>
+                    <span>Overview</span>
                 </a>
                 <a href="#monitoring" class="nav-item" data-nav="monitoring">
                     <span class="nav-icon" aria-hidden="true">
@@ -78,7 +78,7 @@
                             <path d="M12 8v4l3 2"></path>
                         </svg>
                     </span>
-                    <span>Riwayat Sensor</span>
+                    <span>Sensor History</span>
                 </a>
                 <a href="#perangkat" class="nav-item" data-nav="perangkat">
                     <span class="nav-icon" aria-hidden="true">
@@ -87,7 +87,7 @@
                             <path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"></path>
                         </svg>
                     </span>
-                    <span>Kendali Aktuator</span>
+                    <span>Device Control</span>
                 </a>
             </nav>
 
@@ -180,6 +180,23 @@
                                 <!-- Three.js WebGL & CSS2D mounted here -->
                             </div>
 
+                            <!-- Hotspot Detail Inspector Card (Click-to-Inspect) -->
+                            <div class="hotspot-inspector-card" id="hotspot-inspector-card" role="region" aria-label="Detail Komponen Terpilih">
+                                <div class="inspector-header">
+                                    <div class="inspector-title-group">
+                                        <h4 class="inspector-title" id="inspector-title">Detail Komponen</h4>
+                                        <span class="inspector-badge badge-normal" id="inspector-badge">Normal</span>
+                                    </div>
+                                    <button type="button" class="btn-close-inspector" id="btn-close-inspector" aria-label="Tutup detail komponen">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                            <path d="M18 6 6 18M6 6l12 12"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                                <p class="inspector-desc" id="inspector-desc">Klik salah satu titik hotspot pada prototipe 3D untuk melihat analisis komponen.</p>
+                                <span class="inspector-sub" id="inspector-sub">Telemetri Real-time</span>
+                            </div>
+
                             <!-- Simulation Preset Bar (Active when Simulation Mode ON) -->
                             <div class="simulation-bar" id="simulation-bar" style="display: none;">
                                 <div class="sim-bar-label">
@@ -236,7 +253,7 @@
                                             <circle class="donut-fg" id="ai-donut-progress" cx="50" cy="50" r="40" stroke-dasharray="251.2" stroke-dashoffset="25.1"></circle>
                                         </svg>
                                         <div class="donut-text-center">
-                                            <span class="donut-number" id="ai-score-value">—</span>
+                                            <span class="donut-number" id="ai-score-value">--</span>
                                             <span class="donut-sublabel">Selaras</span>
                                         </div>
                                     </div>
@@ -254,7 +271,7 @@
                                 <div class="ai-extra-metrics">
                                     <div class="extra-metric-item">
                                         <span>Anomali AI</span>
-                                        <strong id="ai-anomaly-count">—</strong>
+                                        <strong id="ai-anomaly-count">--</strong>
                                     </div>
                                     <div class="extra-metric-item">
                                         <span>Sampel Model</span>
@@ -262,7 +279,7 @@
                                     </div>
                                     <div class="extra-metric-item">
                                         <span>Dilatih Pada</span>
-                                        <strong id="ai-model-date" class="text-truncate">—</strong>
+                                        <strong id="ai-model-date" class="text-truncate">--</strong>
                                     </div>
                                 </div>
                             </article>
@@ -456,7 +473,7 @@
                                     </svg>
                                 </span>
                             </div>
-                            <div class="stat-value"><span id="stat-gas">--</span><small>ADC</small></div>
+                            <div class="stat-value"><span id="stat-gas">Bersih</span></div>
                             <span class="sensor-status-badge status-ok" id="stat-gas-badge">Menunggu</span>
                             <span class="stat-foot" id="foot-gas">Sensor MQ-2 &bull; Udara bersih &amp; aman</span>
                             <div class="card-mini-meter"><span class="meter-fill" id="meter-gas" style="width: 0%"></span></div>
@@ -473,13 +490,16 @@
                                     </svg>
                                 </span>
                             </div>
-                            <div class="stat-value"><span id="stat-cahaya">--</span><small>ADC</small></div>
+                            <div class="stat-value"><span id="stat-cahaya">Terang</span></div>
                             <span class="sensor-status-badge status-ok" id="stat-cahaya-badge">Menunggu</span>
                             <span class="stat-foot" id="foot-cahaya">Sensor LDR &bull; Kamar cukup terang</span>
                             <div class="card-mini-meter"><span class="meter-fill" id="meter-cahaya" style="width: 0%"></span></div>
                         </article>
                     </div>
+                </section>
 
+                <!-- ==================== MONITORING & GRAFIK TREN ==================== -->
+                <section class="page-section" id="monitoring">
                     <!-- ALERT BANNER -->
                     <section id="alert-banner" class="alert-banner alert-normal">
                         <div class="alert-icon" id="alert-icon">
@@ -514,10 +534,6 @@
                             <div class="summary-details" id="summary-details"></div>
                         </div>
                     </section>
-                </section>
-
-                <!-- ==================== MONITORING & GRAFIK TREN ==================== -->
-                <section class="page-section" id="monitoring">
                     <div class="section-header">
                         <div>
                             <h3 class="section-heading">Grafik Tren &amp; Metrik Sensor</h3>

@@ -454,7 +454,7 @@ function updateAIUI(data) {
         : null;
 
     if (elAiScoreValue) {
-        elAiScoreValue.textContent = scoreVal !== null ? `${scoreVal.toFixed(0)}%` : "—";
+        elAiScoreValue.textContent = scoreVal !== null ? `${scoreVal.toFixed(0)}%` : "--";
     }
 
     if (elAiDonutProgress) {
@@ -713,29 +713,52 @@ function updateStatCards(data) {
     elMeterKelembapan.style.width = `${percentKelembapan}%`;
 
     // Gas MQ-2
-    elStatGas.textContent = data.gas;
+    let gasText = "Bersih";
+    let gasBadge = "Bersih";
+    let gasBadgeClass = "status-ok";
     if (data.gas >= GAS_THRESHOLD) {
-        setBadge(elStatGasBadge, "Bahaya! Gas Terdeteksi", "status-danger");
+        gasText = "Bahaya Asap";
+        gasBadge = "Bahaya Asap";
+        gasBadgeClass = "status-danger";
         if (elFootGas) elFootGas.textContent = `Sensor MQ-2: ${data.gas} ADC • Alarm dan kipas aktif!`;
     } else if (data.gas >= 1200) {
-        setBadge(elStatGasBadge, "Mulai Pengap", "status-warn");
-        if (elFootGas) elFootGas.textContent = `Sensor MQ-2: ${data.gas} ADC • Udara mulai pengap`;
+        gasText = "Agak Pengap";
+        gasBadge = "Agak Pengap";
+        gasBadgeClass = "status-warn";
+        if (elFootGas) elFootGas.textContent = `Sensor MQ-2: ${data.gas} ADC • Udara agak pengap`;
     } else {
-        setBadge(elStatGasBadge, "Udara Bersih & Aman", "status-ok");
+        gasText = "Bersih";
+        gasBadge = "Udara Bersih";
+        gasBadgeClass = "status-ok";
         if (elFootGas) elFootGas.textContent = `Sensor MQ-2: ${data.gas} ADC • Kondisi udara aman`;
     }
+    elStatGas.textContent = gasText;
+    setBadge(elStatGasBadge, gasBadge, gasBadgeClass);
     const percentGas = Math.min(100, Math.max(0, (data.gas / 2600) * 100));
     elMeterGas.style.width = `${percentGas}%`;
 
     // Cahaya LDR
-    elStatCahaya.textContent = data.cahaya;
+    let cahayaText = "Terang";
+    let cahayaBadge = "Terang";
+    let cahayaBadgeClass = "status-ok";
     if (data.cahaya >= LDR_THRESHOLD) {
-        setBadge(elStatCahayaBadge, "Kamar Gelap", "status-dark");
+        cahayaText = "Gelap";
+        cahayaBadge = "Gelap";
+        cahayaBadgeClass = "status-dark";
         if (elFootCahaya) elFootCahaya.textContent = `Sensor LDR: ${data.cahaya} ADC • Lampu otomatis menyala`;
+    } else if (data.cahaya >= 1200) {
+        cahayaText = "Redup";
+        cahayaBadge = "Redup";
+        cahayaBadgeClass = "status-warn";
+        if (elFootCahaya) elFootCahaya.textContent = `Sensor LDR: ${data.cahaya} ADC • Ruangan temaram`;
     } else {
-        setBadge(elStatCahayaBadge, "Kamar Terang", "status-ok");
+        cahayaText = "Terang";
+        cahayaBadge = "Terang";
+        cahayaBadgeClass = "status-ok";
         if (elFootCahaya) elFootCahaya.textContent = `Sensor LDR: ${data.cahaya} ADC • Lampu hemat daya padam`;
     }
+    elStatCahaya.textContent = cahayaText;
+    setBadge(elStatCahayaBadge, cahayaBadge, cahayaBadgeClass);
     const percentCahaya = Math.min(100, Math.max(0, (data.cahaya / 4095) * 100));
     elMeterCahaya.style.width = `${percentCahaya}%`;
 }
@@ -1230,7 +1253,7 @@ window.addEventListener("resize", () => {
 
 // Sidebar Navigation
 const SECTION_LABELS = {
-    dashboard: "Digital Twin",
+    dashboard: "Overview",
     monitoring: "Monitoring",
     ai: "AI Analysis",
     riwayat: "Sensor History",
@@ -1242,7 +1265,7 @@ function setActiveNav(id) {
         item.classList.toggle("is-active", item.dataset.nav === id);
     });
 
-    const label = SECTION_LABELS[id] || "Digital Twin";
+    const label = SECTION_LABELS[id] || "Overview";
     if (elPageTitle) elPageTitle.textContent = "Smart Kamar Kos 01";
     if (elBreadcrumbCurrent) elBreadcrumbCurrent.textContent = label;
 }
