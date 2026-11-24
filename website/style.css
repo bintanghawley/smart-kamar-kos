@@ -703,6 +703,13 @@ body {
     color: #FFFFFF;
 }
 
+.stat-card .sensor-status-badge.status-offline,
+.category-tile .sensor-status-badge.status-offline {
+    background: #262322;
+    color: #a8a29e;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
 .stat-foot {
     font-size: 0.68rem;
     font-weight: 600;

@@ -922,6 +922,48 @@ export function inspectHotspot(id) {
     const fanOn = String(currentData.kipas ?? 'OFF').toUpperCase() === 'ON';
     const online = Boolean(currentData.esp32_online);
 
+    if (!online) {
+        if (id === 'lamp') {
+            titleEl.textContent = 'Lampu Kamar & Sensor Cahaya';
+            badgeEl.textContent = 'Offline';
+            badgeEl.className = 'inspector-badge badge-normal';
+            descEl.textContent = 'Perangkat Offline — Menunggu data dari ESP32.';
+            subEl.textContent = 'Sensor LDR: Standby • Pin Kontrol: GPIO 26';
+        } else if (id === 'left_sensor') {
+            titleEl.textContent = 'Sensor Samping Kiri (MQ-2 Gas & Asap)';
+            badgeEl.textContent = 'Offline';
+            badgeEl.className = 'inspector-badge badge-normal';
+            descEl.textContent = 'Perangkat Offline — Menunggu data dari ESP32.';
+            subEl.textContent = 'Sensor MQ-2: Standby • Ambang Bahaya ≥ 2000 ADC';
+        } else if (id === 'right_sensor') {
+            titleEl.textContent = 'Sensor Samping Kanan (LDR Cahaya)';
+            badgeEl.textContent = 'Offline';
+            badgeEl.className = 'inspector-badge badge-normal';
+            descEl.textContent = 'Perangkat Offline — Menunggu data dari ESP32.';
+            subEl.textContent = 'Sensor LDR: Standby • Ambang Gelap ≥ 2000 ADC';
+        } else if (id === 'temp') {
+            titleEl.textContent = 'Sensor Suhu & Kelembapan (DHT11)';
+            badgeEl.textContent = 'Offline';
+            badgeEl.className = 'inspector-badge badge-normal';
+            descEl.textContent = 'Perangkat Offline — Menunggu data dari ESP32.';
+            subEl.textContent = 'Modul DHT11 (GPIO 18) • Standby';
+        } else if (id === 'fan') {
+            titleEl.textContent = 'Exhaust Fan Ventilasi';
+            badgeEl.textContent = 'Offline';
+            badgeEl.className = 'inspector-badge badge-normal';
+            descEl.textContent = 'Perangkat Offline — Menunggu data dari ESP32.';
+            subEl.textContent = 'Relay GPIO 27 • Standby';
+        } else if (id === 'esp') {
+            titleEl.textContent = 'Boks Kontroler ESP32';
+            badgeEl.textContent = 'ESP32 Offline';
+            badgeEl.className = 'inspector-badge badge-warn';
+            descEl.textContent = 'ESP32 belum terhubung fisik. Anda dapat menggunakan Mode Simulasi untuk pengujian.';
+            subEl.textContent = 'Firmware MicroPython • Dual-Core Tensilica LX6';
+        }
+        card.classList.add('is-open');
+        return;
+    }
+
     if (id === 'lamp') {
         titleEl.textContent = 'Lampu Kamar & Sensor Cahaya';
         badgeEl.textContent = ledOn ? 'Menyala Hangat' : 'Padam (Hemat Daya)';
@@ -1335,11 +1377,11 @@ export function updateData(data) {
     if (!data) return;
     currentData = Object.assign(currentData, data);
 
-    const kelembapan = Number(data.kelembapan ?? 0);
-    const gas = Number(data.gas ?? 0);
-    const ledOn = String(data.led ?? 'OFF').toUpperCase() === 'ON';
-    const fanOn = String(data.kipas ?? 'OFF').toUpperCase() === 'ON';
     const online = Boolean(data.esp32_online);
+    const kelembapan = online ? Number(data.kelembapan ?? 0) : 0;
+    const gas = online ? Number(data.gas ?? 0) : 0;
+    const ledOn = online && String(data.led ?? 'OFF').toUpperCase() === 'ON';
+    const fanOn = online && String(data.kipas ?? 'OFF').toUpperCase() === 'ON';
 
     checkAutoHighlight(data);
 
@@ -1465,7 +1507,8 @@ function animate() {
     }
 
     // 2. Putaran Bilah Exhaust Fan 3D
-    const isFanOn = String(currentData.kipas ?? 'OFF').toUpperCase() === 'ON';
+    const isOnline = Boolean(currentData.esp32_online);
+    const isFanOn = isOnline && String(currentData.kipas ?? 'OFF').toUpperCase() === 'ON';
     if (fanImpeller && isFanOn) {
         fanImpeller.rotation.z -= delta * 24.0;
     }
@@ -1486,7 +1529,7 @@ function animate() {
     }
 
     // 4. Partikel Asap saat Gas >= 2000
-    const isGasHazard = Number(currentData.gas ?? 0) >= 2000;
+    const isGasHazard = isOnline && Number(currentData.gas ?? 0) >= 2000;
     for (let i = 0; i < smokeParticles.length; i++) {
         const s = smokeParticles[i];
         s.visible = isGasHazard;
@@ -1501,7 +1544,7 @@ function animate() {
     }
 
     // 5. Gelombang Suara Buzzer
-    const isBuzzerActive = String(currentData.buzzer ?? 'OFF').toUpperCase() === 'ON' && !currentData.buzzer_muted;
+    const isBuzzerActive = isOnline && String(currentData.buzzer ?? 'OFF').toUpperCase() === 'ON' && !currentData.buzzer_muted;
     for (let i = 0; i < soundWaveMeshes.length; i++) {
         const ring = soundWaveMeshes[i];
         ring.visible = isBuzzerActive;

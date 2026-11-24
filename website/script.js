@@ -252,6 +252,7 @@ function handleDataSuccess(data) {
     isServerConnected = true;
     isEsp32Online = Boolean(data.esp32_online);
     lastSeenTime = data.last_seen || "-";
+    const isOfflineLive = !data.esp32_online && !isSimulationMode;
 
     const suhu = Number(data.suhu ?? 0);
     const kelembapan = Number(data.kelembapan ?? 0);
@@ -283,19 +284,18 @@ function handleDataSuccess(data) {
         }
     }
 
-    // Update 3D Digital Twin
     if (window.Room3D && typeof window.Room3D.updateData === "function") {
         window.Room3D.updateData(normalizedData);
     }
 
     updateConnectionUI();
     updateHumanVerdicts(normalizedData, data);
-    updateStatCards(normalizedData);
-    updateActuatorCards(normalizedData);
+    updateStatCards(normalizedData, isOfflineLive);
+    updateActuatorCards(normalizedData, isOfflineLive);
     updateAlertBanner(normalizedData);
     updateRoomSummary(normalizedData);
     updateSystemInfo(true);
-    updateAIUI(data);
+    updateAIUI(data, isOfflineLive);
     updateCalibrationUI(data);
     renderHistoryTable();
     drawChart();
@@ -308,7 +308,9 @@ function handleDataError(error) {
     updateConnectionUI();
     updateHumanVerdictsOnOffline();
     updateSystemInfo(false, error.message);
-    updateAIUI({ ai_available: false, ai_status: "TIDAK TERSEDIA", ai_error: "Server tidak dapat dihubungi." });
+    updateStatCards({ suhu: 0, kelembapan: 0, cahaya: 0, gas: 0 }, true);
+    updateActuatorCards({ led: "OFF", buzzer: "OFF", kipas: "OFF" }, true);
+    updateAIUI({ ai_available: false, ai_status: "TIDAK TERSEDIA", ai_error: "Server tidak dapat dihubungi." }, true);
     updateCalibrationUI({
         calibration_status: "UNKNOWN",
         calibration_active: false,
@@ -393,8 +395,33 @@ function formatModelDate(value) {
     });
 }
 
-function updateAIUI(data) {
+function updateAIUI(data, isOffline = false) {
     if (!elAiStatusBadge) return;
+
+    if (isOffline) {
+        setStatusPill(elAiStatusBadge, "STANDBY", "ai-state-neutral");
+        if (elAiHumanTitle) elAiHumanTitle.textContent = "AI Siaga (Menunggu Sensor ESP32)";
+        if (elAiHumanSub) elAiHumanSub.textContent = "Model AI siap menganalisis segera setelah perangkat ESP32 terhubung secara real-time.";
+        if (elAiScoreValue) elAiScoreValue.textContent = "--%";
+        if (elAiDonutProgress) {
+            const circ = 2 * Math.PI * 40;
+            elAiDonutProgress.style.strokeDashoffset = String(circ);
+            elAiDonutProgress.style.stroke = "rgba(255, 255, 255, 0.15)";
+        }
+        if (elAiSlotNamePill) {
+            const slotLabel = data.ai_active_slot_label || "Siang";
+            const slotRange = data.ai_active_slot_range || "11:00 - 15:00";
+            elAiSlotNamePill.textContent = `Slot ${slotLabel} (${slotRange})`;
+        }
+        if (elAiSlotSourcePill) {
+            const isCalibrated = Boolean(data.ai_is_slot_calibrated);
+            elAiSlotSourcePill.textContent = data.ai_model_source || (isCalibrated ? "Kalibrasi Ruangan" : "Model Default");
+        }
+        if (elAiAnomalyCount) elAiAnomalyCount.textContent = "0 / 5";
+        if (elAiTrainingSamples) elAiTrainingSamples.textContent = data.ai_training_samples ?? "100";
+        if (elAiModelDate) elAiModelDate.textContent = formatModelDate(data.ai_model_trained_at);
+        return;
+    }
 
     const status = String(data.ai_status || "TIDAK TERSEDIA").toUpperCase();
     const busy = Boolean(data.calibration_busy) || status === "KALIBRASI" || data.calibration_status === "KALIBRASI BERLANGSUNG" || data.calibration_status === "MELATIH MODEL";
@@ -659,8 +686,31 @@ function setBadge(element, label, variant) {
     element.className = `sensor-status-badge ${variant}`;
 }
 
-function updateStatCards(data) {
+function updateStatCards(data, isOffline = false) {
     if (!elStatSuhu) return;
+
+    if (isOffline) {
+        elStatSuhu.textContent = "--";
+        setBadge(elStatSuhuBadge, "Offline", "status-offline");
+        if (elFootSuhu) elFootSuhu.textContent = "Menunggu koneksi ESP32";
+        elMeterSuhu.style.width = "0%";
+
+        elStatKelembapan.textContent = "--";
+        setBadge(elStatKelembapanBadge, "Offline", "status-offline");
+        if (elFootKelembapan) elFootKelembapan.textContent = "Menunggu koneksi ESP32";
+        elMeterKelembapan.style.width = "0%";
+
+        elStatGas.textContent = "--";
+        setBadge(elStatGasBadge, "Offline", "status-offline");
+        if (elFootGas) elFootGas.textContent = "Sensor MQ-2 belum terhubung";
+        elMeterGas.style.width = "0%";
+
+        elStatCahaya.textContent = "--";
+        setBadge(elStatCahayaBadge, "Offline", "status-offline");
+        if (elFootCahaya) elFootCahaya.textContent = "Sensor LDR belum terhubung";
+        elMeterCahaya.style.width = "0%";
+        return;
+    }
 
     // Suhu
     elStatSuhu.textContent = data.suhu;
@@ -743,7 +793,33 @@ function updateStatCards(data) {
     elMeterCahaya.style.width = `${percentCahaya}%`;
 }
 
-function updateActuatorCards(data) {
+function updateActuatorCards(data, isOffline = false) {
+    if (isOffline) {
+        elCardLed.classList.remove("state-led-on");
+        elStateLed.textContent = "OFF";
+        elPillLed.textContent = "OFFLINE";
+        elPillLed.className = "output-state-pill pill-off";
+        if (elHumanStatusLed) elHumanStatusLed.textContent = "Menunggu perangkat ESP32";
+
+        elCardBuzzer.classList.remove("state-buzzer-on", "state-buzzer-muted");
+        elStateBuzzer.textContent = "OFF";
+        elPillBuzzer.textContent = "SIAGA";
+        elPillBuzzer.className = "output-state-pill pill-off";
+        if (elHumanStatusBuzzer) elHumanStatusBuzzer.textContent = "Menunggu perangkat ESP32";
+        if (elBtnBuzzerMute) {
+            elBtnBuzzerMute.className = "btn-buzzer-mute state-idle";
+            elBtnBuzzerMute.disabled = true;
+            elBtnBuzzerMute.innerHTML = `${ICONS_BUZZER_BTN.idle} <span id="btn-buzzer-mute-text">Buzzer Siaga</span>`;
+        }
+
+        elCardKipas.classList.remove("state-kipas-on");
+        elStateKipas.textContent = "OFF";
+        elPillKipas.textContent = "OFFLINE";
+        elPillKipas.className = "output-state-pill pill-off";
+        if (elHumanStatusKipas) elHumanStatusKipas.textContent = "Menunggu perangkat ESP32";
+        return;
+    }
+
     // LED
     if (data.led === "ON") {
         elCardLed.classList.add("state-led-on");
@@ -1420,6 +1496,29 @@ function toggleSimulationMode() {
         elBtnDemoText.textContent = "Mode Simulasi";
         if (elSimulationBar) elSimulationBar.style.display = "none";
         if (simulationInterval) clearInterval(simulationInterval);
+
+        if (!isEsp32Online) {
+            const resetData = {
+                suhu: 0,
+                kelembapan: 0,
+                cahaya: 0,
+                gas: 0,
+                led: "OFF",
+                buzzer: "OFF",
+                kipas: "OFF",
+                esp32_online: false,
+                lastSeen: lastSeenTime
+            };
+            updateStatCards(resetData, true);
+            updateActuatorCards(resetData, true);
+            updateAIUI({ ai_status: "STANDBY" }, true);
+            updateHumanVerdicts(resetData, { ai_status: "STANDBY" });
+            updateAlertBanner(resetData);
+            updateRoomSummary(resetData);
+            if (window.Room3D && typeof window.Room3D.updateData === "function") {
+                window.Room3D.updateData(resetData);
+            }
+        }
         fetchSensorData();
     }
 }

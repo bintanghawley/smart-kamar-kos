@@ -1502,12 +1502,23 @@ class SmartKosServer(BaseHTTPRequestHandler):
 
                 response = dict(sensor_data)
                 response["esp32_online"] = online
+                response["is_stale"] = not online
+                response["has_live_data"] = online
                 response["last_seen"] = last_received_time_str
                 response["buzzer_muted"] = buzzer_muted
                 response["gas_threshold"] = GAS_THRESHOLD
                 response["ldr_threshold"] = LDR_THRESHOLD
 
-            response.update(get_ai_payload())
+            ai_payload = get_ai_payload()
+            if not online:
+                ai_payload["ai_status"] = "STANDBY"
+                ai_payload["ai_score"] = None
+                ai_payload["ai_score_percent"] = "--"
+                ai_payload["ai_anomaly_count"] = 0
+                ai_payload["ai_trigger_desc"] = "Menunggu data sensor ESP32."
+                ai_payload["ai_status_desc"] = "Model AI siap memproses segera setelah perangkat ESP32 terhubung dan mengirimkan data."
+
+            response.update(ai_payload)
             response.update(get_calibration_payload())
 
             self.send_json(200, response)
