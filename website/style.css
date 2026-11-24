@@ -2360,9 +2360,17 @@ body {
 /* ==================== 3D TWIN HERO GRID ==================== */
 .twin-hero-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr);
-    gap: 20px;
-    align-items: stretch;
+    grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+    gap: 18px;
+    align-items: start;
+}
+
+/* LEFT: 3D STAGE & SENSOR STACK */
+.twin-left-column {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
 }
 
 /* LEFT: 3D STAGE CARD */
@@ -2375,14 +2383,15 @@ body {
     position: relative;
     overflow: hidden;
     box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
+    flex: 0 0 auto;
 }
 
 .stage-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 18px;
-    background: rgba(21, 19, 18, 0.85);
+    padding: 12px 18px;
+    background: rgba(21, 19, 18, 0.88);
     backdrop-filter: blur(10px);
     border-bottom: 1px solid var(--border);
     z-index: 12;
@@ -2434,7 +2443,7 @@ body {
 
 .verdict-title {
     font-family: var(--font-display);
-    font-size: 15px;
+    font-size: 14.5px;
     font-weight: 700;
     color: var(--text-primary);
     line-height: 1.25;
@@ -2445,55 +2454,89 @@ body {
     color: var(--text-secondary);
 }
 
-.stage-view-controls {
+/* 3D STAGE CONTROLS GROUP (BUKA ATAP, AUTO-FOKUS, RESET) */
+.stage-controls-group {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 7px;
 }
 
-.btn-view {
+.btn-stage-action {
     display: inline-flex;
     align-items: center;
     gap: 6px;
     padding: 6px 13px;
     border-radius: var(--radius-pill);
     background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.09);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     color: var(--text-secondary);
     font-size: 12px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
+    user-select: none;
 }
 
-.btn-view:hover {
+.btn-stage-action:hover {
     background: rgba(255, 255, 255, 0.1);
     color: var(--text-primary);
+    border-color: rgba(255, 255, 255, 0.18);
 }
 
-.btn-view.is-active {
-    background: var(--yellow);
-    color: var(--ink);
-    border-color: var(--yellow);
+.btn-action-icon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+
+.btn-roof-toggle.is-open {
+    background: rgba(255, 215, 47, 0.18);
+    color: var(--yellow);
+    border-color: rgba(255, 215, 47, 0.45);
+    box-shadow: 0 0 12px rgba(255, 215, 47, 0.25);
     font-weight: 700;
-    box-shadow: 0 0 14px rgba(255, 215, 47, 0.35);
 }
 
-.btn-view-reset {
-    padding: 7px 9px;
+.btn-autofocus-toggle {
+    gap: 7px;
 }
 
-.btn-view-reset svg {
+.autofocus-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #666;
+    transition: all 0.25s ease;
+    flex-shrink: 0;
+}
+
+.btn-autofocus-toggle.is-active {
+    background: rgba(43, 217, 168, 0.15);
+    color: var(--turq);
+    border-color: rgba(43, 217, 168, 0.35);
+    font-weight: 700;
+}
+
+.btn-autofocus-toggle.is-active .autofocus-dot {
+    background: var(--turq);
+    box-shadow: 0 0 8px var(--turq);
+}
+
+.btn-cam-reset {
+    padding: 7px 10px;
+}
+
+.btn-cam-reset svg {
     width: 14px;
     height: 14px;
 }
 
-/* 3D CANVAS WRAPPER */
+/* 3D CANVAS WRAPPER (VIEWPORT) */
 .stage-canvas-wrapper {
     position: relative;
     width: 100%;
-    height: 520px;
-    min-height: 480px;
+    height: 440px;
+    min-height: 400px;
     background: radial-gradient(ellipse at 50% 35%, #181514 0%, #0a0908 100%);
     overflow: hidden;
 }
@@ -2590,20 +2633,20 @@ body {
 /* HOTSPOT INSPECTOR CARD (CLICK-TO-INSPECT) */
 .hotspot-inspector-card {
     position: absolute;
-    bottom: 48px;
-    left: 18px;
-    max-width: 320px;
-    width: calc(100% - 36px);
+    bottom: 14px;
+    left: 14px;
+    max-width: 310px;
+    width: calc(100% - 28px);
     background: rgba(18, 16, 14, 0.94);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.14);
     border-radius: var(--radius-md);
-    padding: 13px 15px;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    padding: 12px 14px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.06);
     z-index: 25;
     opacity: 0;
-    transform: translateY(12px) scale(0.96);
+    transform: translateY(10px) scale(0.96);
     pointer-events: none;
     transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1), transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -2773,27 +2816,23 @@ body {
     font-weight: 700;
 }
 
-/* OFFLINE HELPER PROMPT */
+/* OFFLINE HELPER PROMPT (SLIM 1-BAR) */
 .offline-helper {
-    position: absolute;
-    bottom: 46px;
-    left: 16px;
-    right: 16px;
+    position: relative;
     z-index: 14;
-    background: rgba(32, 28, 25, 0.94);
-    border: 1px solid rgba(255, 176, 32, 0.35);
-    border-radius: 12px;
-    padding: 12px 18px;
+    background: rgba(28, 25, 22, 0.96);
+    border-top: 1px solid rgba(255, 176, 32, 0.35);
+    border-bottom: 1px solid rgba(255, 176, 32, 0.35);
+    padding: 8px 18px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 14px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(8px);
+    gap: 12px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
 }
 
 .offline-helper-icon {
-    font-size: 24px;
+    font-size: 20px;
 }
 
 .offline-helper-info {
@@ -2804,7 +2843,7 @@ body {
 }
 
 .offline-helper-info strong {
-    font-size: 13px;
+    font-size: 12px;
     color: var(--color-warning);
 }
 
@@ -2814,12 +2853,12 @@ body {
 }
 
 .btn-activate-sim {
-    padding: 7px 15px;
+    padding: 5px 13px;
     border-radius: var(--radius-pill);
     background: var(--yellow);
     color: var(--ink);
     border: none;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
     cursor: pointer;
     white-space: nowrap;
@@ -2833,6 +2872,45 @@ body {
 
 /* STAGE FOOTER */
 .stage-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 9px 18px;
+    background: rgba(18, 16, 15, 0.92);
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--text-muted);
+    z-index: 12;
+}
+
+/* 4 HUMAN SENSOR METRIC CARDS (2x2 GRID IN LEFT COLUMN) */
+.stats-grid-2x2 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    width: 100%;
+}
+
+.stats-grid-2x2 .stat-card {
+    min-height: 126px;
+    padding: 13px 15px;
+    gap: 5px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+}
+
+.stats-grid-2x2 .stat-top {
+    margin-bottom: 2px;
+}
+
+.stats-grid-2x2 .stat-value {
+    font-size: 2.05rem;
+    line-height: 1.05;
+}
+
+.stats-grid-2x2 .stat-foot {
+    font-size: 11px;
+    line-height: 1.35;
+}
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -3301,5 +3379,11 @@ body {
 
     .simulation-bar {
         padding: 8px 12px;
+    }
+}
+
+@media (max-width: 640px) {
+    .stats-grid-2x2 {
+        grid-template-columns: 1fr;
     }
 }

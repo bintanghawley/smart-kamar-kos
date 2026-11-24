@@ -221,26 +221,6 @@ if (document.readyState === "loading") {
     setTimeout(init3DStage, 100);
 }
 
-// 3D View Controls
-document.querySelectorAll(".btn-view[data-view]").forEach(btn => {
-    btn.addEventListener("click", () => {
-        const view = btn.dataset.view;
-        if (!window.Room3D) return;
-
-        if (view === "reset") {
-            window.Room3D.resetView();
-            document.querySelectorAll(".btn-view[data-view]").forEach(b => b.classList.remove("is-active"));
-            const outsideBtn = document.getElementById("btn-view-outside");
-            if (outsideBtn) outsideBtn.classList.add("is-active");
-            return;
-        }
-
-        document.querySelectorAll(".btn-view[data-view]").forEach(b => b.classList.remove("is-active"));
-        btn.classList.add("is-active");
-        window.Room3D.setViewMode(view);
-    });
-});
-
 async function fetchSensorData() {
     if (isSimulationMode) return;
 

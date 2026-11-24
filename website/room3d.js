@@ -17,6 +17,19 @@ let activeHotspotId = null;
 let currentViewMode = 'outside';
 let activeCameraTween = null;
 
+// Roof & Auto-Focus System
+let isRoofOpen = false;
+let roofAnim = null;
+let isAutoFocusEnabled = true;
+let isUserInteracting = false;
+let lastAutoHighlightTime = 0;
+let prevLiveState = {
+    hasBaseline: false,
+    fanOn: false,
+    ledOn: false,
+    gasDanger: false
+};
+
 let currentData = {
     suhu: 0,
     kelembapan: 0,
@@ -1011,7 +1024,7 @@ export function init(containerElement) {
     cssRenderer.domElement.style.pointerEvents = 'none';
     container.appendChild(cssRenderer.domElement);
 
-    // 5. OrbitControls (Putar bebas 360 derajat)
+    // OrbitControls (Putar bebas 360 derajat)
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enableRotate = true;
     controls.enableZoom = true;
@@ -1026,12 +1039,18 @@ export function init(containerElement) {
     controls.maxDistance = 16.0;
     controls.target.copy(VIEW_PRESETS.outside.target);
 
-    // Saat user berinteraksi mouse/touch, matikan tween kamera otomatis
+    // Deteksi interaksi pengguna untuk melepas kontrol otomatis
     controls.addEventListener('start', () => {
         activeCameraTween = null;
+        isUserInteracting = true;
+        lastAutoHighlightTime = performance.now();
+    });
+    controls.addEventListener('end', () => {
+        isUserInteracting = false;
+        lastAutoHighlightTime = performance.now();
     });
 
-    // 6. Pencahayaan Studio
+    // Pencahayaan Studio
     const ambLight = new THREE.AmbientLight(0xffeedd, 0.95);
     scene.add(ambLight);
 
@@ -1066,6 +1085,23 @@ export function init(containerElement) {
         btnCloseInspector.addEventListener('click', closeInspector);
     }
 
+    const btnToggleRoof = document.getElementById('btn-toggle-roof');
+    if (btnToggleRoof) {
+        btnToggleRoof.addEventListener('click', toggleRoof);
+    }
+
+    const btnToggleAutofocus = document.getElementById('btn-toggle-autofocus');
+    if (btnToggleAutofocus) {
+        btnToggleAutofocus.addEventListener('click', () => {
+            toggleAutoFocus();
+        });
+    }
+
+    const btnResetCam = document.getElementById('btn-reset-cam');
+    if (btnResetCam) {
+        btnResetCam.addEventListener('click', resetCamera);
+    }
+
     isInitialized = true;
     lastTime = performance.now();
     animate();
@@ -1094,23 +1130,164 @@ function onWindowResize() {
     cssRenderer.setSize(w, h);
 }
 
+export function toggleRoof() {
+    isRoofOpen = !isRoofOpen;
+    const duration = 350;
+    const now = performance.now();
+    const currentY = roofGroup ? roofGroup.position.y : 0;
+
+    if (roofGroup) {
+        roofGroup.traverse(child => {
+            if (child.isMesh && child.material) {
+                child.material.transparent = true;
+            }
+        });
+        roofGroup.visible = true;
+    }
+
+    const targetY = isRoofOpen ? 2.4 : 0.0;
+    const startOp = isRoofOpen ? 1.0 : 0.0;
+    const targetOp = isRoofOpen ? 0.0 : 1.0;
+
+    roofAnim = {
+        startY: currentY,
+        endY: targetY,
+        startOpacity: startOp,
+        endOpacity: targetOp,
+        startTime: now,
+        duration
+    };
+
+    updateRoofButtonUI();
+    return isRoofOpen;
+}
+
+export function updateRoofButtonUI() {
+    const btnRoofText = document.getElementById('btn-roof-text');
+    const btnRoof = document.getElementById('btn-toggle-roof');
+    if (btnRoofText) {
+        btnRoofText.textContent = isRoofOpen ? 'Tutup Atap' : 'Buka Atap';
+    }
+    if (btnRoof) {
+        btnRoof.classList.toggle('is-open', isRoofOpen);
+        btnRoof.title = isRoofOpen ? 'Tutup kembali atap kamar kos' : 'Buka atap untuk melihat perabot interior';
+    }
+}
+
+export function toggleAutoFocus(forceState = null) {
+    if (forceState !== null) {
+        isAutoFocusEnabled = Boolean(forceState);
+    } else {
+        isAutoFocusEnabled = !isAutoFocusEnabled;
+    }
+    updateAutoFocusButtonUI();
+    return isAutoFocusEnabled;
+}
+
+export function updateAutoFocusButtonUI() {
+    const btnText = document.getElementById('btn-autofocus-text');
+    const btnAuto = document.getElementById('btn-toggle-autofocus');
+    if (btnText) {
+        btnText.textContent = isAutoFocusEnabled ? 'Auto-Fokus: ON' : 'Auto-Fokus: OFF';
+    }
+    if (btnAuto) {
+        btnAuto.classList.toggle('is-active', isAutoFocusEnabled);
+        btnAuto.title = isAutoFocusEnabled
+            ? 'Auto-Fokus Aktif: Kamera otomatis menyorot saat sensor/aktuator terpicu'
+            : 'Auto-Fokus Nonaktif: Kamera tetap pada posisi pilihan Anda';
+    }
+}
+
+export function resetCamera() {
+    animateCameraTo(VIEW_PRESETS.outside.cam, VIEW_PRESETS.outside.target, 450);
+    closeInspector();
+}
+
 export function setViewMode(modeName) {
     if (!VIEW_PRESETS[modeName]) return;
     currentViewMode = modeName;
     const preset = VIEW_PRESETS[modeName];
 
-    // Sembunyikan atap pada mode Dalam Kamar agar tidak menghalangi interior
     if (roofGroup) {
         roofGroup.visible = (modeName !== 'inside');
     }
 
-    // Transisi kamera cepat 450ms
     animateCameraTo(preset.cam, preset.target, 450);
 }
 
 export function resetView() {
-    setViewMode('outside');
-    closeInspector();
+    resetCamera();
+}
+
+function checkAutoHighlight(data) {
+    if (!data) return;
+
+    const gas = Number(data.gas ?? 0);
+    const ledOn = String(data.led ?? 'OFF').toUpperCase() === 'ON';
+    const fanOn = String(data.kipas ?? 'OFF').toUpperCase() === 'ON';
+    const buzzerOn = String(data.buzzer ?? 'OFF').toUpperCase() === 'ON';
+    const gasDanger = gas >= 2000 || (buzzerOn && !data.buzzer_muted);
+
+    if (!prevLiveState.hasBaseline) {
+        prevLiveState = {
+            hasBaseline: true,
+            fanOn,
+            ledOn,
+            gasDanger
+        };
+        return;
+    }
+
+    const now = performance.now();
+    const canTrigger = isAutoFocusEnabled && !isUserInteracting && (now - lastAutoHighlightTime > 3500);
+
+    // Prioritas 1: Bahaya gas atau buzzer aktif
+    if (gasDanger && !prevLiveState.gasDanger) {
+        if (canTrigger) {
+            lastAutoHighlightTime = now;
+            const targetCam = new THREE.Vector3(-4.5, 3.2, -4.5);
+            const targetLook = new THREE.Vector3(-1.4, 1.3, -1.3);
+            animateCameraTo(targetCam, targetLook, 550, () => {
+                inspectHotspot('left_sensor');
+            });
+            showAutoHighlightBadge('Auto-Fokus: Deteksi Gas & Kipas Aktif');
+        }
+    }
+    // Prioritas 2: Exhaust fan menyala karena kelembapan
+    else if (fanOn && !prevLiveState.fanOn && !gasDanger) {
+        if (canTrigger) {
+            lastAutoHighlightTime = now;
+            const targetCam = new THREE.Vector3(-1.15, 2.4, -6.0);
+            const targetLook = new THREE.Vector3(-1.15, 1.45, -1.8);
+            animateCameraTo(targetCam, targetLook, 550, () => {
+                inspectHotspot('fan');
+            });
+            showAutoHighlightBadge('Auto-Fokus: Sirkulasi Kipas Aktif');
+        }
+    }
+    // Prioritas 3: Lampu otomatis menyala
+    else if (ledOn && !prevLiveState.ledOn) {
+        if (canTrigger) {
+            lastAutoHighlightTime = now;
+            const targetCam = new THREE.Vector3(3.4, 2.6, 5.6);
+            const targetLook = new THREE.Vector3(0.5, 1.3, 0.6);
+            animateCameraTo(targetCam, targetLook, 550, () => {
+                inspectHotspot('lamp');
+            });
+            showAutoHighlightBadge('Auto-Fokus: Lampu Kamar Menyala');
+        }
+    }
+
+    prevLiveState.fanOn = fanOn;
+    prevLiveState.ledOn = ledOn;
+    prevLiveState.gasDanger = gasDanger;
+}
+
+function showAutoHighlightBadge(text) {
+    const subEl = document.getElementById('inspector-sub');
+    if (subEl) {
+        subEl.innerHTML = `<span style="color:var(--turq);font-weight:700;">★ ${text}</span>`;
+    }
 }
 
 export function updateData(data) {
@@ -1122,6 +1299,8 @@ export function updateData(data) {
     const ledOn = String(data.led ?? 'OFF').toUpperCase() === 'ON';
     const fanOn = String(data.kipas ?? 'OFF').toUpperCase() === 'ON';
     const online = Boolean(data.esp32_online);
+
+    checkAutoHighlight(data);
 
     // 1. Lampu Plafon Kamar
     if (roomLight) {
@@ -1188,7 +1367,7 @@ function animate() {
     const delta = Math.min((now - lastTime) / 1000, 0.1);
     lastTime = now;
 
-    // 1. Kamera Tweening Cepat 450ms
+    // 1. Kamera Tweening Cepat
     if (activeCameraTween) {
         const elapsed = now - activeCameraTween.startTime;
         const p = Math.min(1.0, elapsed / activeCameraTween.duration);
@@ -1206,6 +1385,29 @@ function animate() {
         }
     }
     controls.update();
+
+    // Animasi Buka/Tutup Atap (~350ms)
+    if (roofAnim) {
+        const elapsed = now - roofAnim.startTime;
+        const p = Math.min(1.0, elapsed / roofAnim.duration);
+        const ease = easeOutCubic(p);
+        if (roofGroup) {
+            roofGroup.position.y = roofAnim.startY + (roofAnim.endY - roofAnim.startY) * ease;
+            const currentOp = roofAnim.startOpacity + (roofAnim.endOpacity - roofAnim.startOpacity) * ease;
+            roofGroup.traverse(child => {
+                if (child.isMesh && child.material) {
+                    child.material.opacity = currentOp;
+                }
+            });
+            if (p >= 1.0) {
+                roofGroup.position.y = roofAnim.endY;
+                if (isRoofOpen) {
+                    roofGroup.visible = false;
+                }
+                roofAnim = null;
+            }
+        }
+    }
 
     // 2. Putaran Bilah Exhaust Fan 3D
     const isFanOn = String(currentData.kipas ?? 'OFF').toUpperCase() === 'ON';
@@ -1269,8 +1471,11 @@ function animate() {
 window.Room3D = {
     init,
     updateData,
-    setViewMode,
-    resetView,
+    toggleRoof,
+    toggleAutoFocus,
+    resetCamera,
     inspectHotspot,
-    closeInspector
+    closeInspector,
+    setViewMode,
+    resetView
 };

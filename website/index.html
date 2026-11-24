@@ -147,90 +147,172 @@
                 <!-- ==================== DASHBOARD & 3D DIGITAL TWIN ==================== -->
                 <section class="page-section" id="dashboard">
                     <!-- HERO DIGITAL TWIN GRID -->
+                    <!-- HERO DIGITAL TWIN GRID -->
                     <div class="twin-hero-grid">
-                        <!-- LEFT: 3D STAGE (~65%) -->
-                        <div class="stage-3d-card" id="room-3d-stage">
-                            <!-- 3D Header Controls & Human Banner -->
-                            <div class="stage-header">
-                                <div class="human-verdict" id="human-status-banner">
-                                    <span class="verdict-dot" id="human-verdict-dot"></span>
-                                    <div class="verdict-texts">
-                                        <h2 class="verdict-title" id="human-verdict-title">Kamar Kos 01 Nyaman &amp; Aman</h2>
-                                        <p class="verdict-subtitle" id="human-verdict-sub">Suhu, kelembapan, dan sirkulasi udara terpantau stabil.</p>
+                        <!-- LEFT COLUMN: 3D DIGITAL TWIN + 4 SENSOR CARDS (2x2) -->
+                        <div class="twin-left-column">
+                            <!-- 3D STAGE CARD -->
+                            <div class="stage-3d-card" id="room-3d-stage">
+                                <!-- 3D Header Controls & Human Banner -->
+                                <div class="stage-header">
+                                    <div class="human-verdict" id="human-status-banner">
+                                        <span class="verdict-dot" id="human-verdict-dot"></span>
+                                        <div class="verdict-texts">
+                                            <h2 class="verdict-title" id="human-verdict-title">Kamar Kos 01 Nyaman &amp; Aman</h2>
+                                            <p class="verdict-subtitle" id="human-verdict-sub">Suhu, kelembapan, dan sirkulasi udara terpantau stabil.</p>
+                                        </div>
+                                    </div>
+
+                                    <!-- Kontrol Panggung 3D: Buka Atap, Auto-Fokus, dan Reset Kamera -->
+                                    <div class="stage-controls-group" role="group" aria-label="Kontrol Panggung 3D">
+                                        <button type="button" class="btn-stage-action btn-roof-toggle" id="btn-toggle-roof" title="Buka atau tutup atap untuk melihat perabot interior">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-action-icon" aria-hidden="true">
+                                                <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                                                <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                                            </svg>
+                                            <span id="btn-roof-text">Buka Atap</span>
+                                        </button>
+
+                                        <button type="button" class="btn-stage-action btn-autofocus-toggle is-active" id="btn-toggle-autofocus" title="Aktif/Nonaktifkan sorot otomatis kamera saat sensor atau aktuator terpicu">
+                                            <span class="autofocus-dot" aria-hidden="true"></span>
+                                            <span id="btn-autofocus-text">Auto-Fokus: ON</span>
+                                        </button>
+
+                                        <button type="button" class="btn-stage-action btn-cam-reset" id="btn-reset-cam" title="Kembalikan sudut kamera isometrik awal">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                                                <path d="M3 3v5h5"></path>
+                                            </svg>
+                                        </button>
                                     </div>
                                 </div>
-                                <div class="stage-view-controls" role="group" aria-label="Mode Tampilan 3D">
-                                    <button type="button" class="btn-view is-active" data-view="outside" id="btn-view-outside">
-                                        <span>Tampak Luar</span>
-                                    </button>
-                                    <button type="button" class="btn-view" data-view="inside" id="btn-view-inside">
-                                        <span>Dalam Kamar</span>
-                                    </button>
-                                    <button type="button" class="btn-view" data-view="sensors" id="btn-view-sensors">
-                                        <span>Sisi Kipas &amp; Sensor</span>
-                                    </button>
-                                    <button type="button" class="btn-view btn-view-reset" data-view="reset" id="btn-view-reset" title="Kembalikan kamera awal">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
-                                    </button>
-                                </div>
-                            </div>
 
-                            <!-- 3D Canvas Mount Point -->
-                            <div class="stage-canvas-wrapper" id="room-3d-container">
-                                <!-- Three.js WebGL & CSS2D mounted here -->
-                            </div>
-
-                            <!-- Hotspot Detail Inspector Card (Click-to-Inspect) -->
-                            <div class="hotspot-inspector-card" id="hotspot-inspector-card" role="region" aria-label="Detail Komponen Terpilih">
-                                <div class="inspector-header">
-                                    <div class="inspector-title-group">
-                                        <h4 class="inspector-title" id="inspector-title">Detail Komponen</h4>
-                                        <span class="inspector-badge badge-normal" id="inspector-badge">Normal</span>
+                                <!-- 3D Canvas Mount Point + Nested Floating Inspector -->
+                                <div class="stage-canvas-wrapper" id="room-3d-container">
+                                    <!-- Hotspot Detail Inspector Card (Nested directly inside viewport to prevent jumping) -->
+                                    <div class="hotspot-inspector-card" id="hotspot-inspector-card" role="region" aria-label="Detail Komponen Terpilih">
+                                        <div class="inspector-header">
+                                            <div class="inspector-title-group">
+                                                <h4 class="inspector-title" id="inspector-title">Detail Komponen</h4>
+                                                <span class="inspector-badge badge-normal" id="inspector-badge">Normal</span>
+                                            </div>
+                                            <button type="button" class="btn-close-inspector" id="btn-close-inspector" aria-label="Tutup detail komponen">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                    <path d="M18 6 6 18M6 6l12 12"></path>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                        <p class="inspector-desc" id="inspector-desc">Klik salah satu titik hotspot pada prototipe 3D untuk melihat analisis komponen.</p>
+                                        <span class="inspector-sub" id="inspector-sub">Telemetri Real-time</span>
                                     </div>
-                                    <button type="button" class="btn-close-inspector" id="btn-close-inspector" aria-label="Tutup detail komponen">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                            <path d="M18 6 6 18M6 6l12 12"></path>
-                                        </svg>
-                                    </button>
                                 </div>
-                                <p class="inspector-desc" id="inspector-desc">Klik salah satu titik hotspot pada prototipe 3D untuk melihat analisis komponen.</p>
-                                <span class="inspector-sub" id="inspector-sub">Telemetri Real-time</span>
+
+                                <!-- Simulation Preset Bar (Active when Simulation Mode ON) -->
+                                <div class="simulation-bar" id="simulation-bar" style="display: none;">
+                                    <div class="sim-bar-label">
+                                        <span class="sim-badge">SIMULASI AKTIF</span>
+                                        <span>Pilih Skenario Pengujian:</span>
+                                    </div>
+                                    <div class="sim-presets">
+                                        <button type="button" class="sim-preset-btn is-active" data-sim="normal">1. Nyaman &amp; Normal</button>
+                                        <button type="button" class="sim-preset-btn" data-sim="dark">2. Malam Gelap (Lampu ON)</button>
+                                        <button type="button" class="sim-preset-btn" data-sim="humid">3. Lembap (Kipas ON)</button>
+                                        <button type="button" class="sim-preset-btn" data-sim="gas">4. Bahaya Gas (Alarm &amp; Kipas)</button>
+                                        <button type="button" class="sim-preset-btn" data-sim="anomaly">5. Anomali AI</button>
+                                    </div>
+                                </div>
+
+                                <!-- Offline Helper Prompt (Compact 1-line bar) -->
+                                <div class="offline-helper" id="offline-helper-banner">
+                                    <span class="offline-helper-icon">📡</span>
+                                    <div class="offline-helper-info">
+                                        <strong>Perangkat Belum Terhubung</strong>
+                                        <span>ESP32 belum mengirim data. Aktifkan mode simulasi untuk mencoba visualisasi 3D secara interaktif.</span>
+                                    </div>
+                                    <button type="button" class="btn-activate-sim" id="btn-activate-sim">Coba Mode Simulasi</button>
+                                </div>
+
+                                <!-- Stage Footer Hint -->
+                                <div class="stage-footer">
+                                    <span class="stage-hint">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="hint-icon"><circle cx="12" cy="12" r="10"></circle><path d="m10 15 5-3-5-3v6z"></path></svg>
+                                        Geser mouse untuk rotasi 360&deg; &bull; Scroll untuk zoom &bull; Tombol atas untuk buka atap
+                                    </span>
+                                    <span class="twin-tag" id="stage-actuator-tag">Aktuator: Kipas Siaga &bull; Lampu Siaga</span>
+                                </div>
                             </div>
 
-                            <!-- Simulation Preset Bar (Active when Simulation Mode ON) -->
-                            <div class="simulation-bar" id="simulation-bar" style="display: none;">
-                                <div class="sim-bar-label">
-                                    <span class="sim-badge">SIMULASI AKTIF</span>
-                                    <span>Pilih Skenario Pengujian:</span>
-                                </div>
-                                <div class="sim-presets">
-                                    <button type="button" class="sim-preset-btn is-active" data-sim="normal">1. Nyaman &amp; Normal</button>
-                                    <button type="button" class="sim-preset-btn" data-sim="dark">2. Malam Gelap (Lampu ON)</button>
-                                    <button type="button" class="sim-preset-btn" data-sim="humid">3. Lembap (Kipas ON)</button>
-                                    <button type="button" class="sim-preset-btn" data-sim="gas">4. Bahaya Gas (Alarm &amp; Kipas)</button>
-                                    <button type="button" class="sim-preset-btn" data-sim="anomaly">5. Anomali AI</button>
-                                </div>
-                            </div>
+                            <!-- 4 HUMAN SENSOR METRIC CARDS (GRID 2x2 SEJAJAR DI BAWAH 3D) -->
+                            <div class="stats-grid stats-grid-2x2">
+                                <!-- SUHU -->
+                                <article class="stat-card tone-pink">
+                                    <div class="stat-top">
+                                        <span class="stat-label">Suhu Kamar</span>
+                                        <span class="stat-icon" aria-hidden="true">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <path d="M14 4a2 2 0 1 0-4 0v9.5a4.5 4.5 0 1 0 4 0z"></path>
+                                                <path d="M12 9v4.2"></path>
+                                            </svg>
+                                        </span>
+                                    </div>
+                                    <div class="stat-value"><span id="stat-suhu">--</span><small>&deg;C</small></div>
+                                    <span class="sensor-status-badge status-ok" id="stat-suhu-badge">Menunggu</span>
+                                    <span class="stat-foot" id="foot-suhu">Suhu terasa nyaman untuk beristirahat</span>
+                                    <div class="card-mini-meter"><span class="meter-fill" id="meter-suhu" style="width: 0%"></span></div>
+                                </article>
 
-                            <!-- Offline Helper Prompt -->
-                            <div class="offline-helper" id="offline-helper-banner">
-                                <span class="offline-helper-icon">📡</span>
-                                <div class="offline-helper-info">
-                                    <strong>Perangkat Belum Terhubung</strong>
-                                    <span>ESP32 belum mengirim data. Aktifkan mode simulasi untuk mencoba visualisasi 3D secara interaktif.</span>
-                                </div>
-                                <button type="button" class="btn-activate-sim" id="btn-activate-sim">Coba Mode Simulasi</button>
-                            </div>
+                                <!-- KELEMBAPAN -->
+                                <article class="stat-card tone-turq">
+                                    <div class="stat-top">
+                                        <span class="stat-label">Kelembapan Udara</span>
+                                        <span class="stat-icon" aria-hidden="true">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <path d="M12 2.5s6.5 6.6 6.5 11.2a6.5 6.5 0 0 1-13 0C5.5 9.1 12 2.5 12 2.5z"></path>
+                                            </svg>
+                                        </span>
+                                    </div>
+                                    <div class="stat-value"><span id="stat-kelembapan">--</span><small>%</small></div>
+                                    <span class="sensor-status-badge status-ok" id="stat-kelembapan-badge">Menunggu</span>
+                                    <span class="stat-foot" id="foot-kelembapan">Udara segar &bull; Ambang batas kipas &ge; 60%</span>
+                                    <div class="card-mini-meter"><span class="meter-fill" id="meter-kelembapan" style="width: 0%"></span></div>
+                                </article>
 
-                            <!-- Stage Footer Hint -->
-                            <div class="stage-footer">
-                                <span class="stage-hint">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="hint-icon"><circle cx="12" cy="12" r="10"></circle><path d="m10 15 5-3-5-3v6z"></path></svg>
-                                    Geser mouse untuk rotasi 360&deg; &bull; Scroll untuk zoom &bull; Tombol atas untuk tampak dalam
-                                </span>
-                                <span class="twin-tag" id="stage-actuator-tag">Aktuator: Kipas Siaga &bull; Lampu Siaga</span>
+                                <!-- GAS / ASAP -->
+                                <article class="stat-card tone-flame">
+                                    <div class="stat-top">
+                                        <span class="stat-label">Kualitas Udara &amp; Gas</span>
+                                        <span class="stat-icon" aria-hidden="true">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <path d="M12 4 2.7 20h18.6z"></path>
+                                                <path d="M12 9.5V14"></path>
+                                                <path d="M12 17h.01"></path>
+                                            </svg>
+                                        </span>
+                                    </div>
+                                    <div class="stat-value"><span id="stat-gas">Bersih</span></div>
+                                    <span class="sensor-status-badge status-ok" id="stat-gas-badge">Menunggu</span>
+                                    <span class="stat-foot" id="foot-gas">Sensor MQ-2 &bull; Udara bersih &amp; aman</span>
+                                    <div class="card-mini-meter"><span class="meter-fill" id="meter-gas" style="width: 0%"></span></div>
+                                </article>
+
+                                <!-- PENCAHAYAAN -->
+                                <article class="stat-card tone-yellow">
+                                    <div class="stat-top">
+                                        <span class="stat-label">Pencahayaan Kamar</span>
+                                        <span class="stat-icon" aria-hidden="true">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <circle cx="12" cy="12" r="4"></circle>
+                                                <path d="M12 2v2.2M12 19.8V22M2 12h2.2M19.8 12H22M4.3 4.3l1.6 1.6M18.1 18.1l1.6 1.6M19.7 4.3l-1.6 1.6M5.9 18.1l-1.6 1.6"></path>
+                                            </svg>
+                                        </span>
+                                    </div>
+                                    <div class="stat-value"><span id="stat-cahaya">Terang</span></div>
+                                    <span class="sensor-status-badge status-ok" id="stat-cahaya-badge">Menunggu</span>
+                                    <span class="stat-foot" id="foot-cahaya">Sensor LDR &bull; Kamar cukup terang</span>
+                                    <div class="card-mini-meter"><span class="meter-fill" id="meter-cahaya" style="width: 0%"></span></div>
+                                </article>
                             </div>
-                        </div>
+                        </div><!-- /.twin-left-column -->
 
                         <!-- RIGHT: QUICK SUMMARY & CONTROLS (~35%) -->
                         <div class="twin-quick-panel">
@@ -424,77 +506,6 @@
                                 </div>
                             </article>
                         </div>
-                    </div>
-
-                    <!-- 4 HUMAN SENSOR METRIC CARDS -->
-                    <div class="stats-grid">
-                        <!-- SUHU -->
-                        <article class="stat-card tone-pink">
-                            <div class="stat-top">
-                                <span class="stat-label">Suhu Kamar</span>
-                                <span class="stat-icon" aria-hidden="true">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M14 4a2 2 0 1 0-4 0v9.5a4.5 4.5 0 1 0 4 0z"></path>
-                                        <path d="M12 9v4.2"></path>
-                                    </svg>
-                                </span>
-                            </div>
-                            <div class="stat-value"><span id="stat-suhu">--</span><small>&deg;C</small></div>
-                            <span class="sensor-status-badge status-ok" id="stat-suhu-badge">Menunggu</span>
-                            <span class="stat-foot" id="foot-suhu">Suhu terasa nyaman untuk beristirahat</span>
-                            <div class="card-mini-meter"><span class="meter-fill" id="meter-suhu" style="width: 0%"></span></div>
-                        </article>
-
-                        <!-- KELEMBAPAN -->
-                        <article class="stat-card tone-turq">
-                            <div class="stat-top">
-                                <span class="stat-label">Kelembapan Udara</span>
-                                <span class="stat-icon" aria-hidden="true">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M12 2.5s6.5 6.6 6.5 11.2a6.5 6.5 0 0 1-13 0C5.5 9.1 12 2.5 12 2.5z"></path>
-                                    </svg>
-                                </span>
-                            </div>
-                            <div class="stat-value"><span id="stat-kelembapan">--</span><small>%</small></div>
-                            <span class="sensor-status-badge status-ok" id="stat-kelembapan-badge">Menunggu</span>
-                            <span class="stat-foot" id="foot-kelembapan">Udara segar &bull; Ambang batas kipas &ge; 60%</span>
-                            <div class="card-mini-meter"><span class="meter-fill" id="meter-kelembapan" style="width: 0%"></span></div>
-                        </article>
-
-                        <!-- GAS / ASAP -->
-                        <article class="stat-card tone-flame">
-                            <div class="stat-top">
-                                <span class="stat-label">Kualitas Udara &amp; Gas</span>
-                                <span class="stat-icon" aria-hidden="true">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M12 4 2.7 20h18.6z"></path>
-                                        <path d="M12 9.5V14"></path>
-                                        <path d="M12 17h.01"></path>
-                                    </svg>
-                                </span>
-                            </div>
-                            <div class="stat-value"><span id="stat-gas">Bersih</span></div>
-                            <span class="sensor-status-badge status-ok" id="stat-gas-badge">Menunggu</span>
-                            <span class="stat-foot" id="foot-gas">Sensor MQ-2 &bull; Udara bersih &amp; aman</span>
-                            <div class="card-mini-meter"><span class="meter-fill" id="meter-gas" style="width: 0%"></span></div>
-                        </article>
-
-                        <!-- PENCAHAYAAN -->
-                        <article class="stat-card tone-yellow">
-                            <div class="stat-top">
-                                <span class="stat-label">Pencahayaan Kamar</span>
-                                <span class="stat-icon" aria-hidden="true">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <circle cx="12" cy="12" r="4"></circle>
-                                        <path d="M12 2v2.2M12 19.8V22M2 12h2.2M19.8 12H22M4.3 4.3l1.6 1.6M18.1 18.1l1.6 1.6M19.7 4.3l-1.6 1.6M5.9 18.1l-1.6 1.6"></path>
-                                    </svg>
-                                </span>
-                            </div>
-                            <div class="stat-value"><span id="stat-cahaya">Terang</span></div>
-                            <span class="sensor-status-badge status-ok" id="stat-cahaya-badge">Menunggu</span>
-                            <span class="stat-foot" id="foot-cahaya">Sensor LDR &bull; Kamar cukup terang</span>
-                            <div class="card-mini-meter"><span class="meter-fill" id="meter-cahaya" style="width: 0%"></span></div>
-                        </article>
                     </div>
                 </section>
 
