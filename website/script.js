@@ -1488,7 +1488,37 @@ document.querySelectorAll(".sim-preset-btn[data-sim]").forEach(btn => {
     });
 });
 
-// First load
+async function fetchInitialHistory() {
+    try {
+        const response = await fetch("/api/history?limit=40", {
+            headers: { "Accept": "application/json" }
+        });
+        if (!response.ok) return;
+        const res = await response.json();
+        if (Array.isArray(res.data) && res.data.length > 0) {
+            const items = res.data.slice().reverse().map(item => ({
+                time: item.timestamp_str || item.created_at || "-",
+                suhu: Number(item.suhu ?? 0),
+                kelembapan: Number(item.kelembapan ?? 0),
+                cahaya: Number(item.cahaya ?? 0),
+                gas: Number(item.gas ?? 0),
+                led: String(item.led ?? "OFF").toUpperCase(),
+                buzzer: String(item.buzzer ?? "OFF").toUpperCase(),
+                kipas: String(item.kipas ?? "OFF").toUpperCase(),
+                buzzer_muted: String(item.buzzer ?? "").toUpperCase() === "MUTED",
+                esp32_online: true,
+                lastSeen: item.timestamp_str || "-"
+            }));
+            historyData = items.slice(-MAX_HISTORY);
+            renderHistoryTable();
+            drawChart();
+        }
+    } catch (err) {
+        // Fallback jika database belum aktif atau server dalam mode in-memory
+    }
+}
+
 renderHistoryTable();
+fetchInitialHistory();
 fetchSensorData();
 setInterval(fetchSensorData, POLLING_INTERVAL);

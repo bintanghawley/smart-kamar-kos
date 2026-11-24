@@ -1,0 +1,26 @@
+# Environment & Credentials
+.env
+*.env.local
+
+# Python cache & virtual environment
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# Editor & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Pending AI datasets/models (temporary during calibration)
+website/ai/dataset_calibration_pending.csv
+website/ai/ai_model_pending.pkl

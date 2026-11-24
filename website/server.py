@@ -14,8 +14,14 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from sklearn.ensemble import IsolationForest
 
+try:
+    from website import db
+except ImportError:
+    import db
+
 HOST = "0.0.0.0"
 PORT = 5000
+DEVICE_TOKEN = os.environ.get("DEVICE_TOKEN", "").strip()
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 AI_DIR = os.path.join(BASE_DIR, "ai")
@@ -164,6 +170,11 @@ active_model_source = "DEFAULT"
 active_evaluated_slot = None
 ai_trigger_desc = "Menunggu data sensor..."
 ai_status_desc = "Menunggu pembacaan sensor."
+
+event_lock = threading.Lock()
+prev_gas_danger = False
+prev_actuators = {"led": "OFF", "kipas": "OFF", "buzzer": "OFF"}
+prev_ai_status = "MENUNGGU DATA"
 
 calibration_samples = []
 last_calibration_sample_time = 0
@@ -510,6 +521,11 @@ def start_calibration(requested_slot=None):
         ai_raw_status = "KALIBRASI"
         ai_score = None
 
+    db.record_incident(
+        "CALIBRATION_START",
+        "INFO",
+        f"Sesi kalibrasi slot {target_meta['label']} ({target_meta['range_label']}) dimulai."
+    )
     print(f"Kalibrasi slot '{target_meta['label']}' dimulai.")
     return 200, {
         "status": "OK",
@@ -569,6 +585,19 @@ def cancel_calibration():
         ai_status = "MENUNGGU DATA" if has_model else "TIDAK TERSEDIA"
         ai_raw_status = "MENUNGGU DATA"
         ai_score = None
+
+    db.record_incident(
+        "CALIBRATION_CANCELLED",
+        "INFO",
+        f"Kalibrasi slot {target_label} dibatalkan."
+    )
+    db.record_calibration_session(
+        target_slot,
+        len(calibration_samples),
+        {},
+        None,
+        status="CANCELLED"
+    )
 
     print("Kalibrasi dibatalkan.")
     return 200, {
@@ -913,6 +942,19 @@ def train_calibration_model(samples, target_slot=None):
         except OSError:
             pass
 
+        db.record_calibration_session(
+            target_slot,
+            len(samples),
+            baseline,
+            target_model_file,
+            status="SUCCESS"
+        )
+        db.record_incident(
+            "CALIBRATION_SUCCESS",
+            "INFO",
+            f"Model AI slot {target_meta['label']} berhasil dilatih ({len(samples)} sampel)."
+        )
+
         print(f"Kalibrasi slot '{target_meta['label']}' BERHASIL.")
         print("Sampel pelatihan:", len(samples))
         print("Baseline miniatur:", baseline)
@@ -944,6 +986,19 @@ def train_calibration_model(samples, target_slot=None):
             )
             ai_status = "MENUNGGU DATA" if has_model else "TIDAK TERSEDIA"
             ai_error = str(error)
+
+        db.record_calibration_session(
+            target_slot,
+            len(samples) if samples else 0,
+            {},
+            None,
+            status="FAILED"
+        )
+        db.record_incident(
+            "CALIBRATION_FAILED",
+            "WARNING",
+            f"Kalibrasi slot {target_meta['label']} gagal: {error}."
+        )
 
         print(f"Kalibrasi slot '{target_meta['label']}' gagal:", error)
         print("Model sebelumnya tetap digunakan.")
@@ -1184,6 +1239,12 @@ class SmartKosServer(BaseHTTPRequestHandler):
             )
             return
 
+        if DEVICE_TOKEN:
+            token = self.headers.get("X-Device-Token", "").strip()
+            if token != DEVICE_TOKEN:
+                self.send_json(401, {"error": "Token perangkat tidak valid"})
+                return
+
         try:
             length = int(self.headers.get("Content-Length", 0))
 
@@ -1275,6 +1336,85 @@ class SmartKosServer(BaseHTTPRequestHandler):
                 extra_headers={"X-Buzzer-Mute": "1" if current_mute else "0"}
             )
 
+            try:
+                ai_pay = get_ai_payload()
+                force_db_save = False
+
+                current_gas_val = current_data.get("gas", 0)
+                current_fan = current_data.get("kipas", "OFF")
+                current_led = current_data.get("led", "OFF")
+                current_buzz = current_data.get("buzzer", "OFF")
+                is_gas_danger = isinstance(current_gas_val, (int, float)) and current_gas_val >= GAS_THRESHOLD
+
+                with event_lock:
+                    global prev_gas_danger, prev_actuators, prev_ai_status
+
+                    if is_gas_danger and not prev_gas_danger:
+                        db.record_incident(
+                            "GAS_DANGER",
+                            "DANGER",
+                            f"Gas melebihi ambang batas ({current_gas_val} ADC). Buzzer dan kipas aktif.",
+                            gas_value=current_gas_val,
+                            ai_score=current_ai_score
+                        )
+                        force_db_save = True
+                    prev_gas_danger = is_gas_danger
+
+                    if current_fan != prev_actuators.get("kipas"):
+                        db.record_incident(
+                            "FAN_ON" if current_fan == "ON" else "FAN_OFF",
+                            "INFO",
+                            f"Exhaust fan {'aktif berputar' if current_fan == 'ON' else 'berhenti'}.",
+                            gas_value=current_gas_val,
+                            ai_score=current_ai_score
+                        )
+                        prev_actuators["kipas"] = current_fan
+                        force_db_save = True
+
+                    if current_led != prev_actuators.get("led"):
+                        db.record_incident(
+                            "LED_ON" if current_led == "ON" else "LED_OFF",
+                            "INFO",
+                            f"Lampu LED otomatis {'menyala' if current_led == 'ON' else 'padam'}.",
+                            gas_value=current_gas_val,
+                            ai_score=current_ai_score
+                        )
+                        prev_actuators["led"] = current_led
+
+                    if current_buzz != prev_actuators.get("buzzer"):
+                        if current_buzz == "MUTED":
+                            db.record_incident(
+                                "BUZZER_MUTED",
+                                "WARNING",
+                                "Suara buzzer dimatikan oleh pengguna.",
+                                gas_value=current_gas_val,
+                                ai_score=current_ai_score
+                            )
+                        elif current_buzz == "ON":
+                            db.record_incident(
+                                "BUZZER_ON",
+                                "DANGER",
+                                "Alarm buzzer berbunyi aktif.",
+                                gas_value=current_gas_val,
+                                ai_score=current_ai_score
+                            )
+                        prev_actuators["buzzer"] = current_buzz
+
+                    if current_ai_status == "ANOMALI" and prev_ai_status != "ANOMALI":
+                        db.record_incident(
+                            "AI_ANOMALY",
+                            "WARNING",
+                            f"Pola sensor abnormal: {ai_pay.get('ai_trigger_desc')}",
+                            gas_value=current_gas_val,
+                            ai_score=current_ai_score
+                        )
+                        force_db_save = True
+                    prev_ai_status = current_ai_status
+
+                db.record_telemetry(current_data, ai_pay, force=force_db_save)
+            except Exception as db_err:
+                print("Peringatan, logging DB dilewati:", db_err)
+
         except json.JSONDecodeError:
             self.send_json(400, {"error": "Format JSON Invalid"})
 
@@ -1354,6 +1494,88 @@ class SmartKosServer(BaseHTTPRequestHandler):
             self.send_json(200, response)
             return
 
+        if clean_path == "/api/history":
+            limit = 100
+            if "?" in self.path:
+                for param in self.path.split("?", 1)[1].split("&"):
+                    if param.startswith("limit="):
+                        try:
+                            limit = int(param.split("=")[1])
+                        except ValueError:
+                            pass
+            history = db.get_history(limit=limit)
+            self.send_json(200, {"status": "OK", "count": len(history), "data": history})
+            return
+
+        if clean_path == "/api/incidents":
+            limit = 50
+            if "?" in self.path:
+                for param in self.path.split("?", 1)[1].split("&"):
+                    if param.startswith("limit="):
+                        try:
+                            limit = int(param.split("=")[1])
+                        except ValueError:
+                            pass
+            incidents = db.get_incidents(limit=limit)
+            self.send_json(200, {"status": "OK", "count": len(incidents), "data": incidents})
+            return
+
+        if clean_path == "/api/calibration/history":
+            limit = 20
+            if "?" in self.path:
+                for param in self.path.split("?", 1)[1].split("&"):
+                    if param.startswith("limit="):
+                        try:
+                            limit = int(param.split("=")[1])
+                        except ValueError:
+                            pass
+            calibrations = db.get_calibration_history(limit=limit)
+            self.send_json(200, {"status": "OK", "count": len(calibrations), "data": calibrations})
+            return
+
+        if clean_path == "/api/export/csv":
+            limit = 5000
+            if "?" in self.path:
+                for param in self.path.split("?", 1)[1].split("&"):
+                    if param.startswith("limit="):
+                        try:
+                            limit = int(param.split("=")[1])
+                        except ValueError:
+                            pass
+            csv_content = db.export_telemetry_csv(limit=limit)
+            csv_bytes = csv_content.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/csv; charset=utf-8")
+            self.send_header("Content-Length", str(len(csv_bytes)))
+            self.send_header("Content-Disposition", "attachment; filename=sensor_telemetry.csv")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            try:
+                self.wfile.write(csv_bytes)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+            return
+
+        if clean_path == "/api/health":
+            stats = db.get_stats()
+            with state_lock:
+                online = (
+                    last_received_timestamp > 0
+                    and time.time() - last_received_timestamp
+                    <= ESP32_TIMEOUT_SECONDS
+                )
+            self.send_json(200, {
+                "status": "OK",
+                "timestamp": datetime.now().isoformat(timespec="seconds"),
+                "timezone": os.environ.get("TZ", "Asia/Jakarta"),
+                "db_connected": stats.get("db_connected", False),
+                "telemetry_rows": stats.get("telemetry_rows", 0),
+                "incident_rows": stats.get("incident_rows", 0),
+                "calibration_rows": stats.get("calibration_rows", 0),
+                "esp32_online": online
+            })
+            return
+
         path_map = {
             "/": "index.html",
             "/index.html": "index.html",
@@ -1422,6 +1644,7 @@ if __name__ == "__main__":
                 pass
 
     load_all_ai_models()
+    db.init_db()
 
     server = ThreadingHTTPServer((HOST, PORT), SmartKosServer)
     print("Server aktif pada port {}".format(PORT))
