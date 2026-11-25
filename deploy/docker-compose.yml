@@ -24,8 +24,8 @@ services:
 
   app:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: deploy/Dockerfile
     container_name: smartkos-app
     restart: unless-stopped
     depends_on:
@@ -40,7 +40,7 @@ services:
       DEVICE_TOKEN: ${DEVICE_TOKEN:-}
       DEFAULT_DEVICE_ID: ${DEFAULT_DEVICE_ID:-esp32-kamar-01}
     volumes:
-      - ./website/ai:/app/website/ai
+      - ../website/ai:/app/website/ai
     networks:
       - smartkos-net
 

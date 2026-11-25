@@ -146,14 +146,13 @@ $$\text{Kipas ON} \iff (\text{Gas} \ge 2000) \lor (\text{Kelembapan} \ge 60\%)$$
 ```text
 smart-kamar-kos/
 ├── .dockerignore                 # File yang diabaikan saat build image Docker
-├── .env.example                  # Template variabel lingkungan (database, timezone, token)
 ├── .gitignore                    # Konfigurasi pengabaian Git (cache, venv, database)
-├── Dockerfile                    # Image Docker backend Python 3.11-slim
-├── docker-compose.yml            # Orkestrasi container PostgreSQL 16 & Server SmartKos
-├── requirements.txt              # Dependensi pustaka Python backend
 ├── README.md                     # Dokumentasi utama project
 │
-├── deploy/                       # Berkas operasional deployment cloud VPS
+├── deploy/                       # Berkas operasional deployment cloud VPS & Docker
+│   ├── .env.example              # Template variabel lingkungan (database, timezone, token)
+│   ├── Dockerfile                # Image Docker backend Python 3.11-slim
+│   ├── docker-compose.yml        # Orkestrasi container PostgreSQL 16 & Server SmartKos
 │   ├── PANDUAN_DEPLOY_VPS.md     # Panduan langkah demi langkah deploy VPS Ubuntu
 │   ├── nginx-skk.kradev.my.id.conf # Konfigurasi VirtualHost Nginx Reverse Proxy
 │   └── setup_vps.sh              # Skrip shell otomasi instalasi & konfigurasi VPS
@@ -162,6 +161,7 @@ smart-kamar-kos/
 │   └── main.py                   # Program MicroPython pada board ESP32
 │
 └── website/                      # Backend HTTP server dan antarmuka web
+    ├── requirements.txt          # Dependensi pustaka Python backend
     ├── index.html                # Struktur halaman dashboard & 3D canvas
     ├── style.css                 # Penataan gaya modern, tema gelap, & animasi CSS
     ├── script.js                 # Logika polling data, grafik Canvas, & kontrol UI
@@ -213,7 +213,7 @@ Backend `server.py` menyediakan antarmuka API HTTP berikut:
 #### Langkah 1: Pasang Dependensi Python
 Buka terminal pada direktori utama project:
 ```bash
-pip install -r requirements.txt
+pip install -r website/requirements.txt
 ```
 *(Catatan: Jika `psycopg2` belum terpasang atau PostgreSQL tidak aktif, server otomatis berjalan dalam mode in-memory tanpa error).*
 
@@ -239,14 +239,16 @@ http://localhost:5000
 
 Jika Anda ingin menjalankan backend bersama database PostgreSQL secara terisolasi menggunakan Docker:
 
-1. Salin file environment:
+1. Masuk ke folder `deploy` dan siapkan file environment:
    ```bash
+   cd deploy
    cp .env.example .env
    ```
 2. Jalankan container dengan Docker Compose:
    ```bash
    docker compose up -d
    ```
+   *(Atau langsung dari root project: `docker compose -f deploy/docker-compose.yml up -d`)*
 3. Periksa status container:
    ```bash
    docker compose ps

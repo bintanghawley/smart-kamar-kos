@@ -70,7 +70,7 @@ Skrip `setup_vps.sh` secara otomatis:
 Salin template variabel lingkungan:
 
 ```bash
-cd /root/smart-kamar-kos
+cd /root/smart-kamar-kos/deploy
 cp .env.example .env
 nano .env
 ```
@@ -117,7 +117,7 @@ nginx -t && systemctl reload nginx
 Jalankan database PostgreSQL dan backend Python:
 
 ```bash
-cd /root/smart-kamar-kos
+cd /root/smart-kamar-kos/deploy
 docker compose up -d --build
 ```
 
@@ -190,17 +190,20 @@ Buka di browser:
 ### Pembaruan Kode
 ```bash
 cd /root/smart-kamar-kos
-git pull origin Dev-Cloud
+git pull origin main
+cd deploy
 docker compose up -d --build
 ```
 
 ### Backup Database
 ```bash
+cd /root/smart-kamar-kos/deploy
 docker compose exec db pg_dump -U smartkos smartkos > /root/backup_smartkos_$(date +%Y%m%d_%H%M%S).sql
 ```
 
 ### Restart Layanan
 ```bash
+cd /root/smart-kamar-kos/deploy
 docker compose restart
 systemctl reload nginx
 ```
