@@ -1,6 +1,6 @@
 # Smart Kamar Kos
 
-> Sistem IoT untuk memantau kondisi kamar kos dan mengendalikan perangkat secara otomatis menggunakan ESP32 dan dashboard berbasis web.
+> Sistem IoT terpadu untuk memantau kondisi kamar kos, mengendalikan perangkat secara otomatis, visualisasi 3D Digital Twin interaktif, deteksi anomali AI, serta pencatatan telemetri berbasis PostgreSQL dan Docker.
 
 ---
 
@@ -9,31 +9,32 @@
 **Smart Kamar Kos** adalah project Internet of Things (IoT) yang dibuat untuk membantu penghuni kamar kos memantau kondisi lingkungan ruangan secara real-time sekaligus melakukan otomatisasi perangkat elektronik.
 
 Pada project ini:
-- **ESP32** berfungsi sebagai mikrokontroler utama yang membaca data dari berbagai sensor dan mengendalikan perangkat aktuator secara otomatis.
-- Data pembacaan sensor dikirimkan dari ESP32 ke komputer melalui jaringan **Wi-Fi** menggunakan protokol HTTP.
-- Komputer menjalankan program backend sederhana (`server.py`) yang bertugas menerima data dari ESP32 dan menyediakan antarmuka API.
-- Pengguna dapat memantau seluruh parameter kamar (suhu, kelembapan, cahaya, dan gas) melalui **dashboard website** yang responsif dan interaktif.
-- Sistem secara mandiri melakukan otomasi seperti menyalakan lampu saat gelap, mengaktifkan alarm saat mendeteksi gas, dan menyalakan exhaust fan saat ruangan lembap atau berasap.
+- **ESP32** berfungsi sebagai mikrokontroler utama yang membaca data dari berbagai sensor fisik dan mengendalikan perangkat aktuator secara otomatis.
+- Data pembacaan sensor dikirimkan dari ESP32 ke backend server melalui jaringan **Wi-Fi** menggunakan protokol HTTP.
+- Komputer atau server menjalankan backend (`server.py`) yang bertugas menerima data telemetri, mengevaluasi anomali sensor menggunakan machine learning (*Isolation Forest*), serta mencatat riwayat ke database **PostgreSQL** (dengan *fallback in-memory* otomatis jika database tidak aktif).
+- Pengguna dapat memantau seluruh parameter kamar (suhu, kelembapan, cahaya, dan gas) melalui **dashboard web interaktif** yang dilengkapi **3D Digital Twin Kamar Kos 01** (Three.js) untuk visualisasi ruangan tiga dimensi yang imersif.
+- Sistem secara mandiri melakukan otomasi cerdas seperti menyalakan lampu saat gelap, mengaktifkan alarm saat mendeteksi gas, dan menyalakan exhaust fan saat ruangan lembap atau berasap dengan proteksi *delay timer*.
+- Mendukung pengoperasian lokal (pengujian di laptop/komputer) maupun deployment cloud berbasis **Docker Compose** dan reverse proxy **Nginx + SSL**.
 
 ---
 
-## Fitur
+## Fitur Utama
 
+- **3D Digital Twin Kamar Kos 01 (Three.js Offline)**: Visualisasi miniatur kamar kos secara 3 dimensi tanpa ketergantungan koneksi internet eksternal (*self-hosted vendor*). Dilengkapi kontrol orbit 360°, tombol toggle buka/tutup atap, animasi fokus kamera ke sensor saat bahaya, dan label hotspot interaktif 2 layer.
 - **Monitoring Suhu Ruangan**: Membaca suhu lingkungan kamar kos secara berkala menggunakan sensor DHT11.
 - **Monitoring Kelembapan Udara**: Memantau tingkat kelembapan udara untuk mencegah ruangan terasa pengap.
-- **Monitoring Intensitas Cahaya**: Membaca kondisi terang atau gelapnya kamar menggunakan sensor LDR.
-- **Monitoring Sensor Gas (MQ-2)**: Mendeteksi indikasi gas atau asap di sekitar kamar.
+- **Monitoring Intensitas Cahaya**: Membaca kondisi terang atau gelapnya kamar menggunakan sensor LDR analog.
+- **Monitoring Sensor Gas (MQ-2)**: Mendeteksi indikasi gas berbahaya atau asap di sekitar ruangan.
 - **Lampu/LED Otomatis**: Menyalakan LED secara otomatis ketika intensitas cahaya ruangan terdeteksi gelap.
-- **Alarm Buzzer Keamanan**: Membunyikan buzzer sebagai peringatan bahaya saat konsentrasi gas melewati ambang batas aman.
+- **Alarm Buzzer Keamanan**: Membunyikan buzzer sebagai peringatan bahaya saat konsentrasi gas melewati ambang batas aman, dilengkapi fitur *remote mute* dari dashboard dan *auto-rearm*.
 - **Exhaust Fan Otomatis**: Menyalakan kipas pembuang udara secara otomatis jika kadar gas tinggi atau kelembapan udara tinggi.
 - **Delay Timer Kipas (10 Detik)**: Kipas tidak langsung mati ketika udara mulai membaik, melainkan tetap berputar selama 10 detik untuk memastikan sirkulasi udara bersih sebelum padam.
-- **Dashboard Web Modern**: Menampilkan seluruh data metrik sensor dan status aktuator dalam kartu monitoring yang jelas.
-- **Grafik Tren Sensor Real-Time**: Visualisasi data historis sensor menggunakan HTML5 Canvas dengan pilihan tab sensor (Suhu, Kelembapan, Gas, Cahaya).
-- **Indikator Status Koneksi**: Menampilkan status keterhubungan sistem antara dashboard, server, dan ESP32.
 - **AI Anomaly Detection & Skor Keselarasan Pola**: Analisis pola sensor miniatur kamar secara cerdas berbasis arsitektur *Baseline Adaptive Envelope + Isolation Forest* dengan skor dinamis 0%–100%.
-- **Kalibrasi 4 Slot Waktu (Pagi, Siang, Sore, Malam)**: Fleksibel mengambil 100 sampel saat sensor stabil sesuai waktu (atau dipilih manual via kartu slot) tanpa mengganggu slot waktu lain.
-- **Senyapkan / Mute Buzzer dari Web**: Tombol kontrol remote untuk membisukan suara buzzer saat pengujian atau alarm aktif tanpa menghentikan exhaust fan.
-- **Mode Demo / Simulasi**: Fitur bawaan pada website untuk mensimulasikan pergerakan data sensor saat perangkat keras sedang offline (sangat berguna untuk presentasi di kelas).
+- **Kalibrasi AI 4 Slot Waktu (Pagi, Siang, Sore, Malam)**: Pengambilan 100 sampel saat sensor stabil sesuai waktu ruangan tanpa mengganggu slot waktu lain.
+- **Riwayat Telemetri & Log Insiden (PostgreSQL)**: Pencatatan otomatis riwayat sensor, alert bahaya, dan sesi kalibrasi ke PostgreSQL dengan sistem *graceful in-memory fallback* jika dijalankan tanpa database.
+- **Ekspor Riwayat ke CSV**: Fitur pengunduhan data riwayat telemetri langsung dari dashboard untuk analisis data lanjutan.
+- **Dashboard Web Modern**: Menampilkan seluruh data metrik sensor, status aktuator, panel AI, dan grafik tren historis HTML5 Canvas.
+- **Siap Cloud & Docker Compose**: Dilengkapi `Dockerfile`, `docker-compose.yml`, serta panduan dan skrip setup otomatis VPS Ubuntu dengan Nginx Reverse Proxy dan SSL Let's Encrypt.
 
 ---
 
@@ -42,76 +43,65 @@ Pada project ini:
 Alur interaksi sistem digambarkan dalam bagan berikut:
 
 ```text
-+-----------------------+
-|         ESP32         |
-|  - Baca DHT11, LDR,   |
-|    dan MQ-2           |
-|  - Logika aktuator    |
-|    (LED, Buzzer, Fan) |
-+-----------------------+
-            |
-            | Wi-Fi (HTTP POST /data)
-            v
-+-----------------------+
-|       server.py       |
-|  - Python HTTP Server |
-|  - Simpan data sensor |
-|  - Sediakan API data  |
-+-----------------------+
-            |
-            | HTTP GET /api/data
-            v
-+-----------------------+
-|   Dashboard Website   |
-|  - HTML, CSS, JS      |
-|  - Kartu & Grafik     |
-|  - Alert peringatan   |
-+-----------------------+
++------------------------------------------+
+|                  ESP32                   |
+|  - Baca DHT11 (GPIO 18), LDR (GPIO 34),  |
+|    dan MQ-2 (GPIO 32)                    |
+|  - Logika aktuator mandiri               |
+|    (LED GPIO 26, Buzzer 25, Kipas 27)    |
++------------------------------------------+
+                     |
+                     | Wi-Fi (HTTP POST /data)
+                     v
++------------------------------------------+
+|                server.py                 |
+|  - Python HTTP Server (Port 5000)        |
+|  - AI Engine (Isolation Forest)          |
+|  - Simpan memori status terkini          |
+|  - Logika Remote Mute Buzzer             |
++------------------------------------------+
+         |                        |
+         | (Opsional/Docker)      | HTTP GET/POST API
+         v                        v
++------------------+     +----------------------------------+
+|    PostgreSQL    |     |        Dashboard Website         |
+|  - Riwayat data  |     |  - HTML5, CSS3, JavaScript murni |
+|  - Log insiden   |     |  - 3D Digital Twin (Three.js)    |
+|  - Sesi kalibrasi|     |  - Grafik Canvas Real-Time       |
++------------------+     |  - Panel AI & Slot Waktu         |
+                         +----------------------------------+
 ```
-
-Peran komponen sistem:
-1. **ESP32**: Membaca data fisik dari sensor lingkungan, mengeksekusi logika aktuator, dan mengirimkan payload data ke komputer melalui koneksi Wi-Fi.
-2. **server.py**: Menerima request data dari ESP32, menyimpan status sensor terakhir di memori, dan melayani endpoint data untuk website.
-3. **Dashboard Website**: Melakukan polling berkala ke server untuk menampilkan visual data sensor, status terkini aktuator, notifikasi bahaya, dan kesimpulan otomatis kondisi kamar.
 
 ---
 
-## Komponen yang Digunakan
-
-### Hardware
+## Komponen Hardware
 
 | Komponen | Fungsi |
 |---|---|
 | ESP32 Development Board | Mikrokontroler utama pemroses logika dan modul Wi-Fi |
 | Sensor DHT11 | Mengukur suhu (°C) dan kelembapan udara (%) |
-| Sensor Gas MQ-2 | Mendeteksi keberadaan gas atau asap (pembacaan analog) |
-| Sensor LDR (Photoresistor) | Mendeteksi intensitas cahaya ruangan (pembacaan analog) |
+| Sensor Gas MQ-2 | Mendeteksi keberadaan gas atau asap (pembacaan analog AO) |
+| Sensor LDR (Photoresistor) | Mendeteksi intensitas cahaya ruangan (pembacaan analog AO) |
 | Buzzer Module | Menghasilkan bunyi alarm peringatan saat gas berbahaya terdeteksi |
 | LED | Indikator penerangan otomatis ketika kamar gelap |
 | Relay Module 5V | Sakelar elektronik untuk menyalakan dan mematikan exhaust fan |
 | Kipas DC 5V (Exhaust Fan) | Membuang udara pengap atau gas dan menjaga sirkulasi kamar |
 | Resistor untuk LED | Pembatas arus listrik pengaman komponen LED |
-| Breadboard | Papan penghubung rangkaian prototipe |
-| Kabel Jumper | Menghubungkan pin mikrokontroler dengan modul sensor/aktuator |
+| Breadboard & Kabel Jumper | Papan dan kabel penghubung rangkaian prototipe |
 | Kabel USB | Mengunggah program dan memberikan daya ke ESP32 |
 
 ---
 
 ## Konfigurasi Pin ESP32
 
-Konfigurasi pin yang digunakan pada mikrokontroler ESP32:
-
-| Komponen | Pin ESP32 | Keterangan |
-|---|---:|---|
-| DHT11 DATA | GPIO 18 | Pin data sensor suhu dan kelembapan |
-| MQ-2 AO | GPIO 32 | Pin analog input pembacaan nilai gas |
-| LDR AO | GPIO 34 | Pin analog input pembacaan nilai cahaya |
-| Buzzer I/O | GPIO 25 | Pin output kendali alarm buzzer |
-| LED | GPIO 26 | Pin output kendali lampu LED otomatis |
-| Relay IN | GPIO 27 | Pin output kendali relay kipas exhaust |
-
-> **Catatan Pin Analog**:
-> Pin **AO** (Analog Output) pada modul MQ-2 dan LDR dihubungkan ke pin ADC ESP32 (GPIO 32 dan GPIO 34 dengan atenuasi `ADC.ATTN_11DB`) untuk mendapatkan rentang pembacaan nilai analog 0–4095. Pin digital (DO) pada kedua sensor tidak digunakan dalam sistem ini.
+| Komponen | Pin ESP32 | Tipe | Keterangan |
+|---|---:|---|---|
+| DHT11 DATA | GPIO 18 | Digital I/O | Pin data sensor suhu dan kelembapan |
+| MQ-2 AO | GPIO 32 | Analog Input (ADC1) | Atenuasi `ADC.ATTN_11DB` (rentang nilai 0–4095) |
+| LDR AO | GPIO 34 | Analog Input (ADC1) | Atenuasi `ADC.ATTN_11DB` (rentang nilai 0–4095) |
+| Buzzer I/O | GPIO 25 | Digital Output | Kendali alarm buzzer |
+| LED | GPIO 26 | Digital Output | Kendali lampu LED otomatis |
+| Relay IN | GPIO 27 | Digital Output | Kendali relay exhaust fan |
 
 ---
 
@@ -122,249 +112,194 @@ Sistem bekerja berdasarkan nilai ambang batas (*threshold*) yang telah ditentuka
 - **Threshold Gas**: `2000` (nilai ADC)
 - **Threshold Cahaya**: `2000` (nilai ADC)
 - **Threshold Kelembapan**: `60%`
+- **Delay Fan**: `10000 ms` (10 detik)
 
 ### 1. Sensor Gas (MQ-2)
-- Jika nilai sensor gas **$\ge$ 2000**:
+- Jika nilai sensor gas $\ge$ 2000:
   - Buzzer aktif (berbunyi nyaring).
   - Exhaust fan langsung aktif berputar untuk membuang gas keluar ruangan.
-  - **Fitur Tombol Mute di Dashboard**: Pengguna dapat mematikan suara buzzer langsung melalui tombol di dashboard website. Buzzer akan tetap mati selama nilai gas masih di atas *threshold*.
-  - **Otomatis Aktif Kembali (Re-arm)**: Apabila nilai gas sudah turun kembali ke kondisi normal (< 2000) dan nantinya naik lagi $\ge$ 2000, alarm buzzer akan otomatis kembali berbunyi.
-- Jika nilai sensor gas **< 2000**:
+  - **Mute dari Web**: Pengguna dapat mematikan suara buzzer melalui tombol di dashboard website tanpa menghentikan exhaust fan.
+  - **Auto-Rearm**: Ketika gas turun ke normal (< 2000) lalu naik kembali $\ge$ 2000, buzzer otomatis kembali bersuara.
+- Jika nilai sensor gas < 2000:
   - Buzzer mati (kembali hening) dan status mute disetel ulang (*auto-reset*).
 
 ### 2. Sensor Kelembapan (DHT11)
-- Jika kelembapan **$\ge$ 60%**:
-  - Exhaust fan aktif berputar untuk mengurangi kelembapan dan mencegah jamur di dalam kamar.
-- Jika kelembapan **< 60%**:
-  - Sistem tidak langsung mematikan kipas, melainkan memulai hitung mundur (*delay*) pemadaman kipas.
+- Jika kelembapan $\ge$ 60%:
+  - Exhaust fan aktif berputar untuk mengurangi kelembapan.
+- Jika kelembapan < 60%:
+  - Sistem memulai hitung mundur (*delay*) pemadaman kipas selama 10 detik.
 
 ### 3. Exhaust Fan (Relay)
-Exhaust fan memiliki dua kondisi pemicu:
 $$\text{Kipas ON} \iff (\text{Gas} \ge 2000) \lor (\text{Kelembapan} \ge 60\%)$$
-
-- **Fitur Delay 10 Detik**: Ketika gas sudah normal dan kelembapan sudah di bawah 60%, kipas tetap menyala selama **10 detik (10.000 ms)**. Setelah durasi 10 detik terpenuhi tanpa ada kenaikan gas/kelembapan, barulah kipas dimatikan.
-- Jika sebelum 10 detik berakhir nilai gas kembali $\ge$ 2000 atau kelembapan kembali $\ge$ 60%, timer pemadaman dibatalkan dan kipas terus menyala.
+- **Fitur Delay 10 Detik**: Ketika kondisi pemicu kembali normal, kipas tetap menyala selama 10 detik untuk memastikan udara telah tersirkulasi dengan baik. Jika sebelum 10 detik berakhir kondisi pemicu kembali muncul, timer dibatalkan dan kipas terus menyala.
 
 ### 4. Sensor Cahaya (LDR)
-- Jika nilai LDR **$\ge$ 2000**:
-  - Ruangan dinyatakan **GELAP**.
-  - LED menyala secara otomatis untuk memberikan penerangan.
-- Jika nilai LDR **< 2000**:
-  - Ruangan dinyatakan **TERANG**.
-  - LED dimatikan untuk menghemat energi.
+- Jika nilai LDR $\ge$ 2000:
+  - Ruangan dinyatakan **GELAP** $\rightarrow$ LED menyala otomatis.
+- Jika nilai LDR < 2000:
+  - Ruangan dinyatakan **TERANG** $\rightarrow$ LED dimatikan untuk efisiensi energi.
 
 ---
 
-## Teknologi yang Digunakan
-
-| Teknologi | Penggunaan |
-|---|---|
-| **MicroPython** | Bahasa pemrograman pada board ESP32 |
-| **Python 3** (`http.server`) | Backend server lokal di komputer |
-| **HTML5** | Struktur tampilan antarmuka dashboard |
-| **CSS3** | Penataan gaya modern, tema gelap, dan animasi perangkat |
-| **JavaScript (Vanilla)** | Logika interaktif, pengambilan data, dan render grafik Canvas |
-| **HTTP / JSON** | Protokol dan format pertukaran data antar perangkat |
-
----
-
-## Struktur Repository
+## Struktur Direktori Repository
 
 ```text
 smart-kamar-kos/
-├── esp32/
-│   └── main.py       # Program utama MicroPython pada ESP32
+├── .dockerignore                 # File yang diabaikan saat build image Docker
+├── .env.example                  # Template variabel lingkungan (database, timezone, token)
+├── .gitignore                    # Konfigurasi pengabaian Git (cache, venv, database)
+├── Dockerfile                    # Image Docker backend Python 3.11-slim
+├── docker-compose.yml            # Orkestrasi container PostgreSQL 16 & Server SmartKos
+├── requirements.txt              # Dependensi pustaka Python backend
+├── README.md                     # Dokumentasi utama project
 │
-└── website/
-    ├── index.html    # Struktur halaman dashboard monitoring
-    ├── style.css     # Styling tampilan antarmuka (CSS modern)
-    ├── script.js     # Logika pengambilan data dan grafik Canvas
-    └── server.py     # Server lokal perantara data ESP32 dan website
-```
-
-### Penjelasan File
-- `esp32/main.py`: Program utama yang berjalan di mikrokontroler ESP32. Bertanggung jawab membaca sensor DHT11, MQ-2, LDR, memproses logika kendali output, mengontrol pin LED, buzzer, dan relay, serta mengirim data melalui Wi-Fi.
-- `website/server.py`: Server HTTP lokal berbasis pustaka standar Python (`http.server`). Berfungsi menerima payload data sensor dari ESP32 dan menyediakan data tersebut ke website.
-- `website/index.html`: File halaman antarmuka dashboard monitoring yang menampilkan kartu status sensor, indikator output aktuator, riwayat grafik, dan panel status koneksi.
-- `website/style.css`: File CSS murni yang memberikan tampilan antarmuka modern dengan skema warna gelap, kartu informasi responsif, serta animasi putaran kipas dan kedipan alarm.
-- `website/script.js`: Skrip JavaScript murni yang melakukan polling data ke server secara berkala, memperbarui elemen kartu di layar, membuat narasi kesimpulan kondisi kamar otomatis, dan menggambar grafik pada HTML5 Canvas.
-
----
-
-## Alur Data
-
-1. Sensor DHT11, MQ-2, dan LDR membaca kondisi fisik lingkungan kamar kos.
-2. ESP32 membaca data sensor setiap siklus program dan memproses logika otomatisasi perangkat.
-3. ESP32 langsung mengendalikan pin fisik LED, buzzer, dan relay sesuai kondisi yang terdeteksi.
-4. ESP32 mengirim data sensor dalam format JSON ke komputer melalui jaringan Wi-Fi menggunakan metode HTTP POST ke endpoint `/data`.
-5. `server.py` yang berjalan di komputer menerima data tersebut dan menyimpannya di memori server.
-6. Browser membuka dashboard website, kemudian `script.js` mengambil data sensor terbaru secara berkala (*polling*) menggunakan metode HTTP GET ke endpoint `/api/data`.
-7. Dashboard website memperbarui angka metrik, status perangkat, grafik tren sensor, dan status notifikasi secara real-time.
-
----
-
-## Format Data
-
-Contoh struktur data JSON yang dikirimkan oleh ESP32 ke server:
-
-```json
-{
-  "suhu": 29,
-  "kelembapan": 46,
-  "cahaya": 895,
-  "gas": 980
-}
-```
-
-Dashboard website juga dapat menerima dan memproses data yang menyertakan status aktuator secara langsung:
-
-```json
-{
-  "suhu": 29,
-  "kelembapan": 46,
-  "cahaya": 895,
-  "gas": 980,
-  "led": "OFF",
-  "buzzer": "OFF",
-  "kipas": "OFF"
-}
+├── deploy/                       # Berkas operasional deployment cloud VPS
+│   ├── PANDUAN_DEPLOY_VPS.md     # Panduan langkah demi langkah deploy VPS Ubuntu
+│   ├── nginx-skk.kradev.my.id.conf # Konfigurasi VirtualHost Nginx Reverse Proxy
+│   └── setup_vps.sh              # Skrip shell otomasi instalasi & konfigurasi VPS
+│
+├── esp32/                        # Firmware mikrokontroler
+│   └── main.py                   # Program MicroPython pada board ESP32
+│
+└── website/                      # Backend HTTP server dan antarmuka web
+    ├── index.html                # Struktur halaman dashboard & 3D canvas
+    ├── style.css                 # Penataan gaya modern, tema gelap, & animasi CSS
+    ├── script.js                 # Logika polling data, grafik Canvas, & kontrol UI
+    ├── room3d.js                 # Engine 3D Digital Twin Three.js (geometri & kamera)
+    ├── server.py                 # Backend HTTP server, logika AI, & penyedia REST API
+    ├── db.py                     # Modul koneksi PostgreSQL & pencatatan telemetri
+    │
+    ├── ai/                       # Model machine learning dan dataset kalibrasi
+    │   ├── ai_model_default.pkl  # Model AI baseline default kamar kos
+    │   ├── ai_model_siang.pkl    # Model AI kalibrasi khusus slot siang
+    │   └── dataset_siang.csv     # Dataset sampel sensor slot siang
+    │
+    └── vendor/                   # Pustaka frontend pihak ketiga (tersimpan lokal)
+        └── three/
+            ├── three.module.js   # Three.js core library (ES Module)
+            ├── OrbitControls.js  # Kontrol interaksi rotasi, pan, & zoom 3D
+            └── CSS2DRenderer.js  # Renderer label HTML 2D pada ruang koordinat 3D
 ```
 
 ---
 
-## API Endpoint
+## Daftar Endpoint REST API
 
-Backend `server.py` menyediakan dua endpoint utama:
+Backend `server.py` menyediakan antarmuka API HTTP berikut:
 
-| Method | Endpoint | Pengirim | Penerima | Fungsi |
-|---|---|---|---|---|
-| **POST** | `/data` | ESP32 | `server.py` | Menerima pengiriman data sensor terbaru dari ESP32 |
-| **GET** | `/api/data` | Dashboard Web | `server.py` | Mengirim data sensor dan status perangkat terbaru ke browser |
+| Method | Endpoint | Pengirim | Fungsi |
+|---|---|---|---|
+| **POST** | `/data` | ESP32 | Menerima payload telemetri sensor terbaru dari ESP32 |
+| **GET** | `/api/data` | Web Dashboard | Mengambil data sensor, status perangkat, dan status AI terkini |
+| **POST** | `/api/buzzer/mute` | Web Dashboard | Membisukan bunyi alarm buzzer secara manual |
+| **POST** | `/api/buzzer/unmute` | Web Dashboard | Mengaktifkan kembali bunyi alarm buzzer |
+| **POST** | `/api/buzzer/toggle` | Web Dashboard | Beralih status mute/unmute buzzer |
+| **POST** | `/api/calibration/start` | Web Dashboard | Memulai sesi kalibrasi AI untuk slot waktu tertentu |
+| **POST** | `/api/calibration/cancel` | Web Dashboard | Membatalkan sesi kalibrasi AI yang sedang berlangsung |
+| **POST** | `/api/calibration/reset` | Web Dashboard | Mereset model kalibrasi AI slot tertentu atau seluruhnya |
+| **GET** | `/api/calibration` | Web Dashboard | Mengambil informasi status kalibrasi seluruh 4 slot waktu |
+| **GET** | `/api/history` | Web Dashboard | Mengambil riwayat telemetri tersimpan dari database |
+| **GET** | `/api/incidents` | Web Dashboard | Mengambil riwayat catatan insiden bahaya dan alert sistem |
+| **GET** | `/api/calibration/history` | Web Dashboard | Mengambil log riwayat sesi kalibrasi AI yang pernah dilakukan |
+| **GET** | `/api/export/csv` | Browser | Mengunduh file dataset telemetri sensor dalam format CSV |
+| **GET** | `/api/health` | Docker / Monitoring | Healthcheck status layanan, keterhubungan database, dan ESP32 |
 
 ---
 
-## Cara Menjalankan
+## Panduan Menjalankan Project
 
-### 1. Menyiapkan dan Menjalankan ESP32
-1. Hubungkan board ESP32 ke komputer menggunakan kabel USB.
-2. Buka aplikasi **Thonny IDE** (atau tools MicroPython lainnya).
-3. Buka file `esp32/main.py`.
-4. Sesuaikan konfigurasi koneksi Wi-Fi dan alamat IP komputer yang menjalankan server:
-   ```python
-   WIFI_SSID = "NAMA_WIFI"
-   WIFI_PASSWORD = "PASSWORD_WIFI"
-   SERVER_URL = "http://IP_KOMPUTER:5000/data"
-   ```
-5. Simpan dan jalankan program pada ESP32.
+### Metode 1: Menjalankan Secara Lokal (Komputer / Laptop)
 
-### 2. Menjalankan Server di Komputer
-1. Buka Terminal atau Command Prompt pada komputer.
-2. Masuk ke direktori `website`:
+#### Langkah 1: Pasang Dependensi Python
+Buka terminal pada direktori utama project:
+```bash
+pip install -r requirements.txt
+```
+*(Catatan: Jika `psycopg2` belum terpasang atau PostgreSQL tidak aktif, server otomatis berjalan dalam mode in-memory tanpa error).*
+
+#### Langkah 2: Jalankan Server Backend
+```bash
+cd website
+python server.py
+```
+Server akan aktif di port `5000`:
+```text
+Server aktif pada port 5000
+```
+
+#### Langkah 3: Buka Dashboard Website
+Buka browser (Google Chrome, Microsoft Edge, atau Mozilla Firefox) dan buka:
+```text
+http://localhost:5000
+```
+
+---
+
+### Metode 2: Menjalankan Menggunakan Docker Compose
+
+Jika Anda ingin menjalankan backend bersama database PostgreSQL secara terisolasi menggunakan Docker:
+
+1. Salin file environment:
    ```bash
-   cd website
+   cp .env.example .env
    ```
-3. Jalankan file `server.py`:
+2. Jalankan container dengan Docker Compose:
    ```bash
-   python server.py
+   docker compose up -d
    ```
-4. Server akan aktif dan menampilkan log:
-   ```text
-   Server berjalan di port 5000
+3. Periksa status container:
+   ```bash
+   docker compose ps
    ```
-
-### 3. Membuka Dashboard Website
-1. Buka aplikasi browser modern (Google Chrome, Mozilla Firefox, atau Microsoft Edge).
-2. Kunjungi alamat:
-   ```text
-   http://localhost:5000
-   ```
-3. Dashboard akan mulai memantau dan menampilkan data kondisi kamar secara berkala.
+4. Buka dashboard di browser melalui `http://localhost:5000`.
 
 ---
 
-## Koneksi ESP32 ke Server
+### Metode 3: Deployment ke Cloud VPS
 
-- ESP32 dan komputer harus terhubung ke **jaringan Wi-Fi lokal atau hotspot yang sama**.
-- Karena ESP32 berkomunikasi menggunakan alamat IP komputer, pastikan untuk mengetahui alamat IP lokal komputer Anda terlebih dahulu (gunakan perintah `ipconfig` pada terminal Windows).
-- Alamat target pada ESP32 harus diarahkan ke IP komputer tersebut dengan port `5000`, misalnya `http://192.168.1.15:5000/data`.
-- Jika alamat IP komputer berubah karena DHCP Wi-Fi, sesuaikan kembali alamat target pada program ESP32.
+Jika Anda ingin men-deploy sistem ke server VPS Ubuntu dengan domain/subdomain publik dan reverse proxy Nginx + HTTPS SSL, ikuti panduan lengkap pada berkas:
+📄 [deploy/PANDUAN_DEPLOY_VPS.md](file:///c:/Users/raffi/OneDrive/Desktop/smart-kamar-kos/deploy/PANDUAN_DEPLOY_VPS.md)
 
 ---
 
-## Kebutuhan Sistem
+### Konfigurasi dan Pengunggahan Firmware ESP32
 
-- **Hardware**:
-  - Modul mikrokontroler ESP32
-  - Sensor DHT11, MQ-2, dan LDR
-  - Modul Buzzer, LED, Modul Relay 5V, dan Kipas DC 5V
-  - Breadboard, kabel jumper, resistor penahan, dan kabel USB
-- **Software**:
-  - Firmware MicroPython terpasang pada ESP32
-  - Thonny IDE untuk mengunggah program ke ESP32
-  - Python versi 3.x terinstal di komputer/laptop
-  - Web browser modern
-
----
-
-## Catatan Nilai Threshold
-
-Nilai ambang batas yang digunakan dalam kode program:
-```python
-GAS_THRESHOLD = 2000
-LDR_THRESHOLD = 2000
-HUMIDITY_THRESHOLD = 60
-FAN_OFF_DELAY = 10000  # 10 detik
-```
-
-- Nilai ambang batas di atas ditentukan untuk keperluan purwarupa dan simulasi project sekolah.
-- Pada penerapan nyata, nilai dapat disesuaikan dengan karakteristik ruangan dan intensitas cahaya kamar masing-masing.
-- **Penting mengenai Sensor MQ-2**: Nilai `2000` pada MQ-2 merupakan nilai mentah pembacaan ADC (rentang 0–4095), **bukan nilai konsentrasi ppm**, karena modul sensor ini belum melalui kalibrasi laboratorium gas spesifik.
+1. Hubungkan board ESP32 ke laptop/komputer via kabel USB.
+2. Buka aplikasi **Thonny IDE** dengan interpreter **MicroPython (ESP32)**.
+3. Buka file [esp32/main.py](file:///c:/Users/raffi/OneDrive/Desktop/smart-kamar-kos/esp32/main.py).
+4. Sesuaikan konstanta Wi-Fi dan URL server tujuan:
+   - **Untuk pengujian lokal di rumah/sekolah (satu Wi-Fi dengan laptop):**
+     ```python
+     WIFI_SSID = "NAMA_WIFI_ANDA"
+     WIFI_PASSWORD = "PASSWORD_WIFI_ANDA"
+     SERVER_URL = "http://192.168.1.50:5000/data"  # Ganti dengan IP lokal laptop Anda (cek via 'ipconfig')
+     ```
+   - **Untuk deployment cloud (VPS publik):**
+     ```python
+     WIFI_SSID = "NAMA_WIFI_ANDA"
+     WIFI_PASSWORD = "PASSWORD_WIFI_ANDA"
+     SERVER_URL = "http://skk.kradev.my.id/data"
+     ```
+5. Simpan file ke board ESP32 (`/main.py`), lalu klik tombol **Run** (F5) pada Thonny IDE.
+6. Pantau shell Thonny; ESP32 akan mencetak status koneksi Wi-Fi dan pengiriman payload data secara berkala.
 
 ---
 
 ## Troubleshooting
 
 - **Website menampilkan status "ESP32 / Server Terputus":**
-  - Pastikan terminal yang menjalankan `python server.py` masih aktif dan tidak ditutup.
-  - Periksa apakah URL endpoint pada baris atas `script.js` sudah sesuai (`http://localhost:5000/api/data`).
-- **ESP32 tidak dapat mengirim data ke server:**
-  - Pastikan ESP32 dan laptop/komputer terhubung ke Wi-Fi yang sama.
-  - Periksa alamat IP komputer dengan perintah `ipconfig` dan pastikan firewall Windows mengizinkan lalu lintas masuk pada port 5000.
-- **Buzzer langsung berbunyi saat perangkat baru dinyalakan:**
-  - Sensor gas MQ-2 membutuhkan waktu pemanasan awal (*pre-heating*) selama beberapa menit saat pertama kali diberi tegangan listrik agar nilai hambatannya stabil.
-- **Kipas tidak langsung mati ketika udara sudah normal:**
-  - Hal ini normal karena sistem menerapkan fitur delay keamanan 10 detik sebelum relay kipas benar-benar dimatikan.
+  - Pastikan program `server.py` atau container Docker masih berjalan aktif.
+  - Periksa apakah ESP32 dan laptop berada pada jaringan Wi-Fi/Hotspot yang sama saat pengujian lokal.
+  - Pastikan firewall Windows mengizinkan lalu lintas masuk (*inbound*) pada port `5000`.
+- **Buzzer langsung berbunyi saat ESP32 pertama kali dinyalakan:**
+  - Sensor MQ-2 membutuhkan waktu pemanasan awal (*pre-heating*) selama 1–3 menit saat pertama kali dialiri arus listrik agar pembacaan analognya stabil.
+- **Kipas tidak langsung mati saat gas/kelembapan turun:**
+  - Hal ini normal karena sistem menerapkan fitur keamanan *delay timer* 10 detik sebelum mematikan relay kipas.
+- **Tampilan 3D tidak muncul di browser:**
+  - Pastikan browser mendukung WebGL (aktif secara default pada browser modern seperti Chrome, Edge, Safari, dan Firefox).
 
 ---
 
-## Status Project
+## Lisensi & Kontributor
 
-- [x] Pembacaan sensor suhu dan kelembapan (DHT11)
-- [x] Pembacaan sensor intensitas cahaya (LDR)
-- [x] Pembacaan sensor gas (MQ-2)
-- [x] Otomatisasi lampu LED saat ruangan gelap
-- [x] Otomatisasi alarm buzzer saat terdeteksi gas
-- [x] Otomatisasi exhaust fan dengan logika kombinasi dan delay 10 detik
-- [x] Pengiriman data dari ESP32 ke server lokal
-- [x] Dashboard monitoring berbasis website (HTML, CSS, JS vanilla)
-- [x] Grafik tren data sensor real-time dengan HTML5 Canvas
-- [x] Mode simulasi demo untuk presentasi offline
-
----
-
-## Tujuan Pembelajaran
-
-Project ini dirancang sebagai media pembelajaran terapan untuk siswa dalam menguasai:
-1. Konsep dasar sistem Internet of Things (IoT) dari perangkat fisik hingga tampilan antarmuka.
-2. Pemrograman mikrokontroler modern menggunakan bahasa MicroPython.
-3. Teknik interfacing pembacaan sensor analog (ADC) dan sensor digital.
-4. Pengendalian beban aktuator menggunakan modul relay, indikator LED, dan buzzer.
-5. Konsep jaringan komputer lokal, komunikasi nirkabel Wi-Fi, dan protokol HTTP/JSON.
-6. Pengembangan antarmuka web interaktif tanpa ketergantungan framework (*vanilla web stack*).
-7. Integrasi menyeluruh antara perangkat keras (*hardware*) dan perangkat lunak (*software*).
-
----
-
-## Penutup
-
-**Smart Kamar Kos** adalah project pembelajaran IoT terpadu yang memadukan mikrokontroler ESP32, sensor lingkungan, aktuator otomatis, server lokal Python, dan antarmuka web monitoring. Melalui sistem ini, kondisi kamar kos dapat dipantau dengan mudah dan perangkat penting dapat bekerja secara otomatis untuk menciptakan ruangan yang lebih aman dan nyaman.
+Project **Smart Kamar Kos** dikembangkan sebagai sarana pembelajaran komprehensif Internet of Things (IoT), pemodelan 3D Digital Twin, serta rekayasa perangkat lunak modern yang menggabungkan perangkat keras mikrokontroler, backend server, dan aplikasi antarmuka web.
