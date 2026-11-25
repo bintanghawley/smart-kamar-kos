@@ -446,7 +446,7 @@ def _maybe_run_retention():
 
     def _worker():
         try:
-            sql = "DELETE FROM sensor_telemetry WHERE created_at < NOW() - INTERVAL '%s days';"
+            sql = "DELETE FROM sensor_telemetry WHERE created_at < NOW() - (%s * INTERVAL '1 day');"
             with get_cursor(commit=True) as cur:
                 cur.execute(sql, (RETENTION_DAYS,))
             logger.info(f"Pembersihan data retensi {RETENTION_DAYS} hari selesai")
