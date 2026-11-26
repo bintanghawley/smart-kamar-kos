@@ -297,7 +297,15 @@ function handleDataSuccess(data, { skipHistory = false } = {}) {
         kipas,
         buzzer_muted: buzzerMuted,
         esp32_online: isEsp32Online || isSimulationMode,
-        lastSeen: lastSeenTime
+        lastSeen: lastSeenTime,
+        active_slot: data.ai_active_slot || getTimeSlotKeyForDate(new Date()),
+        sim_scenario: isSimulationMode ? simulationScenario : null,
+        has_manual_led: Boolean(
+            manualDeviceState.led === "ON" ||
+            manualDeviceState.led === "OFF" ||
+            data.manual_overrides?.led === "ON" ||
+            data.manual_overrides?.led === "OFF"
+        )
     };
 
     if (!skipHistory && (isEsp32Online || isSimulationMode)) {
@@ -337,7 +345,10 @@ function handleDataError() {
         kipas: localKipas,
         buzzer: localBuzzer,
         buzzer_muted: localBuzzer === "OFF",
-        esp32_online: false
+        esp32_online: false,
+        active_slot: getTimeSlotKeyForDate(new Date()),
+        sim_scenario: null,
+        has_manual_led: Boolean(manualDeviceState.led === "ON" || manualDeviceState.led === "OFF")
     };
 
     if (window.Room3D && typeof window.Room3D.updateData === "function") {
@@ -510,7 +521,15 @@ async function toggleActuatorManual(device) {
         kipas: effective.kipas,
         buzzer: effective.buzzer,
         buzzer_muted: effective.buzzerMuted,
-        esp32_online: isEsp32Online
+        esp32_online: isEsp32Online,
+        active_slot: baseData.ai_active_slot || getTimeSlotKeyForDate(new Date()),
+        sim_scenario: null,
+        has_manual_led: Boolean(
+            manualDeviceState.led === "ON" ||
+            manualDeviceState.led === "OFF" ||
+            baseData.manual_overrides?.led === "ON" ||
+            baseData.manual_overrides?.led === "OFF"
+        )
     };
     updateActuatorCards(previewNorm);
     if (window.Room3D && typeof window.Room3D.updateData === "function") {
