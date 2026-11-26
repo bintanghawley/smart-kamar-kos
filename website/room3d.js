@@ -18,6 +18,7 @@ let roomLight, espLedLight, floorGlowMesh;
 let sunLight, hemiLight, ambientLight;
 let sunOrbMesh, sunHaloMesh;
 let laptopScreenMat, beamLedMat, insideRedLedMat;
+let streetLight, streetLampBulbMat;
 
 let doorPivot, windowPivot, cubicleDoorPivot;
 let interactiveTargets = [];
@@ -30,6 +31,7 @@ const doorAnimState = {
 let raycaster = new THREE.Raycaster();
 let pointerNdc = new THREE.Vector2();
 let pointerDownPos = { x: 0, y: 0 };
+let pointerIsDownOnCanvas = false;
 
 let hotspotObjects = [];
 let activeHotspotId = null;
@@ -42,11 +44,13 @@ let roofAnim = null;
 let isAutoFocusEnabled = true;
 let isUserInteracting = false;
 let lastAutoHighlightTime = 0;
+let lastAutoFocusedKey = null;
 let prevLiveState = {
     hasBaseline: false,
     fanOn: false,
     ledOn: false,
-    gasDanger: false
+    gasDanger: false,
+    simScenario: null
 };
 
 let sunTimeMode = 'auto';
@@ -62,7 +66,8 @@ const currentSunVisual = {
     ambIntensity: 0.24,
     bgColor: new THREE.Color(0x2a3440),
     orbColor: new THREE.Color(0xfff8dc),
-    orbScale: 1.0
+    orbScale: 1.0,
+    nightWeight: 0.0
 };
 
 let currentData = {
@@ -107,7 +112,8 @@ const SUN_PRESETS = {
         ambIntensity: 0.22,
         bgColor: 0x262c38,
         orbColor: 0xffe4a8,
-        orbScale: 1.05
+        orbScale: 1.05,
+        nightWeight: 0.0
     },
     siang: {
         pos: new THREE.Vector3(2.6, 11.6, 2.0),
@@ -119,7 +125,8 @@ const SUN_PRESETS = {
         ambIntensity: 0.25,
         bgColor: 0x2a3440,
         orbColor: 0xfff8dc,
-        orbScale: 0.95
+        orbScale: 0.95,
+        nightWeight: 0.0
     },
     sore: {
         pos: new THREE.Vector3(-9.8, 4.1, -1.2),
@@ -131,7 +138,8 @@ const SUN_PRESETS = {
         ambIntensity: 0.2,
         bgColor: 0x2c201e,
         orbColor: 0xffaa5c,
-        orbScale: 1.1
+        orbScale: 1.1,
+        nightWeight: 0.0
     },
     malam: {
         pos: new THREE.Vector3(-4.8, 7.6, -3.5),
@@ -143,7 +151,8 @@ const SUN_PRESETS = {
         ambIntensity: 0.14,
         bgColor: 0x10131c,
         orbColor: 0xdbe4ff,
-        orbScale: 0.85
+        orbScale: 0.85,
+        nightWeight: 1.0
     }
 };
 
@@ -193,7 +202,7 @@ function resolveTargetSunSlot() {
     return getActiveWibSlotKey();
 }
 
-function animateCameraSpherical(targetCam, targetTarget, duration = 1600, onComplete = null) {
+function animateCameraSpherical(targetCam, targetTarget, duration = 1350, onComplete = null) {
     if (!camera || !controls) return;
 
     const startTarget = controls.target.clone();
@@ -207,6 +216,9 @@ function animateCameraSpherical(targetCam, targetTarget, duration = 1600, onComp
     let dTheta = (endSph.theta - startSph.theta) % (2 * Math.PI);
     if (dTheta > Math.PI) dTheta -= 2 * Math.PI;
     if (dTheta < -Math.PI) dTheta += 2 * Math.PI;
+
+    // Disable OrbitControls damping during programmatic glide so residual inertia does not tug camera
+    controls.enableDamping = false;
 
     activeCameraTween = {
         type: 'spherical',
@@ -524,13 +536,257 @@ function enableShadows(root) {
     });
 }
 
-function addCableTube(parent, points, colorHex, radius = 0.014) {
-    const curve = new THREE.CatmullRomCurve3(points.map(p => new THREE.Vector3(p[0], p[1], p[2])));
-    const geo = new THREE.TubeGeometry(curve, 16, radius, 6, false);
-    const mat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.55, metalness: 0.1 });
-    const mesh = new THREE.Mesh(geo, mat);
-    parent.add(mesh);
-    return mesh;
+/** Builds ceramic toilet seat, wall faucet, water-filled bucket, and dipper in right cubicle zone. */
+function buildBathroomFixtures(parent, mats) {
+    const porcelainMat = new THREE.MeshStandardMaterial({ color: 0xf6f8fa, roughness: 0.22, metalness: 0.05 });
+    const chromeMat = new THREE.MeshStandardMaterial({ color: 0xd5dae0, roughness: 0.2, metalness: 0.88 });
+    const bucketMat = new THREE.MeshStandardMaterial({ color: 0x2574b8, roughness: 0.48, side: THREE.DoubleSide });
+    const dipperMat = new THREE.MeshStandardMaterial({ color: 0xd9534f, roughness: 0.45, side: THREE.DoubleSide });
+    const waterMat = new THREE.MeshStandardMaterial({
+        color: 0x5cc9f5,
+        transparent: true,
+        opacity: 0.58,
+        roughness: 0.12,
+        metalness: 0.15
+    });
+
+    // Toilet placed in back-right cubicle corner (X >= 1.25) facing -X so door swing X <= 0.96 stays completely clear
+    const toiletGroup = new THREE.Group();
+    toiletGroup.position.set(1.52, 0.01, 0.42);
+
+    const tank = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.38, 0.34), porcelainMat);
+    tank.position.set(0.22, 0.49, 0);
+    const tankLid = new THREE.Mesh(new THREE.BoxGeometry(0.21, 0.035, 0.36), porcelainMat);
+    tankLid.position.set(0.22, 0.695, 0);
+    const flushBtn = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.02, 12), chromeMat);
+    flushBtn.position.set(0.22, 0.72, 0);
+
+    const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.145, 0.28, 18), porcelainMat);
+    pedestal.position.set(-0.02, 0.14, 0);
+    const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.125, 0.14, 20), porcelainMat);
+    bowl.scale.set(1.18, 1, 0.98);
+    bowl.position.set(-0.04, 0.31, 0);
+    const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.165, 0.165, 0.03, 20), porcelainMat);
+    lid.scale.set(1.18, 1, 0.98);
+    lid.position.set(-0.04, 0.39, 0);
+
+    toiletGroup.add(tank, tankLid, flushBtn, pedestal, bowl, lid);
+    parent.add(toiletGroup);
+
+    // Wall metal faucet above bucket on right inner wall (X = 1.84, Y = 0.58, Z = 1.28)
+    const faucetGroup = new THREE.Group();
+    faucetGroup.position.set(1.84, 0.58, 1.28);
+    const flange = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.036, 0.025, 14), chromeMat);
+    flange.rotation.z = Math.PI / 2;
+    flange.position.set(0.02, 0, 0);
+    const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.16, 12), chromeMat);
+    pipe.rotation.z = Math.PI / 2;
+    pipe.position.set(-0.055, 0, 0);
+    const spout = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.011, 0.075, 12), chromeMat);
+    spout.position.set(-0.125, -0.03, 0);
+    const valve = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.018, 0.02), chromeMat);
+    valve.position.set(-0.035, 0.035, 0);
+    faucetGroup.add(flange, pipe, spout, valve);
+    parent.add(faucetGroup);
+
+    // Water-filled plastic bucket directly under faucet
+    const bucketGroup = new THREE.Group();
+    bucketGroup.position.set(1.54, 0.01, 1.28);
+    const bucketWall = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.15, 0.3, 22, 1, true), bucketMat);
+    bucketWall.position.y = 0.15;
+    const bucketBase = new THREE.Mesh(new THREE.CircleGeometry(0.15, 22), bucketMat);
+    bucketBase.rotation.x = -Math.PI / 2;
+    bucketBase.position.y = 0.005;
+    const bucketRim = new THREE.Mesh(new THREE.TorusGeometry(0.19, 0.013, 10, 24), mats.plasticWhiteMat);
+    bucketRim.rotation.x = Math.PI / 2;
+    bucketRim.position.y = 0.3;
+    const waterSurface = new THREE.Mesh(new THREE.CircleGeometry(0.175, 22), waterMat);
+    waterSurface.rotation.x = -Math.PI / 2;
+    waterSurface.position.y = 0.24;
+    waterSurface.userData.noShadow = true;
+    bucketGroup.add(bucketWall, bucketBase, bucketRim, waterSurface);
+    parent.add(bucketGroup);
+
+    // Handled dipper (gayung) perched neatly on bucket rim
+    const gayungGroup = new THREE.Group();
+    gayungGroup.position.set(1.48, 0.31, 1.22);
+    gayungGroup.rotation.set(0.18, 0.45, -0.22);
+    const gCup = new THREE.Mesh(new THREE.CylinderGeometry(0.068, 0.052, 0.085, 16, 1, true), dipperMat);
+    const gBottom = new THREE.Mesh(new THREE.CircleGeometry(0.052, 16), dipperMat);
+    gBottom.rotation.x = -Math.PI / 2;
+    gBottom.position.y = -0.04;
+    const gHandle = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.014, 0.022), dipperMat);
+    gHandle.position.set(-0.1, 0.032, 0);
+    gayungGroup.add(gCup, gBottom, gHandle);
+    parent.add(gayungGroup);
+}
+
+/** Builds relocated rotated bed behind cubicle, left desk + chair + laptop, and 2-door wardrobe. */
+function buildBedroomFurniture(parent, mats) {
+    // Relocated bed behind cubicle, rotated 90 deg horizontally along X (X: +0.12..+1.84, Z: -1.62..-0.66)
+    const bedGroup = new THREE.Group();
+    bedGroup.position.set(0.98, 0, -1.14);
+    const bedFrame = new THREE.Mesh(new THREE.BoxGeometry(1.72, 0.24, 0.96), mats.darkFrameMat);
+    bedFrame.position.y = 0.12;
+    const mattress = new THREE.Mesh(
+        new THREE.BoxGeometry(1.64, 0.16, 0.88),
+        new THREE.MeshStandardMaterial({ color: 0xf4eee4, roughness: 0.88 })
+    );
+    mattress.position.y = 0.28;
+    const pillow = new THREE.Mesh(
+        new THREE.BoxGeometry(0.32, 0.085, 0.56),
+        new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.94 })
+    );
+    pillow.position.set(0.56, 0.39, 0);
+    const blanket = new THREE.Mesh(
+        new THREE.BoxGeometry(1.02, 0.17, 0.9),
+        new THREE.MeshStandardMaterial({ color: 0x24424d, roughness: 0.82 })
+    );
+    blanket.position.set(-0.32, 0.285, 0);
+    bedGroup.add(bedFrame, mattress, pillow, blanket);
+    parent.add(bedGroup);
+
+    // Relocated study desk, chair, and laptop against left wall (-X), rotated 90 deg facing +X
+    const deskGroup = new THREE.Group();
+    deskGroup.position.set(-1.56, 0, -1.06);
+    const deskTop = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.07, 1.04), mats.doorMat);
+    deskTop.position.y = 0.66;
+    deskGroup.add(deskTop);
+    [[-0.22, -0.45], [0.22, -0.45], [-0.22, 0.45], [0.22, 0.45]].forEach(([lx, lz]) => {
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.66, 0.06), mats.doorMat);
+        leg.position.set(lx, 0.33, lz);
+        deskGroup.add(leg);
+    });
+
+    const laptopBase = new THREE.Mesh(
+        new THREE.BoxGeometry(0.22, 0.02, 0.32),
+        new THREE.MeshStandardMaterial({ color: 0x2a2c32, metalness: 0.72, roughness: 0.32 })
+    );
+    laptopBase.position.set(0.02, 0.705, 0);
+    laptopScreenMat = new THREE.MeshStandardMaterial({
+        color: 0x58b0ff,
+        emissive: 0x4ea8ff,
+        emissiveIntensity: 0.35,
+        roughness: 0.25
+    });
+    const laptopScreen = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.22, 0.32), laptopScreenMat);
+    laptopScreen.position.set(-0.09, 0.82, 0);
+    laptopScreen.rotation.z = -0.18;
+    deskGroup.add(laptopBase, laptopScreen);
+    parent.add(deskGroup);
+
+    const chairGroup = new THREE.Group();
+    chairGroup.position.set(-1.02, 0, -1.06);
+    const chairSeat = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.05, 0.4), mats.doorMat);
+    chairSeat.position.y = 0.38;
+    const chairBack = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.36, 0.4), mats.doorMat);
+    chairBack.position.set(0.17, 0.58, 0);
+    chairGroup.add(chairSeat, chairBack);
+    [[-0.15, -0.16], [0.15, -0.16], [-0.15, 0.16], [0.15, 0.16]].forEach(([cx, cz]) => {
+        const cleg = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.38, 0.045), mats.doorMat);
+        cleg.position.set(cx, 0.19, cz);
+        chairGroup.add(cleg);
+    });
+    parent.add(chairGroup);
+
+    // 2-door wood wardrobe against left wall beside desk (X: -1.85..-1.31, Z: -0.31..+0.61)
+    const wardrobeGroup = new THREE.Group();
+    wardrobeGroup.position.set(-1.58, 0, 0.15);
+    const wBody = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.5, 0.9), mats.darkFrameMat);
+    wBody.position.set(-0.01, 0.76, 0);
+    const wPlinth = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.05, 0.92), mats.darkFrameMat);
+    wPlinth.position.set(0, 0.025, 0);
+    const wCrown = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.04, 0.94), mats.darkFrameMat);
+    wCrown.position.set(0.005, 1.51, 0);
+    const wSeam = new THREE.Mesh(
+        new THREE.BoxGeometry(0.012, 1.4, 0.015),
+        new THREE.MeshStandardMaterial({ color: 0x1e130c, roughness: 0.9 })
+    );
+    wSeam.position.set(0.245, 0.77, 0);
+    const wDoorL = new THREE.Mesh(new THREE.BoxGeometry(0.025, 1.4, 0.43), mats.doorMat);
+    wDoorL.position.set(0.252, 0.77, -0.225);
+    const wDoorR = new THREE.Mesh(new THREE.BoxGeometry(0.025, 1.4, 0.43), mats.doorMat);
+    wDoorR.position.set(0.252, 0.77, 0.225);
+    const wHandleL = new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.14, 0.02), mats.handleMat);
+    wHandleL.position.set(0.272, 0.8, -0.055);
+    const wHandleR = new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.14, 0.02), mats.handleMat);
+    wHandleR.position.set(0.272, 0.8, 0.055);
+    wardrobeGroup.add(wBody, wPlinth, wCrown, wSeam, wDoorL, wDoorR, wHandleL, wHandleR);
+    parent.add(wardrobeGroup);
+}
+
+/** Builds exterior yard streetlamp (front-left) and 2-tier shoe rack + sneakers right of front door. */
+function buildExteriorFixtures(parent, mats) {
+    // Yard streetlamp post on front-left grass (-2.75, 0, +2.85), arm aimed toward house
+    const poleMat = new THREE.MeshStandardMaterial({ color: 0x202329, roughness: 0.42, metalness: 0.65 });
+    const lampGroup = new THREE.Group();
+    lampGroup.position.set(-2.75, 0, 2.85);
+
+    const basePedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.11, 0.18, 16), poleMat);
+    basePedestal.position.y = 0.09;
+    const verticalPole = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.048, 2.25, 14), poleMat);
+    verticalPole.position.y = 1.21;
+
+    const armPivot = new THREE.Group();
+    armPivot.position.set(0, 2.34, 0);
+    armPivot.rotation.y = Math.PI / 4; // Aim arm along (+X, -Z) toward house facade
+
+    const armBeam = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.026, 0.44, 12), poleMat);
+    armBeam.rotation.z = Math.PI / 2 - 0.16;
+    armBeam.position.set(0.2, 0.04, 0);
+    const hood = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.14, 0.09, 16), poleMat);
+    hood.position.set(0.41, 0.06, 0);
+
+    streetLampBulbMat = new THREE.MeshStandardMaterial({
+        color: 0xffe4b5,
+        emissive: 0xffc978,
+        emissiveIntensity: 0.05,
+        roughness: 0.25
+    });
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.065, 14, 14), streetLampBulbMat);
+    bulb.position.set(0.41, -0.01, 0);
+    bulb.userData.noShadow = true;
+
+    streetLight = new THREE.PointLight(0xffcf87, 0.0, 11.5, 1.35);
+    streetLight.position.set(0.41, -0.08, 0);
+
+    armPivot.add(armBeam, hood, bulb, streetLight);
+    lampGroup.add(basePedestal, verticalPole, armPivot);
+    parent.add(lampGroup);
+
+    // 2-tier exterior shoe rack right of front door (X: -0.45..+0.15, Z: +1.83..+2.09), clear of door swing
+    const rackGroup = new THREE.Group();
+    rackGroup.position.set(-0.15, 0, 1.96);
+    [[-0.28, -0.11], [0.28, -0.11], [-0.28, 0.11], [0.28, 0.11]].forEach(([px, pz]) => {
+        const post = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.36, 0.032), mats.darkFrameMat);
+        post.position.set(px, 0.18, pz);
+        rackGroup.add(post);
+    });
+    [0.09, 0.27].forEach(sy => {
+        const shelf = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.022, 0.24), mats.doorMat);
+        shelf.position.set(0, sy, 0);
+        rackGroup.add(shelf);
+    });
+
+    // 1 pair of sneakers neatly arranged on the upper shelf
+    const soleMat = new THREE.MeshStandardMaterial({ color: 0xf1f3f6, roughness: 0.65 });
+    const shoeUpperMat = new THREE.MeshStandardMaterial({ color: 0x2b3e55, roughness: 0.72 });
+    const shoeTrimMat = new THREE.MeshStandardMaterial({ color: 0xe6eaf0, roughness: 0.6 });
+    [-0.08, 0.08].forEach(sx => {
+        const shoe = new THREE.Group();
+        shoe.position.set(sx, 0.282, 0.01);
+        const sole = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.018, 0.19), soleMat);
+        sole.position.y = 0.009;
+        const heel = new THREE.Mesh(new THREE.BoxGeometry(0.078, 0.055, 0.1), shoeUpperMat);
+        heel.position.set(0, 0.044, -0.038);
+        const toe = new THREE.Mesh(new THREE.BoxGeometry(0.076, 0.036, 0.085), shoeUpperMat);
+        toe.position.set(0, 0.034, 0.045);
+        const tongue = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.022, 0.045), shoeTrimMat);
+        tongue.position.set(0, 0.068, 0.005);
+        shoe.add(sole, heel, toe, tongue);
+        rackGroup.add(shoe);
+    });
+    parent.add(rackGroup);
 }
 
 function buildModel() {
@@ -637,10 +893,10 @@ function buildModel() {
     frontShape.holes.push(doorHole);
 
     const windowHole = new THREE.Path();
-    windowHole.moveTo(0.40, 0.65);
-    windowHole.lineTo(1.60, 0.65);
-    windowHole.lineTo(1.60, 1.70);
-    windowHole.lineTo(0.40, 1.70);
+    windowHole.moveTo(0.79, 1.18);
+    windowHole.lineTo(1.41, 1.18);
+    windowHole.lineTo(1.41, 1.74);
+    windowHole.lineTo(0.79, 1.74);
     windowHole.closePath();
     frontShape.holes.push(windowHole);
 
@@ -725,44 +981,44 @@ function buildModel() {
     doormatMesh.position.set(-1.125, 0.009, houseD / 2 + 0.28);
     houseGroup.add(doormatMesh);
 
-    // Profiled outer window frame & sill
-    const winTop = new THREE.Mesh(new THREE.BoxGeometry(1.28, 0.065, 0.16), darkFrameMat);
-    winTop.position.set(1.0, 1.71, houseD / 2 - wallThick / 2);
-    const winBottom = new THREE.Mesh(new THREE.BoxGeometry(1.32, 0.07, 0.19), darkFrameMat);
-    winBottom.position.set(1.0, 0.64, houseD / 2 - wallThick / 2 + 0.01);
-    const winLeft = new THREE.Mesh(new THREE.BoxGeometry(0.065, 1.07, 0.16), darkFrameMat);
-    winLeft.position.set(0.40, 1.175, houseD / 2 - wallThick / 2);
-    const winRight = new THREE.Mesh(new THREE.BoxGeometry(0.065, 1.07, 0.16), darkFrameMat);
-    winRight.position.set(1.60, 1.175, houseD / 2 - wallThick / 2);
+    // Profiled outer window frame & sill (proportional 0.62 x 0.56)
+    const winTop = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.055, 0.16), darkFrameMat);
+    winTop.position.set(1.1, 1.745, houseD / 2 - wallThick / 2);
+    const winBottom = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.06, 0.19), darkFrameMat);
+    winBottom.position.set(1.1, 1.17, houseD / 2 - wallThick / 2 + 0.01);
+    const winLeft = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.58, 0.16), darkFrameMat);
+    winLeft.position.set(0.78, 1.46, houseD / 2 - wallThick / 2);
+    const winRight = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.58, 0.16), darkFrameMat);
+    winRight.position.set(1.42, 1.46, houseD / 2 - wallThick / 2);
     houseGroup.add(winTop, winBottom, winLeft, winRight);
 
-    // Interactive hinged casement window sash at left jamb
+    // Interactive hinged casement window sash at left jamb (0.80, 1.46, 1.77)
     windowPivot = new THREE.Group();
-    windowPivot.position.set(0.43, 1.175, houseD / 2 - 0.03);
+    windowPivot.position.set(0.8, 1.46, houseD / 2 - 0.03);
 
     const sashThick = 0.045;
-    const sashW = 1.14;
-    const sashH = 1.0;
-    const sashTop = new THREE.Mesh(new THREE.BoxGeometry(sashW, 0.055, sashThick), darkFrameMat);
-    sashTop.position.set(sashW / 2, sashH / 2 - 0.0275, 0);
-    const sashBot = new THREE.Mesh(new THREE.BoxGeometry(sashW, 0.055, sashThick), darkFrameMat);
-    sashBot.position.set(sashW / 2, -sashH / 2 + 0.0275, 0);
-    const sashL = new THREE.Mesh(new THREE.BoxGeometry(0.055, sashH, sashThick), darkFrameMat);
-    sashL.position.set(0.0275, 0, 0);
-    const sashR = new THREE.Mesh(new THREE.BoxGeometry(0.055, sashH, sashThick), darkFrameMat);
-    sashR.position.set(sashW - 0.0275, 0, 0);
+    const sashW = 0.58;
+    const sashH = 0.52;
+    const sashTop = new THREE.Mesh(new THREE.BoxGeometry(sashW, 0.045, sashThick), darkFrameMat);
+    sashTop.position.set(sashW / 2, sashH / 2 - 0.0225, 0);
+    const sashBot = new THREE.Mesh(new THREE.BoxGeometry(sashW, 0.045, sashThick), darkFrameMat);
+    sashBot.position.set(sashW / 2, -sashH / 2 + 0.0225, 0);
+    const sashL = new THREE.Mesh(new THREE.BoxGeometry(0.045, sashH, sashThick), darkFrameMat);
+    sashL.position.set(0.0225, 0, 0);
+    const sashR = new THREE.Mesh(new THREE.BoxGeometry(0.045, sashH, sashThick), darkFrameMat);
+    sashR.position.set(sashW - 0.0225, 0, 0);
 
     // Cross mullions
-    const mullionV = new THREE.Mesh(new THREE.BoxGeometry(0.035, sashH - 0.08, sashThick * 0.8), darkFrameMat);
+    const mullionV = new THREE.Mesh(new THREE.BoxGeometry(0.024, sashH - 0.06, sashThick * 0.8), darkFrameMat);
     mullionV.position.set(sashW / 2, 0, 0);
-    const mullionH = new THREE.Mesh(new THREE.BoxGeometry(sashW - 0.08, 0.035, sashThick * 0.8), darkFrameMat);
+    const mullionH = new THREE.Mesh(new THREE.BoxGeometry(sashW - 0.06, 0.024, sashThick * 0.8), darkFrameMat);
     mullionH.position.set(sashW / 2, 0, 0);
 
-    const winHandle = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.11, 0.06), handleMat);
-    winHandle.position.set(sashW - 0.045, 0, 0.02);
+    const winHandle = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.08, 0.05), handleMat);
+    winHandle.position.set(sashW - 0.035, 0, 0.02);
 
     const winGlass = new THREE.Mesh(
-        new THREE.BoxGeometry(sashW - 0.08, sashH - 0.08, 0.018),
+        new THREE.BoxGeometry(sashW - 0.06, sashH - 0.06, 0.018),
         new THREE.MeshStandardMaterial({
             color: 0xaad4eb,
             transparent: true,
@@ -901,9 +1157,8 @@ function buildModel() {
     wallBuzzerRing.position.set(1.15, 1.82, -houseD / 2 + wallThick + 0.047);
     houseGroup.add(wallBuzzerBody, wallBuzzerRing);
 
-    // Back exterior sensors (+X side): DHT11 & blue module with masking tape
+    // Clean back & side sensor modules without exposed wires or masking tape
     const pcbMat = new THREE.MeshStandardMaterial({ color: 0x0b5fa5, roughness: 0.48, metalness: 0.1 });
-    const tapeMat = new THREE.MeshStandardMaterial({ color: 0xf0ede6, roughness: 0.92 });
 
     const dhtPcb = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.44, 0.03), pcbMat);
     dhtPcb.position.set(0.85, 1.5, -houseD / 2 - 0.02);
@@ -912,9 +1167,7 @@ function buildModel() {
         new THREE.MeshStandardMaterial({ color: 0x72c4e8, roughness: 0.55 })
     );
     dhtGrid.position.set(0.85, 1.55, -houseD / 2 - 0.07);
-    const dhtTape = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.12, 0.012), tapeMat);
-    dhtTape.position.set(0.85, 1.28, -houseD / 2 - 0.04);
-    houseGroup.add(dhtPcb, dhtGrid, dhtTape);
+    houseGroup.add(dhtPcb, dhtGrid);
 
     const blueModPcb = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.42, 0.03), pcbMat);
     blueModPcb.position.set(1.4, 1.5, -houseD / 2 - 0.02);
@@ -924,9 +1177,7 @@ function buildModel() {
     );
     blueModPot.rotation.x = Math.PI / 2;
     blueModPot.position.set(1.4, 1.52, -houseD / 2 - 0.05);
-    const blueModTape = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.12, 0.012), tapeMat);
-    blueModTape.position.set(1.4, 1.28, -houseD / 2 - 0.04);
-    houseGroup.add(blueModPcb, blueModPot, blueModTape);
+    houseGroup.add(blueModPcb, blueModPot);
 
     // Side gable walls (-X and +X)
     const sideGableShape = new THREE.Shape();
@@ -949,11 +1200,9 @@ function buildModel() {
     wallRight.position.set(houseW / 2, 0, 0);
     houseGroup.add(wallRight);
 
-    // Left gable wall (-X): exterior sensor PCB + interior sensor head with glowing tiny red indicator LED
+    // Left gable wall (-X): clean exterior sensor PCB + interior sensor head with glowing tiny red indicator LED
     const leftSensorPcb = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.38, 0.24), pcbMat);
     leftSensorPcb.position.set(-houseW / 2 - 0.02, 1.45, -1.05);
-    const leftSensorTape = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.12, 0.28), tapeMat);
-    leftSensorTape.position.set(-houseW / 2 - 0.038, 1.26, -1.05);
 
     const insideLeftPcb = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.16, 0.12), pcbMat);
     insideLeftPcb.position.set(-houseW / 2 + wallThick + 0.035, 1.65, -1.05);
@@ -966,13 +1215,11 @@ function buildModel() {
     const insideRedLed = new THREE.Mesh(new THREE.SphereGeometry(0.026, 12, 12), insideRedLedMat);
     insideRedLed.position.set(-houseW / 2 + wallThick + 0.08, 1.63, -1.05);
     insideRedLed.userData.noShadow = true;
-    houseGroup.add(leftSensorPcb, leftSensorTape, insideLeftPcb, insideRedLed);
+    houseGroup.add(leftSensorPcb, insideLeftPcb, insideRedLed);
 
-    // Right gable wall (+X, cubicle side): exterior blue MQ-2 PCB + interior shiny silver wire-mesh MQ-2 head
+    // Right gable wall (+X, cubicle side): clean exterior blue MQ-2 PCB + interior shiny silver wire-mesh MQ-2 head
     const rightSensorPcb = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.38, 0.24), pcbMat);
     rightSensorPcb.position.set(houseW / 2 + 0.02, 1.45, -1.15);
-    const rightSensorTape = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.12, 0.28), tapeMat);
-    rightSensorTape.position.set(houseW / 2 + 0.038, 1.26, -1.15);
 
     const mqMeshPbr = createMqMeshPBRTextures();
     const mqCollar = new THREE.Mesh(
@@ -995,7 +1242,7 @@ function buildModel() {
     );
     mqSilverMesh.rotation.z = Math.PI / 2;
     mqSilverMesh.position.set(houseW / 2 - wallThick - 0.085, 1.82, -1.15);
-    houseGroup.add(rightSensorPcb, rightSensorTape, mqCollar, mqSilverMesh);
+    houseGroup.add(rightSensorPcb, mqCollar, mqSilverMesh);
 
     // Rear ESP32 control box
     const espBox = new THREE.Mesh(
@@ -1037,14 +1284,7 @@ function buildModel() {
     buzzerRing.position.set(1.15, 0.915, -2.65);
     houseGroup.add(buzzerBody, buzzerRing);
 
-    // Neat sensor cables routed into the ESP32 box
-    addCableTube(houseGroup, [[-1.15, 1.04, -1.86], [-1.15, 0.92, -1.96], [-1.05, 0.72, -2.02]], 0x22252a);
-    addCableTube(houseGroup, [[0.85, 1.24, -1.83], [0.85, 1.0, -1.94], [0.8, 0.74, -2.02]], 0x2b7cb3);
-    addCableTube(houseGroup, [[1.4, 1.24, -1.83], [1.4, 1.0, -1.94], [1.3, 0.74, -2.02]], 0xebe6dc);
-    addCableTube(houseGroup, [[-2.02, 1.22, -1.05], [-2.04, 0.85, -1.45], [-1.72, 0.65, -2.05]], 0xb8382c);
-    addCableTube(houseGroup, [[2.02, 1.22, -1.15], [2.04, 0.85, -1.55], [1.72, 0.65, -2.05]], 0xd6d2c9);
-
-    // Crossbeam + ceiling white LED + orange wire (always attached across walls)
+    // Crossbeam + enclosed electrical conduit trunking + clean ceiling lamp fitting
     const beamMat = new THREE.MeshStandardMaterial({
         color: 0xc94a29,
         bumpMap: wallPbr.bumpMap,
@@ -1056,11 +1296,21 @@ function buildModel() {
     crossbeamMesh.position.set(0, houseH - 0.05, 0);
     houseGroup.add(crossbeamMesh);
 
-    const beamTape = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.01, 0.22), tapeMat);
-    beamTape.position.set(0.02, houseH - 0.018, -0.02);
-    const beamBackTape = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.015, 0.16), tapeMat);
-    beamBackTape.position.set(0.06, houseH - 0.015, -houseD / 2 + 0.08);
-    houseGroup.add(beamTape, beamBackTape);
+    const conduitMat = new THREE.MeshStandardMaterial({ color: 0x353942, roughness: 0.55, metalness: 0.18 });
+    const housingMat = new THREE.MeshStandardMaterial({ color: 0x262930, roughness: 0.48, metalness: 0.25 });
+    const socketTrimMat = new THREE.MeshStandardMaterial({ color: 0xd8dde4, roughness: 0.35, metalness: 0.55 });
+
+    // Rectangular trunking running cleanly along crossbeam underside from inner back wall (Z=-1.68) to lamp fitting (Z=0.10)
+    const beamConduit = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.03, 1.78), conduitMat);
+    beamConduit.position.set(0, houseH - 0.092, -0.79);
+    const wallJunctionCollar = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.04, 0.045), conduitMat);
+    wallJunctionCollar.position.set(0, houseH - 0.092, -houseD / 2 + wallThick + 0.02);
+
+    // Compact ceiling lamp housing & recessed fitting at (0, 2.305, 0.10)
+    const lampFittingBox = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.042, 0.16), housingMat);
+    lampFittingBox.position.set(0, houseH - 0.098, 0.1);
+    const lampSocketRing = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.048, 0.028, 16), socketTrimMat);
+    lampSocketRing.position.set(0, houseH - 0.125, 0.1);
 
     beamLedMat = new THREE.MeshStandardMaterial({
         color: 0xf8f9fa,
@@ -1068,28 +1318,14 @@ function buildModel() {
         emissiveIntensity: 0.12,
         roughness: 0.25
     });
-    const beamLedBase = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.028, 0.032, 0.07, 12),
-        new THREE.MeshStandardMaterial({ color: 0x262629, roughness: 0.6 })
-    );
-    beamLedBase.rotation.x = Math.PI * 0.42;
-    beamLedBase.position.set(0, houseH - 0.085, 0.06);
-
     const beamLedBulb = new THREE.Mesh(new THREE.SphereGeometry(0.058, 16, 16), beamLedMat);
-    beamLedBulb.position.set(0, houseH - 0.12, 0.13);
+    beamLedBulb.position.set(0, houseH - 0.16, 0.1);
     beamLedBulb.name = 'ceilingLampBulb';
     beamLedBulb.userData.noShadow = true;
-    houseGroup.add(beamLedBase, beamLedBulb);
-
-    addCableTube(
-        houseGroup,
-        [[0, houseH - 0.07, 0.05], [0.04, houseH - 0.01, -0.15], [0.08, houseH - 0.01, -1.78], [0.4, 2.0, -2.02], [0.65, 0.86, -2.25]],
-        0xf58220,
-        0.016
-    );
+    houseGroup.add(beamConduit, wallJunctionCollar, lampFittingBox, lampSocketRing, beamLedBulb);
 
     roomLight = new THREE.PointLight(0xffd27d, 0.0, 11.0, 1.25);
-    roomLight.position.set(0, houseH - 0.22, 0.15);
+    roomLight.position.set(0, houseH - 0.24, 0.12);
     roomLight.castShadow = true;
     roomLight.shadow.mapSize.set(512, 512);
     roomLight.shadow.camera.near = 0.12;
@@ -1146,64 +1382,13 @@ function buildModel() {
     interiorGroup.add(cubicleDoorPivot);
     interactiveTargets.push(cubDoorLeaf, cubDoorTrim);
 
-    // Minimalist bed on left-back main area (-X: -1.82..-0.64, Z: -1.68..+0.24)
-    const bedFrame = new THREE.Mesh(new THREE.BoxGeometry(1.18, 0.26, 1.92), darkFrameMat);
-    bedFrame.position.set(-1.23, 0.13, -0.72);
-    const mattress = new THREE.Mesh(
-        new THREE.BoxGeometry(1.08, 0.18, 1.82),
-        new THREE.MeshStandardMaterial({ color: 0xf4eee4, roughness: 0.88 })
-    );
-    mattress.position.set(-1.23, 0.3, -0.72);
-    const pillow = new THREE.Mesh(
-        new THREE.BoxGeometry(0.66, 0.09, 0.36),
-        new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.94 })
-    );
-    pillow.position.set(-1.23, 0.42, -1.36);
-    const blanket = new THREE.Mesh(
-        new THREE.BoxGeometry(1.1, 0.19, 1.15),
-        new THREE.MeshStandardMaterial({ color: 0x24424d, roughness: 0.82 })
-    );
-    blanket.position.set(-1.23, 0.305, -0.38);
-    interiorGroup.add(bedFrame, mattress, pillow, blanket);
+    const plasticWhiteMat = new THREE.MeshStandardMaterial({ color: 0xf1f2f4, roughness: 0.45 });
+    const sharedMats = { darkFrameMat, doorMat, handleMat, plasticWhiteMat };
 
-    // Study desk, small chair, and mini laptop behind the cubicle (+X, -Z)
-    const deskTop = new THREE.Mesh(new THREE.BoxGeometry(1.08, 0.07, 0.56), doorMat);
-    deskTop.position.set(1.14, 0.66, -1.3);
-    const deskLegOffsets = [[-0.46, -0.22], [0.46, -0.22], [-0.46, 0.22], [0.46, 0.22]];
-    deskLegOffsets.forEach(([lx, lz]) => {
-        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.66, 0.06), doorMat);
-        leg.position.set(1.14 + lx, 0.33, -1.3 + lz);
-        interiorGroup.add(leg);
-    });
-
-    const chairSeat = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.05, 0.38), doorMat);
-    chairSeat.position.set(1.14, 0.38, -0.82);
-    const chairBack = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.36, 0.045), doorMat);
-    chairBack.position.set(1.14, 0.58, -0.65);
-    [[-0.16, -0.15], [0.16, -0.15], [-0.16, 0.15], [0.16, 0.15]].forEach(([cx, cz]) => {
-        const cleg = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.38, 0.045), doorMat);
-        cleg.position.set(1.14 + cx, 0.19, -0.82 + cz);
-        interiorGroup.add(cleg);
-    });
-
-    const laptopBase = new THREE.Mesh(
-        new THREE.BoxGeometry(0.32, 0.02, 0.22),
-        new THREE.MeshStandardMaterial({ color: 0x2a2c32, metalness: 0.72, roughness: 0.32 })
-    );
-    laptopBase.position.set(1.14, 0.705, -1.27);
-    laptopScreenMat = new THREE.MeshStandardMaterial({
-        color: 0x58b0ff,
-        emissive: 0x4ea8ff,
-        emissiveIntensity: 0.35,
-        roughness: 0.25
-    });
-    const laptopScreen = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.22, 0.02), laptopScreenMat);
-    laptopScreen.position.set(1.14, 0.82, -1.38);
-    laptopScreen.rotation.x = 0.18;
-    interiorGroup.add(deskTop, chairSeat, chairBack, laptopBase, laptopScreen);
+    buildBathroomFixtures(interiorGroup, sharedMats);
+    buildBedroomFurniture(interiorGroup, sharedMats);
 
     // Wall light switch and twin wall socket inside front wall beside front door
-    const plasticWhiteMat = new THREE.MeshStandardMaterial({ color: 0xf1f2f4, roughness: 0.45 });
     const switchPlate = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.14, 0.025), plasticWhiteMat);
     switchPlate.position.set(-0.28, 0.96, houseD / 2 - wallThick - 0.012);
     const switchRocker = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.06, 0.022), plasticWhiteMat);
@@ -1218,6 +1403,8 @@ function buildModel() {
     outletRecess.rotation.x = Math.PI / 2;
     outletRecess.position.set(-0.28, 0.4, houseD / 2 - wallThick - 0.022);
     interiorGroup.add(switchPlate, switchRocker, outletPlate, outletRecess);
+
+    buildExteriorFixtures(houseGroup, sharedMats);
 
     // Corrugated gable roof + fascia edge trim
     roofGroup = new THREE.Group();
@@ -1335,6 +1522,7 @@ function triggerSunTransitionIfNeeded(forceImmediate = false) {
         currentSunVisual.bgColor.setHex(preset.bgColor);
         currentSunVisual.orbColor.setHex(preset.orbColor);
         currentSunVisual.orbScale = preset.orbScale;
+        currentSunVisual.nightWeight = preset.nightWeight ?? 0.0;
         applyCurrentSunVisuals();
         sunTransition = null;
         return;
@@ -1375,7 +1563,9 @@ function triggerSunTransitionIfNeeded(forceImmediate = false) {
         startOrbColor: currentSunVisual.orbColor.clone(),
         endOrbColor: new THREE.Color(preset.orbColor),
         startOrbScale: currentSunVisual.orbScale,
-        endOrbScale: preset.orbScale
+        endOrbScale: preset.orbScale,
+        startNightWeight: currentSunVisual.nightWeight ?? 0.0,
+        endNightWeight: preset.nightWeight ?? 0.0
     };
 }
 
@@ -1391,6 +1581,15 @@ function applyCurrentSunVisuals() {
 
     ambientLight.intensity = currentSunVisual.ambIntensity;
     scene.background = currentSunVisual.bgColor;
+
+    const nw = THREE.MathUtils.clamp(currentSunVisual.nightWeight ?? 0.0, 0, 1);
+    if (streetLight) {
+        streetLight.intensity = 4.2 * nw;
+    }
+    if (streetLampBulbMat) {
+        streetLampBulbMat.emissiveIntensity = 0.05 + 2.85 * nw;
+    }
+
     updateSunOrbTransform();
 }
 
@@ -1456,7 +1655,7 @@ const HOTSPOT_DEFINITIONS = [
         name: 'Lampu',
         icon: 'light',
         filled: false,
-        pos: new THREE.Vector3(0.0, 2.28, 0.13)
+        pos: new THREE.Vector3(0.0, 2.24, 0.1)
     },
     {
         id: 'alarm',
@@ -1540,9 +1739,21 @@ function bindInteractiveRaycaster() {
 
     dom.addEventListener('pointerdown', e => {
         pointerDownPos = { x: e.clientX, y: e.clientY };
+        pointerIsDownOnCanvas = true;
     });
 
     dom.addEventListener('pointermove', e => {
+        if (pointerIsDownOnCanvas) {
+            const dist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+            if (dist >= 5) {
+                if (activeCameraTween) {
+                    activeCameraTween = null;
+                    controls.enableDamping = true;
+                }
+                isUserInteracting = true;
+                lastAutoHighlightTime = performance.now();
+            }
+        }
         if (isUserInteracting) {
             dom.style.cursor = 'grabbing';
             return;
@@ -1551,17 +1762,37 @@ function bindInteractiveRaycaster() {
         dom.style.cursor = hit ? 'pointer' : 'grab';
     });
 
+    dom.addEventListener('wheel', () => {
+        if (activeCameraTween) {
+            activeCameraTween = null;
+            controls.enableDamping = true;
+        }
+        lastAutoHighlightTime = performance.now();
+    }, { passive: true });
+
     // Distinguish fast click (< 5px pointer travel) from OrbitControls drag
     dom.addEventListener('pointerup', e => {
+        const wasDragging = isUserInteracting;
+        pointerIsDownOnCanvas = false;
+        isUserInteracting = false;
+
         const dist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
-        if (dist >= 5) return;
+        if (dist >= 5 || wasDragging) {
+            lastAutoHighlightTime = performance.now();
+            return;
+        }
 
         const hit = getHitObject(e.clientX, e.clientY);
         if (hit && hit.userData.interactiveType) {
             toggleInteractivePart(hit.userData.interactiveType);
-        } else {
+        } else if (!hit) {
             closeInspector();
         }
+    });
+
+    window.addEventListener('pointerup', () => {
+        pointerIsDownOnCanvas = false;
+        isUserInteracting = false;
     });
 }
 
@@ -1581,23 +1812,32 @@ export function focusHotspot(id) {
     });
 
     if (id === 'lamp') {
+        lastAutoFocusedKey = 'lamp';
+        currentViewMode = 'inside';
         setRoofOpen(true);
         animateCameraSpherical(
             new THREE.Vector3(2.4, 5.0, 3.8),
             new THREE.Vector3(0, 1.85, 0.1),
-            1200
+            1350
         );
     } else if (id === 'fan') {
+        lastAutoFocusedKey = 'fan';
+        currentViewMode = 'outside';
+        setRoofOpen(false);
         animateCameraSpherical(
-            new THREE.Vector3(-1.35, 2.35, -5.6),
-            new THREE.Vector3(-1.15, 1.45, -1.8),
-            1200
+            new THREE.Vector3(-2.6, 2.9, -5.6),
+            new THREE.Vector3(-0.65, 1.4, -1.75),
+            1350
         );
     } else if (id === 'alarm') {
+        lastAutoFocusedKey = 'alarm';
+        currentViewMode = 'outside';
+        setRoofOpen(false);
+        // Back-right three-quarter framing shows MQ-2 gas sensor (+X) + Exhaust Fan & Alarm buzzer (-Z)
         animateCameraSpherical(
-            new THREE.Vector3(3.4, 2.7, -5.2),
-            new THREE.Vector3(1.05, 1.05, -2.55),
-            1200
+            new THREE.Vector3(5.4, 3.4, -5.0),
+            new THREE.Vector3(0.25, 1.35, -1.45),
+            1350
         );
     }
 }
@@ -1627,6 +1867,14 @@ function updateSunButtonsUI() {
     });
 }
 
+function getResponsiveFov(width, height) {
+    const aspect = width / Math.max(1, height);
+    if (aspect >= 1.25) return 40;
+    const baseHalfTan = Math.tan(THREE.MathUtils.degToRad(40 / 2));
+    const adjusted = THREE.MathUtils.radToDeg(2 * Math.atan(baseHalfTan * (1.25 / Math.max(aspect, 0.85))));
+    return Math.min(54, Math.max(40, adjusted));
+}
+
 export function init(containerElement) {
     if (!containerElement) return false;
     container = containerElement;
@@ -1647,7 +1895,8 @@ export function init(containerElement) {
 
     scene = new THREE.Scene();
 
-    camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
+    // 2. Camera with responsive FOV from origin/main
+    camera = new THREE.PerspectiveCamera(getResponsiveFov(width, height), width / height, 0.1, 100);
     camera.position.copy(VIEW_PRESETS.outside.cam);
 
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
@@ -1686,13 +1935,20 @@ export function init(containerElement) {
     controls.target.copy(VIEW_PRESETS.outside.target);
 
     controls.addEventListener('start', () => {
-        activeCameraTween = null;
-        isUserInteracting = true;
-        lastAutoHighlightTime = performance.now();
+        // Ignore simple click starts; real camera drags (>5px) and wheels are handled explicitly
+        if (!pointerIsDownOnCanvas && activeCameraTween) {
+            activeCameraTween = null;
+            controls.enableDamping = true;
+            isUserInteracting = true;
+            lastAutoHighlightTime = performance.now();
+        }
     });
     controls.addEventListener('end', () => {
+        if (isUserInteracting) {
+            lastAutoHighlightTime = performance.now();
+        }
+        pointerIsDownOnCanvas = false;
         isUserInteracting = false;
-        lastAutoHighlightTime = performance.now();
     });
 
     createSunAndSkyRig();
@@ -1758,6 +2014,7 @@ function onWindowResize() {
     const w = container.clientWidth;
     const h = container.clientHeight;
     if (!w || !h) return;
+    camera.fov = getResponsiveFov(w, h);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     renderer.setSize(w, h, false);
@@ -1810,12 +2067,12 @@ export function setRoomView(mode) {
     if (mode === 'inside') {
         currentViewMode = 'inside';
         setRoofOpen(true);
-        animateCameraSpherical(VIEW_PRESETS.inside.cam, VIEW_PRESETS.inside.target, 1200);
+        animateCameraSpherical(VIEW_PRESETS.inside.cam, VIEW_PRESETS.inside.target, 1350);
     } else {
         currentViewMode = 'outside';
         setRoofOpen(false);
         closeInspector();
-        animateCameraSpherical(VIEW_PRESETS.outside.cam, VIEW_PRESETS.outside.target, 1200);
+        animateCameraSpherical(VIEW_PRESETS.outside.cam, VIEW_PRESETS.outside.target, 1350);
     }
 }
 
@@ -1852,7 +2109,7 @@ export function setViewMode(modeName) {
     if (!VIEW_PRESETS[modeName]) return;
     currentViewMode = modeName;
     const preset = VIEW_PRESETS[modeName];
-    animateCameraSpherical(preset.cam, preset.target, 1200);
+    animateCameraSpherical(preset.cam, preset.target, 1350);
 }
 
 export function resetView() {
@@ -1871,22 +2128,29 @@ export function focusScenario(scenario, force = false) {
     } else if (scenario === 'gas' || scenario === 'alarm' || scenario === 'emergency') {
         focusHotspot('alarm');
     } else if (scenario === 'normal') {
+        lastAutoFocusedKey = 'normal';
         setRoomView('outside');
     } else if (scenario === 'anomaly') {
+        lastAutoFocusedKey = 'anomaly';
+        currentViewMode = 'outside';
         setRoofOpen(false);
-        animateCameraSpherical(new THREE.Vector3(5.5, 4.8, 6.5), new THREE.Vector3(0, 1.2, 0), 1200);
+        animateCameraSpherical(new THREE.Vector3(5.5, 4.8, 6.5), new THREE.Vector3(0, 1.2, 0), 1350);
     }
 }
+
+let pendingAutoHighlight = false;
 
 function checkAutoHighlight(data) {
     if (!data) return;
 
-    const isOnline = Boolean(data.esp32_online) || Boolean(window.isSimulationModeActive);
+    const isSim = Boolean(window.isSimulationModeActive);
+    const isOnline = Boolean(data.esp32_online) || isSim;
+    const simScenario = isSim ? (data.sim_scenario || 'normal') : null;
+
     if (!isOnline) {
-        prevLiveState.hasBaseline = true;
-        prevLiveState.fanOn = false;
-        prevLiveState.ledOn = false;
-        prevLiveState.gasDanger = false;
+        prevLiveState = { hasBaseline: false, fanOn: false, ledOn: false, gasDanger: false, simScenario: null };
+        lastAutoFocusedKey = null;
+        pendingAutoHighlight = false;
         return;
     }
 
@@ -1897,28 +2161,55 @@ function checkAutoHighlight(data) {
     const buzzerOn = String(data.buzzer ?? 'OFF').toUpperCase() === 'ON';
     const gasDanger = gas >= gasThreshold || (buzzerOn && !data.buzzer_muted);
 
-    if (!prevLiveState.hasBaseline) {
-        prevLiveState = { hasBaseline: true, fanOn, ledOn, gasDanger };
+    if (!gasDanger && !fanOn && !ledOn && !isSim) {
+        lastAutoFocusedKey = null;
+    }
+
+    const isFirstBaseline = !prevLiveState.hasBaseline;
+    const simChanged = isSim && simScenario !== prevLiveState.simScenario;
+
+    let pendingScenario = null;
+    if (simChanged && (simScenario === 'normal' || simScenario === 'anomaly')) {
+        pendingScenario = simScenario;
+    } else if (gasDanger && (isFirstBaseline || !prevLiveState.gasDanger || (simChanged && lastAutoFocusedKey !== 'alarm'))) {
+        pendingScenario = 'gas';
+    } else if (
+        fanOn && !gasDanger &&
+        (isFirstBaseline || !prevLiveState.fanOn || prevLiveState.gasDanger || (lastAutoFocusedKey !== 'fan' && simChanged))
+    ) {
+        pendingScenario = 'humid';
+    } else if (ledOn && !gasDanger && (isFirstBaseline || !prevLiveState.ledOn || simChanged)) {
+        pendingScenario = 'dark';
+    }
+
+    if (!pendingScenario) {
+        prevLiveState = { hasBaseline: true, fanOn, ledOn, gasDanger, simScenario };
+        pendingAutoHighlight = false;
         return;
     }
 
     const now = performance.now();
-    const canTrigger = isAutoFocusEnabled && !isUserInteracting && (now - lastAutoHighlightTime > 1600);
+    const isHighPriority = pendingScenario === 'gas' || simChanged;
+    const cooldownOk = isHighPriority || (now - lastAutoHighlightTime > 1200);
+    const canTrigger = isAutoFocusEnabled && !isUserInteracting && cooldownOk;
 
-    if (gasDanger && !prevLiveState.gasDanger && canTrigger) {
-        lastAutoHighlightTime = now;
-        focusScenario('gas');
-    } else if (fanOn && !prevLiveState.fanOn && !gasDanger && canTrigger) {
-        lastAutoHighlightTime = now;
-        focusScenario('humid');
-    } else if (ledOn && !prevLiveState.ledOn && canTrigger) {
-        lastAutoHighlightTime = now;
-        focusScenario('dark');
+    if (!isAutoFocusEnabled) {
+        prevLiveState = { hasBaseline: true, fanOn, ledOn, gasDanger, simScenario };
+        pendingAutoHighlight = false;
+        return;
     }
 
-    prevLiveState.fanOn = fanOn;
-    prevLiveState.ledOn = ledOn;
-    prevLiveState.gasDanger = gasDanger;
+    if (!canTrigger) {
+        // Defer without swallowing transition so the camera focuses as soon as drag/cooldown finishes
+        pendingAutoHighlight = true;
+        prevLiveState.hasBaseline = true;
+        return;
+    }
+
+    lastAutoHighlightTime = now;
+    pendingAutoHighlight = false;
+    prevLiveState = { hasBaseline: true, fanOn, ledOn, gasDanger, simScenario };
+    focusScenario(pendingScenario);
 }
 
 export function updateData(data) {
@@ -1926,7 +2217,6 @@ export function updateData(data) {
     currentData = Object.assign(currentData, data);
 
     const online = Boolean(currentData.esp32_online);
-    const isSystemActive = online || Boolean(window.isSimulationModeActive);
     const kelembapan = online ? Number(currentData.kelembapan ?? 0) : 0;
     const gas = online ? Number(currentData.gas ?? 0) : 0;
     const realLedOn = String(currentData.led ?? 'OFF').toUpperCase() === 'ON';
@@ -1938,14 +2228,8 @@ export function updateData(data) {
     triggerSunTransitionIfNeeded(false);
     checkAutoHighlight(currentData);
 
-    // Offline night preview automatically turns on 3D lamp without changing real sensor status cards
-    const isNightPreviewAuto = !isSystemActive && sunTimeMode === 'malam' && !Boolean(currentData.has_manual_led);
-    const visualLedOn = isNightPreviewAuto ? true : realLedOn;
-
-    const previewBadge = document.getElementById('sun-preview-badge');
-    if (previewBadge) {
-        previewBadge.hidden = !isNightPreviewAuto;
-    }
+    // Indoor lamp strictly reflects true LED actuator state (yard lighting handles night ambiance)
+    const visualLedOn = realLedOn;
 
     if (roomLight) {
         roomLight.intensity = visualLedOn ? 5.6 : 0.0;
@@ -2023,6 +2307,11 @@ function animate() {
     const delta = Math.min((now - lastTime) / 1000, 0.1);
     lastTime = now;
 
+    if (pendingAutoHighlight && !isUserInteracting && (now - lastAutoHighlightTime > 1200)) {
+        pendingAutoHighlight = false;
+        checkAutoHighlight(currentData);
+    }
+
     if (activeCameraTween) {
         const elapsed = now - activeCameraTween.startTime;
         const p = Math.min(1.0, elapsed / activeCameraTween.duration);
@@ -2041,19 +2330,26 @@ function animate() {
             const offset = new THREE.Vector3().setFromSphericalCoords(r, phi, theta);
             camera.position.copy(currentTarget).add(offset);
             controls.target.copy(currentTarget);
+            camera.lookAt(controls.target);
         } else {
             camera.position.lerpVectors(activeCameraTween.startCam, activeCameraTween.endCam, ease);
             controls.target.lerpVectors(activeCameraTween.startTarget, activeCameraTween.endTarget, ease);
+            camera.lookAt(controls.target);
         }
 
         if (p >= 1.0) {
             controls.target.copy(activeCameraTween.endTarget || activeCameraTween.startTarget);
+            camera.lookAt(controls.target);
             const cb = activeCameraTween.onComplete;
             activeCameraTween = null;
+            controls.update();
+            controls.enableDamping = true;
             if (cb) cb();
         }
+    } else {
+        controls.enableDamping = true;
+        controls.update();
     }
-    controls.update();
 
     // Smooth ~1s sun cycle spherical arc lerp
     if (sunTransition) {
@@ -2074,6 +2370,7 @@ function animate() {
         currentSunVisual.bgColor.copy(sunTransition.startBgColor).lerp(sunTransition.endBgColor, ease);
         currentSunVisual.orbColor.copy(sunTransition.startOrbColor).lerp(sunTransition.endOrbColor, ease);
         currentSunVisual.orbScale = THREE.MathUtils.lerp(sunTransition.startOrbScale, sunTransition.endOrbScale, ease);
+        currentSunVisual.nightWeight = THREE.MathUtils.lerp(sunTransition.startNightWeight, sunTransition.endNightWeight, ease);
         applyCurrentSunVisuals();
 
         if (p >= 1.0) {

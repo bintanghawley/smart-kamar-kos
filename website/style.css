@@ -479,12 +479,14 @@ body {
     flex-direction: column;
     gap: 34px;
     min-width: 0;
+    width: 100%;
     max-width: 100%;
 }
 
 .page-section {
     scroll-margin-top: 96px;
     min-width: 0;
+    width: 100%;
     max-width: 100%;
 }
 
@@ -517,6 +519,8 @@ body {
     background: var(--surface);
     border-radius: var(--radius-lg);
     position: relative;
+    min-width: 0;
+    max-width: 100%;
 }
 
 /* ==================== 3D STAGE CARD ==================== */
@@ -552,7 +556,7 @@ body {
 /* Top overlay controls inside 3D canvas */
 .stage-top-controls {
     position: absolute;
-    top: 14px;
+    top: 16px;
     left: 16px;
     right: 16px;
     z-index: 20;
@@ -568,6 +572,7 @@ body {
     pointer-events: auto;
     display: inline-flex;
     align-items: center;
+    gap: 4px;
     padding: 4px;
     border-radius: var(--radius-pill);
     background: rgba(24, 21, 19, 0.78);
@@ -580,20 +585,27 @@ body {
     border: none;
     background: transparent;
     color: #e9e5e0;
-    font-family: var(--font-sans);
-    font-size: 13px;
-    font-weight: 600;
-    padding: 6px 16px;
+    width: 40px;
+    height: 34px;
+    padding: 0;
     border-radius: var(--radius-pill);
     cursor: pointer;
-    transition: background 0.2s ease, color 0.2s ease;
-    white-space: nowrap;
+    display: grid;
+    place-items: center;
+    transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
+}
+
+.view-switch-btn:hover {
+    color: #ffffff;
+}
+
+.view-switch-icon {
+    font-size: 20px;
 }
 
 .view-switch-btn.is-active {
     background: #ffffff;
     color: var(--ink);
-    font-weight: 700;
 }
 
 .sun-cycle-switch {
@@ -603,6 +615,15 @@ body {
     padding: 3px;
     border-radius: var(--radius-pill);
     background: rgba(20, 18, 16, 0.88);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.sun-cycle-switch[hidden] {
+    display: none;
+}
     border: 1px solid rgba(255, 255, 255, 0.22);
     max-width: 100%;
     overflow-x: auto;
@@ -952,6 +973,47 @@ body {
 
 .actuator-card.is-on[data-device="buzzer"] .actuator-gicon {
     animation: alarmRing 0.9s ease-in-out infinite;
+}
+
+.actuator-auto-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 14px;
+    border-radius: var(--radius-md);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 214, 52, 0.28);
+    font-size: 12.5px;
+    color: var(--text-secondary);
+}
+
+.actuator-auto-bar[hidden] {
+    display: none;
+}
+
+.actuator-auto-text {
+    font-weight: 500;
+    color: #e6dfd8;
+}
+
+.actuator-auto-btn {
+    border: 1px solid rgba(255, 214, 52, 0.45);
+    background: rgba(255, 214, 52, 0.14);
+    color: var(--yellow);
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 5px 12px;
+    border-radius: var(--radius-pill);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.18s ease, color 0.18s ease;
+}
+
+.actuator-auto-btn:hover {
+    background: var(--yellow);
+    color: var(--ink);
 }
 
 /* ==================== CHART CARD ==================== */
@@ -1748,14 +1810,53 @@ body {
 @media (max-width: 1040px) {
     .dashboard-grid {
         grid-template-columns: 1fr;
+        gap: 16px;
     }
 
-    .stage-canvas-wrapper {
-        height: 360px;
+    .dash-left-col,
+    .dash-right-col {
+        display: contents;
+    }
+
+    .stage-3d-card {
+        order: 1;
+        width: 100%;
+        min-width: 0;
+    }
+
+    .condition-card {
+        order: 2;
+        width: 100%;
+        min-width: 0;
     }
 
     .ai-detector-card {
-        min-height: 340px;
+        order: 3;
+        width: 100%;
+        min-width: 0;
+        min-height: 0;
+    }
+
+    .actuators-grid {
+        order: 4;
+        width: 100%;
+        min-width: 0;
+    }
+
+    .actuator-auto-bar {
+        order: 4;
+        width: 100%;
+        min-width: 0;
+    }
+
+    .chart-card {
+        order: 5;
+        width: 100%;
+        min-width: 0;
+    }
+
+    .stage-canvas-wrapper {
+        height: 400px;
     }
 }
 
@@ -1763,7 +1864,7 @@ body {
     .app-shell {
         flex-direction: column;
         align-items: stretch;
-        padding: 14px 14px 86px;
+        padding: 12px 14px 104px;
         gap: 14px;
     }
 
@@ -1795,62 +1896,92 @@ body {
         width: auto;
         min-height: auto;
         height: auto;
-        padding: 8px 12px;
-        background: rgba(27, 24, 23, 0.95);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
+        padding: 10px 16px;
+        background: rgba(24, 21, 20, 0.92);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
         border: 1px solid var(--border-strong);
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.65);
     }
 
     .sidebar-nav {
         flex-direction: row;
-        gap: 10px;
+        gap: 16px;
+    }
+
+    .nav-item {
+        width: 54px;
+        height: 54px;
+    }
+
+    .nav-item .material-symbols-rounded {
+        font-size: 26px;
     }
 
     .topbar {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 10px;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px 10px;
         top: 8px;
         padding: 10px 14px;
         border-radius: 18px;
     }
 
+    .topbar-title {
+        font-size: 19px;
+    }
+
     .topbar-actions {
         width: 100%;
         justify-content: space-between;
+        gap: 8px;
+    }
+
+    .status-pill,
+    .datetime-pill {
+        font-size: 12px;
+        padding: 7px 12px;
+        gap: 6px;
+    }
+
+    .dt-cal-icon,
+    .dt-time-icon {
+        font-size: 16px;
+        margin-left: 1px;
     }
 
     .status-popover {
         left: 0;
         right: auto;
+        width: min(296px, calc(100vw - 36px));
+    }
+
+    .content {
+        gap: 24px;
+    }
+
+    .section-heading {
+        font-size: 20px;
+        margin-bottom: 12px;
     }
 
     .stage-canvas-wrapper {
-        height: 330px;
+        height: clamp(360px, 47vh, 430px);
+        min-height: 360px;
     }
 
     .stage-top-controls {
-        top: 10px;
-        left: 10px;
-        right: 10px;
+        top: 12px;
+        left: 12px;
+        right: 12px;
         gap: 6px;
-    }
-
-    .view-switch-btn {
-        font-size: 12px;
-        padding: 7px 12px;
     }
 
     .sun-btn {
         font-size: 11.5px;
-        padding: 7px 9px;
-    }
-
-    .sun-preview-badge {
-        left: 10px;
-        bottom: 10px;
-        font-size: 10.5px;
+        padding: 6px 9px;
     }
 
     .stage-3d-hint {
@@ -1858,26 +1989,163 @@ body {
         padding: 6px 10px;
     }
 
-    .actuators-grid {
+    .view-switch-btn {
+        width: 42px;
+        height: 36px;
+    }
+
+    .hotspot-icon-circle {
+        width: 34px;
+        height: 34px;
+    }
+
+    .hotspot-name,
+    .hotspot-state {
+        font-size: 12px;
+    }
+
+    .condition-card {
+        padding: 18px;
+    }
+
+    .condition-header {
+        margin-bottom: 12px;
+    }
+
+    .card-heading,
+    .condition-verdict {
+        font-size: 18.5px;
+    }
+
+    .stats-grid-2x2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    .stat-card {
+        padding: 13px 14px 14px;
+        min-height: 106px;
+        border-radius: 15px;
+    }
+
+    .stat-label {
+        font-size: 12px;
+        line-height: 1.25;
+    }
+
+    .stat-gicon {
+        font-size: 18px;
+        flex-shrink: 0;
+    }
+
+    .stat-num {
+        font-size: 27px;
+    }
+
+    .stat-word {
+        font-size: 23px;
+    }
+
+    .stat-trend-icon {
+        font-size: 21px;
+    }
+
+    .ai-detector-card {
+        padding: 18px;
+    }
+
+    .ai-footer-top {
+        flex-wrap: wrap;
         gap: 8px;
     }
 
+    .ai-slot-popover {
+        right: 12px;
+        width: min(292px, calc(100vw - 52px));
+    }
+
+    .actuators-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .actuator-card {
+        min-height: 122px;
+        padding: 14px 18px 16px;
+        border-radius: 18px;
+    }
+
     .actuator-gicon {
-        font-size: 46px;
+        font-size: 56px;
+    }
+
+    .chart-card {
+        padding: 16px;
+    }
+
+    .filter-chips {
+        width: 100%;
+        justify-content: space-between;
+        gap: 2px;
+    }
+
+    .chart-tab {
+        padding: 5px 9px;
+        font-size: 11.5px;
+    }
+
+    .canvas-wrapper {
+        min-height: 175px;
+        height: 185px;
+    }
+
+    .history-card {
+        padding: 14px 12px;
+        overflow: hidden;
+    }
+
+    .history-table {
+        min-width: 0;
+        width: 100%;
+        font-size: 12px;
+    }
+
+    .history-table thead th {
+        padding: 8px 6px 10px;
+        font-size: 11.5px;
+    }
+
+    .history-table tbody td {
+        padding: 10px 6px;
+        height: 38px;
+    }
+
+    .system-card {
+        padding: 8px 18px;
+    }
+
+    .info-item {
+        padding: 12px 0;
+        font-size: 13.5px;
     }
 }
 
 @media (max-width: 480px) {
     .stats-grid-2x2 {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .actuators-grid {
-        grid-template-columns: 1fr;
+    .stat-num {
+        font-size: 24px;
     }
 
+    .stat-word {
+        font-size: 21px;
+    }
+
+    .status-pill,
     .datetime-pill {
         font-size: 11px;
-        padding: 7px 12px;
+        padding: 6px 10px;
     }
 }
