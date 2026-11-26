@@ -42,7 +42,7 @@ services:
       DEVICE_TOKEN: ${DEVICE_TOKEN:-}
       DEFAULT_DEVICE_ID: ${DEFAULT_DEVICE_ID:-esp32-kamar-01}
     volumes:
-      - ../website/ai:/app/website/ai
+      - ../website:/app/website
     networks:
       - smartkos-net
 
