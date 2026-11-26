@@ -111,12 +111,31 @@ const elStageSimStrip = document.getElementById("stage-sim-strip");
 const elSunCycleSwitch = document.getElementById("sun-cycle-switch");
 const elBtnRefresh = document.getElementById("btn-refresh");
 const elBtnWeeklySummary = document.getElementById("btn-weekly-summary");
-const elWeeklyModal = document.getElementById("weekly-modal");
-const elBtnCloseWeekly = document.getElementById("btn-close-weekly");
-const elWeeklyAvgTemp = document.getElementById("weekly-avg-temp");
-const elWeeklyAvgHum = document.getElementById("weekly-avg-hum");
-const elWeeklyMaxTemp = document.getElementById("weekly-max-temp");
-const elWeeklySampleCount = document.getElementById("weekly-sample-count");
+const elWeeklyReportPage = document.getElementById("weekly-report");
+const elBtnWeeklyBack = document.getElementById("btn-weekly-back");
+const elWeeklySourcePill = document.getElementById("weekly-source-pill");
+const elWeeklyWeekTabs = document.getElementById("weekly-week-tabs");
+const elWeeklyRangeText = document.getElementById("weekly-range-text");
+const elWeeklyHeroRange = document.getElementById("weekly-hero-range");
+const elWeeklyHeroValue = document.getElementById("weekly-hero-value");
+const elWeeklyHeroUnit = document.getElementById("weekly-hero-unit");
+const elWeeklyHeroLabel = document.getElementById("weekly-hero-label");
+const elWeeklyChartWrap = document.getElementById("weekly-chart-wrap");
+const elWeeklyBarChart = document.getElementById("weekly-bar-chart");
+const weeklyBarCtx = elWeeklyBarChart ? elWeeklyBarChart.getContext("2d") : null;
+const elWeeklyChartTooltip = document.getElementById("weekly-chart-tooltip");
+const elWeeklyEmptyHint = document.getElementById("weekly-empty-hint");
+const elWeeklyAiStatusPill = document.getElementById("weekly-ai-status-pill");
+const elWeeklyAiNarrative = document.getElementById("weekly-ai-narrative");
+const elWeeklySlotsGrid = document.getElementById("weekly-slots-grid");
+const elWeeklyAiBullets = document.getElementById("weekly-ai-bullets");
+const elBtnWeeklyExport = document.getElementById("btn-weekly-export");
+const elWeeklyHlTemp = document.getElementById("weekly-hl-temp");
+const elWeeklyHlFan = document.getElementById("weekly-hl-fan");
+const elWeeklyHlLed = document.getElementById("weekly-hl-led");
+const elWeeklyHlInc = document.getElementById("weekly-hl-inc");
+const elWeeklyDailyTbody = document.getElementById("weekly-daily-tbody");
+const weeklyMetricTabs = document.querySelectorAll("[data-weekly-metric]");
 
 // Kondisi Saat Ini
 const elConditionVerdict = document.getElementById("condition-verdict");
@@ -1420,15 +1439,16 @@ function updateSystemInfo(success) {
 }
 
 // ==================== SMOOTH CANVAS TREND CHART ====================
-function setupCanvasResolution() {
+function setupCanvasResolution(targetCanvas = canvas, targetCtx = ctx) {
+    if (!targetCanvas || !targetCtx) return null;
     const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
+    const rect = targetCanvas.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return null;
 
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    ctx.resetTransform?.();
-    ctx.scale(dpr, dpr);
+    targetCanvas.width = rect.width * dpr;
+    targetCanvas.height = rect.height * dpr;
+    targetCtx.resetTransform?.();
+    targetCtx.scale(dpr, dpr);
     return rect;
 }
 
@@ -1657,6 +1677,10 @@ function toggleSimulationMode() {
         fetchInitialHistory();
         fetchSensorData();
     }
+
+    if (currentAppPage === "weekly") {
+        loadWeeklySummary();
+    }
 }
 
 function applySimulationStep(skipHistory = false) {
@@ -1727,6 +1751,930 @@ document.querySelectorAll(".sim-preset-btn[data-sim]").forEach(btn => {
     });
 });
 
+// ==================== WEEKLY REPORT PAGE CONTROLLER ====================
+const WEEK_DAYS_SHORT = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"];
+const WEEK_DAYS_FULL = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"];
+
+const WEEKLY_METRIC_META = {
+    suhu: {
+        label: "Rata-rata Suhu",
+        unit: "°C",
+        color: CHART_COLORS.suhu,
+        avgKey: "suhu_avg",
+        minKey: "suhu_min",
+        maxKey: "suhu_max",
+        decimals: 1,
+        minY: 20,
+        defaultMaxY: 36,
+        stepY: 5
+    },
+    kelembapan: {
+        label: "Rata-rata Kelembapan",
+        unit: "%",
+        color: CHART_COLORS.kelembapan,
+        avgKey: "kelembapan_avg",
+        minKey: "kelembapan_min",
+        maxKey: "kelembapan_max",
+        decimals: 0,
+        minY: 0,
+        defaultMaxY: 100,
+        stepY: 25
+    },
+    gas: {
+        label: "Rata-rata Gas",
+        unit: "ADC",
+        color: CHART_COLORS.gas,
+        avgKey: "gas_avg",
+        maxKey: "gas_max",
+        decimals: 0,
+        minY: 0,
+        defaultMaxY: 1200,
+        stepY: 500
+    },
+    cahaya: {
+        label: "Rata-rata Cahaya",
+        unit: "ADC",
+        color: CHART_COLORS.cahaya,
+        avgKey: "cahaya_avg",
+        maxKey: "cahaya_max",
+        decimals: 0,
+        minY: 0,
+        defaultMaxY: 4000,
+        stepY: 1000
+    }
+};
+
+let currentAppPage = "dashboard";
+const weeklyState = {
+    selectedYear: null,
+    selectedWeek: null,
+    activeMetric: "suhu",
+    selectedDayIdx: null,
+    payload: null,
+    barHitboxes: [],
+    animRafId: null
+};
+
+function getIsoWeekInfo(dateObj = new Date()) {
+    const d = new Date(Date.UTC(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    const week = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    return { year: d.getUTCFullYear(), week };
+}
+
+function getMondayOfIsoWeek(isoYear, isoWeek) {
+    const jan4 = new Date(Date.UTC(isoYear, 0, 4));
+    const dayOfWeek = jan4.getUTCDay() || 7;
+    const monday = new Date(jan4);
+    monday.setUTCDate(jan4.getUTCDate() - dayOfWeek + 1 + (isoWeek - 1) * 7);
+    return new Date(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate());
+}
+
+function getRecentWeeksMetadata(numWeeks = 4) {
+    const curr = getIsoWeekInfo(new Date());
+    const currMonday = getMondayOfIsoWeek(curr.year, curr.week);
+    const weeks = [];
+    for (let offset = -(numWeeks - 1); offset <= 0; offset++) {
+        const monday = new Date(currMonday);
+        monday.setDate(currMonday.getDate() + offset * 7);
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+        const info = getIsoWeekInfo(monday);
+        weeks.push({
+            key: `${info.year}-W${String(info.week).padStart(2, "0")}`,
+            year: info.year,
+            week: info.week,
+            label: `W${String(info.week).padStart(2, "0")}`,
+            monday,
+            sunday,
+            range_label: `${monday.getDate()} ${MONTHS_ID[monday.getMonth()]} - ${sunday.getDate()} ${MONTHS_ID[sunday.getMonth()]} (Week ${info.week})`,
+            is_current: offset === 0
+        });
+    }
+    return weeks;
+}
+
+function formatMetricNumber(val, decimals = 1) {
+    if (val === null || val === undefined || !Number.isFinite(Number(val))) return "--";
+    return Number(val).toFixed(decimals);
+}
+
+function buildSimulatedWeeklySummary(isoYear, isoWeek) {
+    const available = getRecentWeeksMetadata(4);
+    const matched = available.find((w) => w.year === isoYear && w.week === isoWeek) || available[available.length - 1];
+    const seed = matched.week;
+
+    // Distinct weekly profile per week number so week selector feels genuinely alive
+    const tempBase = 26.8 + ((seed % 4) * 0.45);
+    const humBase = 57 + ((seed % 3) * 3);
+    const gasBias = seed % 2 === 0 ? 480 : 540;
+    const anomDay = (seed + 2) % 7;
+
+    const days = [];
+    for (let idx = 0; idx < 7; idx++) {
+        const dayDate = new Date(matched.monday);
+        dayDate.setDate(matched.monday.getDate() + idx);
+        const wave = Math.sin((idx + seed) * 0.95);
+        const suhuAvg = Number((tempBase + wave * 1.6).toFixed(1));
+        const suhuMin = Number((suhuAvg - (2.3 + (idx % 2) * 0.5)).toFixed(1));
+        const suhuMax = Number((suhuAvg + (3.1 + ((idx + seed) % 3) * 0.6)).toFixed(1));
+        const humAvg = Math.round(Math.min(82, Math.max(46, humBase - wave * 5 + (idx === 5 ? 6 : 0))));
+        const humMax = Math.min(90, humAvg + 12);
+        const gasAvg = Math.round(gasBias + ((idx * 37 + seed * 19) % 140));
+        const gasMax = gasAvg + 110;
+        const cahayaAvg = Math.round(1350 + Math.cos((idx + seed) * 0.8) * 320);
+        const isAnom = idx === anomDay;
+        const aiScoreAvg = isAnom ? 74.5 : Number((91 + ((idx + seed) % 5) * 1.2).toFixed(1));
+        const kipasPct = humAvg >= 60 ? Math.min(48, 18 + (humAvg - 58) * 2) : 8;
+        const ledPct = 36 + ((idx + seed) % 10);
+
+        const localDateStr = `${dayDate.getFullYear()}-${String(dayDate.getMonth() + 1).padStart(2, "0")}-${String(dayDate.getDate()).padStart(2, "0")}`;
+        days.push({
+            date: localDateStr,
+            day_index: idx,
+            day_short: WEEK_DAYS_SHORT[idx],
+            day_full: WEEK_DAYS_FULL[idx],
+            date_label: `${dayDate.getDate()} ${MONTHS_ID[dayDate.getMonth()].slice(0, 3)}`,
+            sample_count: 180 + idx * 14,
+            suhu_avg: suhuAvg,
+            suhu_min: suhuMin,
+            suhu_max: suhuMax,
+            kelembapan_avg: humAvg,
+            kelembapan_min: Math.max(40, humAvg - 9),
+            kelembapan_max: humMax,
+            gas_avg: gasAvg,
+            gas_max: gasMax,
+            cahaya_avg: cahayaAvg,
+            cahaya_max: cahayaAvg + 950,
+            ai_score_avg: aiScoreAvg,
+            anomaly_count: isAnom ? 1 : 0,
+            gas_danger_count: 0,
+            kipas_pct: kipasPct,
+            led_pct: ledPct
+        });
+    }
+
+    const avg = (arr) => Number((arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1));
+    return {
+        status: "OK",
+        source: "simulation",
+        has_data: true,
+        week: {
+            key: matched.key,
+            year: matched.year,
+            week: matched.week,
+            label: matched.label,
+            range_label: matched.range_label
+        },
+        available_weeks: available.map((w) => ({
+            key: w.key,
+            year: w.year,
+            week: w.week,
+            label: w.label,
+            range_label: w.range_label,
+            is_current: w.is_current
+        })),
+        totals: {
+            total_samples: days.reduce((s, d) => s + d.sample_count, 0),
+            days_with_data: 7,
+            suhu_avg: avg(days.map((d) => d.suhu_avg)),
+            suhu_min: Math.min(...days.map((d) => d.suhu_min)),
+            suhu_max: Math.max(...days.map((d) => d.suhu_max)),
+            kelembapan_avg: avg(days.map((d) => d.kelembapan_avg)),
+            kelembapan_max: Math.max(...days.map((d) => d.kelembapan_max)),
+            gas_avg: Math.round(avg(days.map((d) => d.gas_avg))),
+            gas_max: Math.max(...days.map((d) => d.gas_max)),
+            cahaya_avg: Math.round(avg(days.map((d) => d.cahaya_avg))),
+            cahaya_max: Math.max(...days.map((d) => d.cahaya_max)),
+            ai_score_avg: avg(days.map((d) => d.ai_score_avg)),
+            kipas_pct_avg: Math.round(avg(days.map((d) => d.kipas_pct))),
+            led_pct_avg: Math.round(avg(days.map((d) => d.led_pct))),
+            gas_incidents: 0,
+            ai_anomalies: days.reduce((s, d) => s + d.anomaly_count, 0)
+        },
+        days,
+        time_slots: {
+            pagi: { sample_count: 340, suhu_avg: Number((tempBase - 1.5).toFixed(1)), kelembapan_avg: humBase - 3 },
+            siang: { sample_count: 360, suhu_avg: Number((tempBase + 2.8).toFixed(1)), kelembapan_avg: humBase - 8 },
+            sore: { sample_count: 310, suhu_avg: Number((tempBase + 0.6).toFixed(1)), kelembapan_avg: humBase + 2 },
+            malam: { sample_count: 420, suhu_avg: Number((tempBase - 0.9).toFixed(1)), kelembapan_avg: humBase + 8 }
+        }
+    };
+}
+
+function mergeSessionHistoryIntoWeeklyPayload(payload) {
+    if (!payload || payload.has_data || !Array.isArray(historyData) || !historyData.length) return payload;
+    const curr = getIsoWeekInfo(new Date());
+    if (payload.week?.year !== curr.year || payload.week?.week !== curr.week) return payload;
+
+    const valid = historyData.filter((d) => Number.isFinite(Number(d?.suhu)) && Number.isFinite(Number(d?.kelembapan)));
+    if (!valid.length) return payload;
+
+    const jsDay = new Date().getDay(); // 0=Sun..6=Sat
+    const dayIdx = jsDay === 0 ? 6 : jsDay - 1;
+    const targetDay = payload.days?.[dayIdx];
+    if (!targetDay) return payload;
+
+    const temps = valid.map((d) => Number(d.suhu));
+    const hums = valid.map((d) => Number(d.kelembapan));
+    const gases = valid.map((d) => Number(d.gas || 0));
+    const lights = valid.map((d) => Number(d.cahaya || 0));
+    const kipasOn = valid.filter((d) => String(d.kipas || "").toUpperCase() === "ON").length;
+    const ledOn = valid.filter((d) => String(d.led || "").toUpperCase() === "ON").length;
+
+    const avgArr = (arr) => arr.reduce((a, b) => a + b, 0) / arr.length;
+    targetDay.sample_count = valid.length;
+    targetDay.suhu_avg = Number(avgArr(temps).toFixed(1));
+    targetDay.suhu_min = Number(Math.min(...temps).toFixed(1));
+    targetDay.suhu_max = Number(Math.max(...temps).toFixed(1));
+    targetDay.kelembapan_avg = Number(avgArr(hums).toFixed(1));
+    targetDay.kelembapan_max = Number(Math.max(...hums).toFixed(1));
+    targetDay.gas_avg = Math.round(avgArr(gases));
+    targetDay.gas_max = Math.max(...gases);
+    targetDay.cahaya_avg = Math.round(avgArr(lights));
+    targetDay.kipas_pct = Math.round((kipasOn / valid.length) * 100);
+    targetDay.led_pct = Math.round((ledOn / valid.length) * 100);
+    targetDay.gas_danger_count = gases.filter((g) => g >= GAS_THRESHOLD).length;
+    targetDay.ai_score_avg = latestServerData?.ai_score != null ? Number(latestServerData.ai_score) : null;
+
+    payload.has_data = true;
+    payload.source = "session";
+    payload.totals = {
+        total_samples: valid.length,
+        days_with_data: 1,
+        suhu_avg: targetDay.suhu_avg,
+        suhu_min: targetDay.suhu_min,
+        suhu_max: targetDay.suhu_max,
+        kelembapan_avg: targetDay.kelembapan_avg,
+        kelembapan_max: targetDay.kelembapan_max,
+        gas_avg: targetDay.gas_avg,
+        gas_max: targetDay.gas_max,
+        cahaya_avg: targetDay.cahaya_avg,
+        cahaya_max: Math.max(...lights),
+        ai_score_avg: targetDay.ai_score_avg,
+        kipas_pct_avg: targetDay.kipas_pct,
+        led_pct_avg: targetDay.led_pct,
+        gas_incidents: targetDay.gas_danger_count,
+        ai_anomalies: targetDay.anomaly_count
+    };
+    return payload;
+}
+
+function renderWeeklyWeekTabs(payload) {
+    if (!elWeeklyWeekTabs) return;
+    const weeks = Array.isArray(payload?.available_weeks) && payload.available_weeks.length
+        ? payload.available_weeks
+        : getRecentWeeksMetadata(4);
+    const activeKey = payload?.week?.key;
+
+    elWeeklyWeekTabs.innerHTML = weeks.map((w) => {
+        const isActive = w.key === activeKey;
+        return `<button type="button" class="weekly-week-btn${isActive ? " is-active" : ""}" role="tab" aria-selected="${isActive}" data-wy="${w.year}" data-ww="${w.week}">${w.label}</button>`;
+    }).join("");
+
+    elWeeklyWeekTabs.querySelectorAll(".weekly-week-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            weeklyState.selectedYear = Number(btn.dataset.wy);
+            weeklyState.selectedWeek = Number(btn.dataset.ww);
+            weeklyState.selectedDayIdx = null;
+            hideWeeklyChartTooltip();
+            loadWeeklySummary();
+        });
+    });
+
+    if (elWeeklyRangeText) {
+        elWeeklyRangeText.textContent = payload?.week?.range_label || "-";
+    }
+    if (elWeeklySourcePill) {
+        const isSim = payload?.source === "simulation";
+        elWeeklySourcePill.hidden = !isSim;
+        if (isSim) elWeeklySourcePill.textContent = "Simulasi";
+    }
+}
+
+function hideWeeklyChartTooltip() {
+    if (elWeeklyChartTooltip) elWeeklyChartTooltip.hidden = true;
+}
+
+function showWeeklyChartTooltip(day, metricMeta) {
+    if (!elWeeklyChartTooltip || !day || day.sample_count <= 0) {
+        hideWeeklyChartTooltip();
+        return;
+    }
+    const avgVal = day[metricMeta.avgKey];
+    const extraMinMax = (weeklyState.activeMetric === "suhu" && day.suhu_min != null && day.suhu_max != null)
+        ? ` · Min ${day.suhu_min}° / Maks ${day.suhu_max}°`
+        : (day[metricMeta.maxKey] != null ? ` · Maks ${formatMetricNumber(day[metricMeta.maxKey], metricMeta.decimals)}${metricMeta.unit === "%" || metricMeta.unit === "°C" ? metricMeta.unit : " " + metricMeta.unit}` : "");
+    const unitDisplay = metricMeta.unit === "ADC" ? " ADC" : metricMeta.unit;
+
+    elWeeklyChartTooltip.textContent = `${day.day_full}, ${day.date_label}: ${formatMetricNumber(avgVal, metricMeta.decimals)}${unitDisplay}${extraMinMax}`;
+    elWeeklyChartTooltip.hidden = false;
+}
+
+function drawRoundedCapsule(ctxRef, x, y, w, h, radius) {
+    if (h <= 0 || w <= 0) return;
+    const r = Math.min(radius, w / 2, h / 2);
+    ctxRef.beginPath();
+    if (typeof ctxRef.roundRect === "function") {
+        ctxRef.roundRect(x, y, w, h, r);
+    } else {
+        ctxRef.moveTo(x + r, y);
+        ctxRef.lineTo(x + w - r, y);
+        ctxRef.quadraticCurveTo(x + w, y, x + w, y + r);
+        ctxRef.lineTo(x + w, y + h - r);
+        ctxRef.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        ctxRef.lineTo(x + r, y + h);
+        ctxRef.quadraticCurveTo(x, y + h, x, y + h - r);
+        ctxRef.lineTo(x, y + r);
+        ctxRef.quadraticCurveTo(x, y, x + r, y);
+    }
+    ctxRef.closePath();
+}
+
+function drawWeeklyBarChart(animOpts = null) {
+    const payload = weeklyState.payload;
+    const meta = WEEKLY_METRIC_META[weeklyState.activeMetric] || WEEKLY_METRIC_META.suhu;
+    const totals = payload?.totals || {};
+    const days = Array.isArray(payload?.days) ? payload.days : [];
+    const barFactors = animOpts?.barFactors || null;
+    const avgAlpha = animOpts?.avgAlpha !== undefined ? animOpts.avgAlpha : 1;
+    const skipHeroText = Boolean(animOpts?.skipHeroText);
+
+    // Hero average & min/max meta
+    const heroVal = totals[meta.avgKey];
+    if (elWeeklyHeroValue && !skipHeroText) {
+        elWeeklyHeroValue.textContent = formatMetricNumber(heroVal, meta.decimals);
+    }
+    if (elWeeklyHeroUnit) elWeeklyHeroUnit.textContent = meta.unit;
+    if (elWeeklyHeroLabel) elWeeklyHeroLabel.textContent = meta.label;
+    if (elWeeklyHeroRange) {
+        if (weeklyState.activeMetric === "suhu") {
+            elWeeklyHeroRange.textContent = `Min ${formatMetricNumber(totals.suhu_min, 1)}° · Maks ${formatMetricNumber(totals.suhu_max, 1)}°`;
+        } else if (weeklyState.activeMetric === "kelembapan") {
+            elWeeklyHeroRange.textContent = `Puncak ${formatMetricNumber(totals.kelembapan_max, 0)}% · ${totals.days_with_data || 0} hari data`;
+        } else if (weeklyState.activeMetric === "gas") {
+            elWeeklyHeroRange.textContent = `Puncak ${formatMetricNumber(totals.gas_max, 0)} ADC · Ambang ${GAS_THRESHOLD}`;
+        } else {
+            elWeeklyHeroRange.textContent = `Puncak ${formatMetricNumber(totals.cahaya_max, 0)} ADC · Ambang ${LDR_THRESHOLD}`;
+        }
+    }
+
+    if (elWeeklyEmptyHint) {
+        const showEmptyHint = !payload?.has_data;
+        elWeeklyEmptyHint.hidden = !showEmptyHint;
+        if (showEmptyHint) {
+            elWeeklyEmptyHint.textContent = "Belum ada telemetri tersimpan untuk minggu ini. Aktifkan Mode Simulasi pada menu status untuk melihat pratinjau penuh.";
+        }
+    }
+
+    const rect = setupCanvasResolution(elWeeklyBarChart, weeklyBarCtx);
+    if (!rect || !weeklyBarCtx) return;
+
+    const width = rect.width;
+    const height = rect.height;
+    weeklyBarCtx.clearRect(0, 0, width, height);
+    weeklyState.barHitboxes = [];
+
+    const pad = { top: 20, right: 54, bottom: 28, left: 6 };
+    const plotW = Math.max(60, width - pad.left - pad.right);
+    const plotH = Math.max(60, height - pad.top - pad.bottom);
+
+    const values = days.map((d) => (d.sample_count > 0 && d[meta.avgKey] != null ? Number(d[meta.avgKey]) : null));
+    const numericVals = values.filter((v) => v !== null && Number.isFinite(v));
+
+    let minY = meta.minY;
+    let maxY = meta.defaultMaxY;
+    if (numericVals.length) {
+        const peak = Math.max(...numericVals);
+        const valley = Math.min(...numericVals);
+        if (weeklyState.activeMetric === "suhu") {
+            minY = Math.min(20, Math.floor((valley - 2) / 5) * 5);
+            maxY = Math.max(35, Math.ceil((peak + 2) / 5) * 5);
+        } else if (weeklyState.activeMetric === "gas" || weeklyState.activeMetric === "cahaya") {
+            maxY = Math.max(1000, Math.ceil((peak * 1.2) / 500) * 500);
+        }
+    }
+
+    // Horizontal gridlines & right-side labels
+    const gridLines = 4;
+    const fontFamily = getComputedStyle(document.body).fontFamily;
+    weeklyBarCtx.strokeStyle = CHART_COLORS.grid;
+    weeklyBarCtx.lineWidth = 1;
+    weeklyBarCtx.fillStyle = CHART_COLORS.axis;
+    weeklyBarCtx.font = `500 11px ${fontFamily}`;
+    weeklyBarCtx.textAlign = "left";
+    weeklyBarCtx.textBaseline = "middle";
+
+    for (let i = 0; i <= gridLines; i++) {
+        const y = pad.top + (plotH / gridLines) * i;
+        weeklyBarCtx.beginPath();
+        weeklyBarCtx.moveTo(pad.left, y);
+        weeklyBarCtx.lineTo(pad.left + plotW, y);
+        weeklyBarCtx.stroke();
+
+        const tickVal = maxY - ((maxY - minY) / gridLines) * i;
+        const unitStr = meta.unit === "ADC" ? "" : meta.unit;
+        weeklyBarCtx.fillText(`${Math.round(tickVal)}${unitStr}`, pad.left + plotW + 10, y);
+    }
+
+    const colCount = 7;
+    const colStep = plotW / colCount;
+    const barW = Math.min(24, Math.max(11, Math.round(colStep * 0.42)));
+
+    // Background tracks & actual day bars
+    for (let i = 0; i < colCount; i++) {
+        const day = days[i] || { day_short: WEEK_DAYS_SHORT[i], sample_count: 0 };
+        const centerX = pad.left + colStep * i + colStep / 2;
+        const barX = centerX - barW / 2;
+
+        // Subtle capsule track
+        weeklyBarCtx.fillStyle = "rgba(255, 255, 255, 0.045)";
+        drawRoundedCapsule(weeklyBarCtx, barX, pad.top, barW, plotH, barW / 2);
+        weeklyBarCtx.fill();
+
+        const val = values[i];
+        const isSelected = weeklyState.selectedDayIdx === i;
+        const grow = barFactors ? Math.max(0, Math.min(1, barFactors[i] ?? 1)) : 1;
+
+        if (val !== null && grow > 0.01) {
+            const ratio = Math.max(0.06, Math.min(1, (val - minY) / Math.max(1, maxY - minY)));
+            const fullBarH = Math.max(barW, ratio * plotH);
+            const barH = Math.max(barW * 0.55, fullBarH * grow);
+            const barY = pad.top + plotH - barH;
+
+            weeklyBarCtx.save();
+            weeklyBarCtx.globalAlpha = Math.min(1, 0.35 + grow * 0.65);
+            weeklyBarCtx.fillStyle = meta.color;
+            if (isSelected) {
+                weeklyBarCtx.shadowColor = meta.color;
+                weeklyBarCtx.shadowBlur = 12;
+            }
+            drawRoundedCapsule(weeklyBarCtx, barX, barY, barW, barH, barW / 2);
+            weeklyBarCtx.fill();
+
+            if (isSelected) {
+                weeklyBarCtx.shadowBlur = 0;
+                weeklyBarCtx.strokeStyle = "#ffffff";
+                weeklyBarCtx.lineWidth = 1.6;
+                weeklyBarCtx.stroke();
+            }
+            weeklyBarCtx.restore();
+        }
+
+        // Day X-axis label
+        weeklyBarCtx.fillStyle = isSelected ? "#ffffff" : CHART_COLORS.axis;
+        weeklyBarCtx.font = `${isSelected ? "700" : "500"} 11.5px ${fontFamily}`;
+        weeklyBarCtx.textAlign = "center";
+        weeklyBarCtx.textBaseline = "top";
+        weeklyBarCtx.fillText(day.day_short || WEEK_DAYS_SHORT[i], centerX, pad.top + plotH + 9);
+
+        weeklyState.barHitboxes.push({
+            idx: i,
+            x1: pad.left + colStep * i,
+            x2: pad.left + colStep * (i + 1),
+            y1: pad.top,
+            y2: pad.top + plotH
+        });
+    }
+
+    // Horizontal dashed Average Benchmark Line across the 7 bars
+    if (heroVal !== null && heroVal !== undefined && Number.isFinite(Number(heroVal)) && numericVals.length && avgAlpha > 0.02) {
+        const avgNum = Number(heroVal);
+        const avgRatio = Math.max(0, Math.min(1, (avgNum - minY) / Math.max(1, maxY - minY)));
+        const avgY = pad.top + plotH - avgRatio * plotH;
+
+        weeklyBarCtx.save();
+        weeklyBarCtx.globalAlpha = avgAlpha;
+        weeklyBarCtx.strokeStyle = "rgba(255, 255, 255, 0.72)";
+        weeklyBarCtx.lineWidth = 1.4;
+        weeklyBarCtx.setLineDash([5, 5]);
+        weeklyBarCtx.beginPath();
+        weeklyBarCtx.moveTo(pad.left, avgY);
+        weeklyBarCtx.lineTo(pad.left + plotW, avgY);
+        weeklyBarCtx.stroke();
+        weeklyBarCtx.setLineDash([]);
+
+        const unitTxt = meta.unit === "ADC" ? " ADC" : meta.unit;
+        const badgeText = `Rata-rata ${formatMetricNumber(avgNum, meta.decimals)}${unitTxt}`;
+        weeklyBarCtx.font = `600 10.5px ${fontFamily}`;
+        const badgeW = weeklyBarCtx.measureText(badgeText).width + 14;
+        const badgeH = 19;
+        const badgeX = pad.left + plotW - badgeW - 4;
+        const badgeY = avgY - badgeH - 5 >= pad.top ? avgY - badgeH - 5 : avgY + 5;
+
+        weeklyBarCtx.fillStyle = "rgba(18, 16, 15, 0.88)";
+        drawRoundedCapsule(weeklyBarCtx, badgeX, badgeY, badgeW, badgeH, 9.5);
+        weeklyBarCtx.fill();
+        weeklyBarCtx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+        weeklyBarCtx.lineWidth = 1;
+        weeklyBarCtx.stroke();
+
+        weeklyBarCtx.fillStyle = "#f5f2ef";
+        weeklyBarCtx.textAlign = "center";
+        weeklyBarCtx.textBaseline = "middle";
+        weeklyBarCtx.fillText(badgeText, badgeX + badgeW / 2, badgeY + badgeH / 2 + 0.5);
+        weeklyBarCtx.restore();
+    }
+}
+
+function animateWeeklyEntrance() {
+    if (weeklyState.animRafId) {
+        cancelAnimationFrame(weeklyState.animRafId);
+        weeklyState.animRafId = null;
+    }
+
+    const payload = weeklyState.payload;
+    const meta = WEEKLY_METRIC_META[weeklyState.activeMetric] || WEEKLY_METRIC_META.suhu;
+    const targetRaw = payload?.totals?.[meta.avgKey];
+    const targetVal = (targetRaw !== null && targetRaw !== undefined && Number.isFinite(Number(targetRaw)))
+        ? Number(targetRaw)
+        : null;
+    const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (reduceMotion || !payload?.has_data || targetVal === null) {
+        drawWeeklyBarChart();
+        return;
+    }
+
+    const totalDuration = 720;
+    const staggerMs = 42;
+    const perBarDuration = totalDuration - staggerMs * 6;
+    const startTs = performance.now();
+
+    const step = (now) => {
+        if (currentAppPage !== "weekly") {
+            weeklyState.animRafId = null;
+            return;
+        }
+        const elapsed = now - startTs;
+        const globalT = Math.min(1, elapsed / totalDuration);
+        const easedCount = 1 - Math.pow(1 - globalT, 3);
+
+        if (elWeeklyHeroValue) {
+            elWeeklyHeroValue.textContent = formatMetricNumber(targetVal * easedCount, meta.decimals);
+        }
+
+        const barFactors = [];
+        for (let i = 0; i < 7; i++) {
+            const localElapsed = Math.max(0, elapsed - i * staggerMs);
+            const localT = Math.min(1, localElapsed / perBarDuration);
+            barFactors.push(1 - Math.pow(1 - localT, 3));
+        }
+
+        drawWeeklyBarChart({
+            barFactors,
+            avgAlpha: Math.min(1, Math.max(0, (globalT - 0.15) / 0.65)),
+            skipHeroText: true
+        });
+
+        if (globalT < 1) {
+            weeklyState.animRafId = requestAnimationFrame(step);
+        } else {
+            weeklyState.animRafId = null;
+            drawWeeklyBarChart();
+        }
+    };
+
+    weeklyState.animRafId = requestAnimationFrame(step);
+}
+
+function renderWeeklyRecap() {
+    const payload = weeklyState.payload;
+    const totals = payload?.totals || {};
+    const days = Array.isArray(payload?.days) ? payload.days : [];
+
+    if (elWeeklyHlTemp) {
+        elWeeklyHlTemp.textContent = totals.suhu_min != null && totals.suhu_max != null
+            ? `${formatMetricNumber(totals.suhu_min, 1)}° / ${formatMetricNumber(totals.suhu_max, 1)}°C`
+            : "-- / --°C";
+    }
+    if (elWeeklyHlFan) {
+        elWeeklyHlFan.textContent = payload?.has_data ? `${totals.kipas_pct_avg || 0}% waktu` : "--";
+    }
+    if (elWeeklyHlLed) {
+        elWeeklyHlLed.textContent = payload?.has_data ? `${totals.led_pct_avg || 0}% waktu` : "--";
+    }
+    if (elWeeklyHlInc) {
+        elWeeklyHlInc.textContent = `${totals.gas_incidents || 0} Gas · ${totals.ai_anomalies || 0} AI`;
+    }
+
+    if (!elWeeklyDailyTbody) return;
+    elWeeklyDailyTbody.innerHTML = days.map((d, idx) => {
+        const hasRow = d.sample_count > 0;
+        const isSelected = weeklyState.selectedDayIdx === idx;
+        const tempCell = hasRow
+            ? `<strong>${formatMetricNumber(d.suhu_avg, 1)}°</strong> <small style="color:var(--text-muted)">/${formatMetricNumber(d.suhu_max, 1)}°</small>`
+            : `<span style="color:var(--text-muted)">--</span>`;
+        const humCell = hasRow ? `${Math.round(d.kelembapan_avg)}%` : `<span style="color:var(--text-muted)">--</span>`;
+
+        let gasBadge = `<span class="weekly-badge is-muted">--</span>`;
+        if (hasRow) {
+            if (d.gas_danger_count > 0 || (d.gas_max || 0) >= GAS_THRESHOLD) {
+                gasBadge = `<span class="weekly-badge is-danger">${d.gas_max}</span>`;
+            } else {
+                gasBadge = `<span class="weekly-badge is-ok">${d.gas_max}</span>`;
+            }
+        }
+
+        let aiBadge = `<span class="weekly-badge is-muted">--</span>`;
+        if (hasRow) {
+            if (d.anomaly_count > 0) {
+                aiBadge = `<span class="weekly-badge is-warn">Anomali</span>`;
+            } else {
+                aiBadge = `<span class="weekly-badge is-ok">Normal</span>`;
+            }
+        }
+
+        return `
+            <tr class="${isSelected ? "is-selected-day" : ""}" data-day-idx="${idx}">
+                <td><strong>${d.day_short}</strong> <small style="color:var(--text-muted)">${d.date_label || ""}</small></td>
+                <td>${tempCell}</td>
+                <td>${humCell}</td>
+                <td>${gasBadge}</td>
+                <td>${aiBadge}</td>
+            </tr>
+        `;
+    }).join("");
+
+    elWeeklyDailyTbody.querySelectorAll("tr[data-day-idx]").forEach((tr) => {
+        tr.addEventListener("click", () => {
+            const idx = Number(tr.dataset.dayIdx);
+            weeklyState.selectedDayIdx = weeklyState.selectedDayIdx === idx ? null : idx;
+            const meta = WEEKLY_METRIC_META[weeklyState.activeMetric] || WEEKLY_METRIC_META.suhu;
+            if (weeklyState.selectedDayIdx !== null) {
+                showWeeklyChartTooltip(days[idx], meta);
+            } else {
+                hideWeeklyChartTooltip();
+            }
+            drawWeeklyBarChart();
+            renderWeeklyRecap();
+        });
+    });
+}
+
+function renderWeeklyAISummary() {
+    const payload = weeklyState.payload;
+    const totals = payload?.totals || {};
+    const days = Array.isArray(payload?.days) ? payload.days.filter((d) => d.sample_count > 0) : [];
+    const slots = payload?.time_slots || {};
+
+    // Stability pill
+    if (elWeeklyAiStatusPill) {
+        elWeeklyAiStatusPill.classList.remove("is-warning", "is-danger");
+        if (!payload?.has_data) {
+            elWeeklyAiStatusPill.textContent = "Menunggu Data";
+        } else {
+            const score = totals.ai_score_avg != null ? `${Math.round(totals.ai_score_avg)}%` : "--%";
+            if ((totals.gas_incidents || 0) > 0) {
+                elWeeklyAiStatusPill.textContent = `Waspada · ${score}`;
+                elWeeklyAiStatusPill.classList.add("is-danger");
+            } else if ((totals.ai_anomalies || 0) > 0) {
+                elWeeklyAiStatusPill.textContent = `Perlu Pantau · ${score}`;
+                elWeeklyAiStatusPill.classList.add("is-warning");
+            } else {
+                elWeeklyAiStatusPill.textContent = `Stabil · ${score}`;
+            }
+        }
+    }
+
+    // 4-Slot Pola Waktu Grid
+    if (elWeeklySlotsGrid) {
+        elWeeklySlotsGrid.innerHTML = ["pagi", "siang", "sore", "malam"].map((key) => {
+            const meta = SLOT_METAS[key];
+            const s = slots[key] || {};
+            const hasSlot = (s.sample_count || 0) > 0 && s.suhu_avg != null;
+            const valText = hasSlot ? `${formatMetricNumber(s.suhu_avg, 1)}°C · ${Math.round(s.kelembapan_avg)}%` : "--";
+            return `
+                <div class="weekly-slot-tile">
+                    <span class="material-symbols-rounded icon-filled" aria-hidden="true">${meta.icon}</span>
+                    <div class="weekly-slot-tile-info">
+                        <span>${meta.label}</span>
+                        <strong>${valText}</strong>
+                    </div>
+                </div>
+            `;
+        }).join("");
+    }
+
+    // Narrative & Bullets
+    if (!days.length) {
+        if (elWeeklyAiNarrative) {
+            elWeeklyAiNarrative.textContent = "Belum terdapat cukup riwayat telemetri pada minggu ini untuk menyusun ringkasan pola harian kamar kos.";
+        }
+        if (elWeeklyAiBullets) {
+            elWeeklyAiBullets.innerHTML = `
+                <li><span class="material-symbols-rounded" aria-hidden="true">info</span><span>Pastikan perangkat ESP32 mengirimkan data atau aktifkan Mode Simulasi untuk melihat contoh analisis AI mingguan.</span></li>
+            `;
+        }
+        return;
+    }
+
+    const hottest = days.reduce((a, b) => ((b.suhu_max ?? -99) > (a.suhu_max ?? -99) ? b : a), days[0]);
+    const mostHumid = days.reduce((a, b) => ((b.kelembapan_avg ?? -1) > (a.kelembapan_avg ?? -1) ? b : a), days[0]);
+
+    if (elWeeklyAiNarrative) {
+        const gasText = (totals.gas_incidents || 0) > 0
+            ? `tercatat ${totals.gas_incidents} insiden gas tinggi`
+            : "kualitas udara aman tanpa kebocoran gas";
+        elWeeklyAiNarrative.textContent = `Sepanjang ${payload.week?.label || "minggu ini"}, suhu kamar rata-rata berada di ${formatMetricNumber(totals.suhu_avg, 1)}°C dengan puncak terpanas pada hari ${hottest.day_full} (${formatMetricNumber(hottest.suhu_max, 1)}°C). Kelembapan rata-rata terjaga pada ${Math.round(totals.kelembapan_avg)}% dengan ${gasText}.`;
+    }
+
+    if (elWeeklyAiBullets) {
+        const coolest = days.reduce((a, b) => ((b.suhu_min ?? 99) < (a.suhu_min ?? 99) ? b : a), days[0]);
+        const bullets = [
+            {
+                cls: "",
+                icon: "thermostat",
+                text: `Hari paling sejuk/nyaman tercatat ${coolest.day_full} (${formatMetricNumber(totals.suhu_min, 1)}°C), sedangkan puncak panas di hari ${hottest.day_full} (${formatMetricNumber(hottest.suhu_max, 1)}°C).`
+            },
+            {
+                cls: mostHumid.kelembapan_avg >= HUMIDITY_THRESHOLD ? "is-warn" : "",
+                icon: "air",
+                text: `Kelembapan tertinggi muncul pada hari ${mostHumid.day_full} (${Math.round(mostHumid.kelembapan_avg)}%). Exhaust Fan aktif otomatis sekitar ${totals.kipas_pct_avg}% waktu pengamatan.`
+            },
+            {
+                cls: (totals.ai_anomalies || 0) > 0 ? "is-warn" : "",
+                icon: (totals.ai_anomalies || 0) > 0 ? "warning" : "verified_user",
+                text: (totals.ai_anomalies || 0) > 0
+                    ? `Model AI mendeteksi ${totals.ai_anomalies} kejadian pola sensor tidak biasa; periksa baris hari yang ditandai di Rekap 7 Hari.`
+                    : `Seluruh hari menunjukkan pola normal sesuai kebiasaan kamar (tidak ada penyimpangan anomali AI).`
+            }
+        ];
+        elWeeklyAiBullets.innerHTML = bullets.map((b) => `
+            <li class="${b.cls}">
+                <span class="material-symbols-rounded" aria-hidden="true">${b.icon}</span>
+                <span>${b.text}</span>
+            </li>
+        `).join("");
+    }
+}
+
+function renderWeeklyPageAll() {
+    if (!weeklyState.payload) return;
+    renderWeeklyWeekTabs(weeklyState.payload);
+    animateWeeklyEntrance();
+    renderWeeklyRecap();
+    renderWeeklyAISummary();
+}
+
+async function loadWeeklySummary() {
+    if (weeklyState.selectedYear === null || weeklyState.selectedWeek === null) {
+        const curr = getIsoWeekInfo(new Date());
+        weeklyState.selectedYear = curr.year;
+        weeklyState.selectedWeek = curr.week;
+    }
+
+    if (isSimulationMode) {
+        weeklyState.payload = buildSimulatedWeeklySummary(weeklyState.selectedYear, weeklyState.selectedWeek);
+        renderWeeklyPageAll();
+        return;
+    }
+
+    try {
+        const qs = `year=${encodeURIComponent(weeklyState.selectedYear)}&week=${encodeURIComponent(weeklyState.selectedWeek)}`;
+        const response = await fetch(`/api/summary/weekly?${qs}`, {
+            headers: { "Accept": "application/json" }
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        let payload = await response.json();
+        payload = mergeSessionHistoryIntoWeeklyPayload(payload);
+        weeklyState.payload = payload;
+        renderWeeklyPageAll();
+    } catch (err) {
+        // Fallback offline skeleton so UI stays clean without throwing runtime errors
+        const fallback = {
+            status: "OK",
+            source: "offline",
+            has_data: false,
+            week: getRecentWeeksMetadata(4).find((w) => w.year === weeklyState.selectedYear && w.week === weeklyState.selectedWeek) || getRecentWeeksMetadata(4)[3],
+            available_weeks: getRecentWeeksMetadata(4),
+            totals: {},
+            days: WEEK_DAYS_SHORT.map((s, idx) => ({
+                day_index: idx,
+                day_short: s,
+                day_full: WEEK_DAYS_FULL[idx],
+                date_label: "",
+                sample_count: 0,
+                anomaly_count: 0,
+                gas_danger_count: 0
+            })),
+            time_slots: {}
+        };
+        weeklyState.payload = mergeSessionHistoryIntoWeeklyPayload(fallback);
+        renderWeeklyPageAll();
+    }
+}
+
+function setAppPage(page) {
+    currentAppPage = page === "weekly" ? "weekly" : "dashboard";
+    const isWeekly = currentAppPage === "weekly";
+
+    document.body.classList.toggle("is-weekly-page", isWeekly);
+    if (elWeeklyReportPage) elWeeklyReportPage.hidden = !isWeekly;
+
+    if (elBtnWeeklySummary) {
+        elBtnWeeklySummary.classList.toggle("is-active", isWeekly);
+        elBtnWeeklySummary.setAttribute("aria-pressed", String(isWeekly));
+    }
+
+    if (elStatusPopover) elStatusPopover.hidden = true;
+    if (elConnectionPill) elConnectionPill.setAttribute("aria-expanded", "false");
+    if (elAiSlotPopover) elAiSlotPopover.hidden = true;
+    if (elBtnAiSlotMenu) elBtnAiSlotMenu.setAttribute("aria-expanded", "false");
+
+    window.scrollTo({ top: 0, behavior: "auto" });
+
+    if (isWeekly) {
+        loadWeeklySummary();
+    } else {
+        if (weeklyState.animRafId) {
+            cancelAnimationFrame(weeklyState.animRafId);
+            weeklyState.animRafId = null;
+        }
+        requestAnimationFrame(() => drawChart());
+    }
+}
+
+if (elBtnWeeklySummary) {
+    elBtnWeeklySummary.addEventListener("click", (e) => {
+        e.stopPropagation();
+        setAppPage(currentAppPage === "weekly" ? "dashboard" : "weekly");
+    });
+}
+
+if (elBtnWeeklyBack) {
+    elBtnWeeklyBack.addEventListener("click", () => {
+        setAppPage("dashboard");
+    });
+}
+
+weeklyMetricTabs.forEach((btn) => {
+    btn.addEventListener("click", () => {
+        const metric = btn.dataset.weeklyMetric;
+        if (!metric || !(metric in WEEKLY_METRIC_META)) return;
+        weeklyState.activeMetric = metric;
+        weeklyMetricTabs.forEach((b) => b.classList.toggle("active", b.dataset.weeklyMetric === metric));
+        hideWeeklyChartTooltip();
+        animateWeeklyEntrance();
+    });
+});
+
+if (elWeeklyBarChart) {
+    const pickBarFromEvent = (clientX) => {
+        const rect = elWeeklyBarChart.getBoundingClientRect();
+        const relX = clientX - rect.left;
+        return weeklyState.barHitboxes.find((b) => relX >= b.x1 && relX <= b.x2) || null;
+    };
+
+    elWeeklyBarChart.addEventListener("click", (e) => {
+        const hit = pickBarFromEvent(e.clientX);
+        if (!hit) return;
+        weeklyState.selectedDayIdx = weeklyState.selectedDayIdx === hit.idx ? null : hit.idx;
+        const meta = WEEKLY_METRIC_META[weeklyState.activeMetric] || WEEKLY_METRIC_META.suhu;
+        const days = weeklyState.payload?.days || [];
+        if (weeklyState.selectedDayIdx !== null) {
+            showWeeklyChartTooltip(days[hit.idx], meta);
+        } else {
+            hideWeeklyChartTooltip();
+        }
+        drawWeeklyBarChart();
+        renderWeeklyRecap();
+    });
+}
+
+if (elBtnWeeklyExport) {
+    elBtnWeeklyExport.addEventListener("click", () => {
+        const payload = weeklyState.payload;
+        if (!payload) return;
+        if (isSimulationMode) {
+            const headers = ["Hari", "Tanggal", "Suhu Rata2", "Suhu Min", "Suhu Maks", "Kelembapan (%)", "Gas Maks", "Skor AI (%)"];
+            const lines = [headers.join(",")];
+            (payload.days || []).forEach((d) => {
+                lines.push([d.day_full, d.date || "", d.suhu_avg ?? "", d.suhu_min ?? "", d.suhu_max ?? "", d.kelembapan_avg ?? "", d.gas_max ?? "", d.ai_score_avg ?? ""].join(","));
+            });
+            const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `rekap_mingguan_${payload.week?.label || "sim"}_simulasi.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            return;
+        }
+        const y = weeklyState.selectedYear || "";
+        const w = weeklyState.selectedWeek || "";
+        window.location.href = `/api/export/weekly-csv?year=${encodeURIComponent(y)}&week=${encodeURIComponent(w)}`;
+    });
+}
+
+document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && currentAppPage === "weekly" && !(window.Room3D?.is3DFullscreen?.())) {
+        setAppPage("dashboard");
+    }
+});
+
 // Status Popover Toggle & Outside Click Close
 if (elConnectionPill && elStatusPopover) {
     elConnectionPill.addEventListener("click", (e) => {
@@ -1737,82 +2685,6 @@ if (elConnectionPill && elStatusPopover) {
         if (elAiSlotPopover) elAiSlotPopover.hidden = true;
     });
 }
-
-function updateWeeklyPreview() {
-    if (!elWeeklyAvgTemp || !elWeeklyAvgHum || !elWeeklyMaxTemp || !elWeeklySampleCount) return;
-
-    const valid = Array.isArray(historyData)
-        ? historyData.filter((d) => Number.isFinite(Number(d?.suhu)) && Number.isFinite(Number(d?.kelembapan)))
-        : [];
-
-    if (!valid.length) {
-        elWeeklyAvgTemp.textContent = "-- °C";
-        elWeeklyAvgHum.textContent = "-- %";
-        elWeeklyMaxTemp.textContent = "-- °C";
-        elWeeklySampleCount.textContent = "0 data";
-        return;
-    }
-
-    let sumTemp = 0;
-    let sumHum = 0;
-    let maxTemp = -Infinity;
-
-    for (const item of valid) {
-        const t = Number(item.suhu);
-        const h = Number(item.kelembapan);
-        sumTemp += t;
-        sumHum += h;
-        if (t > maxTemp) maxTemp = t;
-    }
-
-    elWeeklyAvgTemp.textContent = `${(sumTemp / valid.length).toFixed(1)} °C`;
-    elWeeklyAvgHum.textContent = `${Math.round(sumHum / valid.length)} %`;
-    elWeeklyMaxTemp.textContent = `${maxTemp.toFixed(1)} °C`;
-    elWeeklySampleCount.textContent = `${valid.length} data`;
-}
-
-function setWeeklyModalOpen(isOpen) {
-    if (!elWeeklyModal) return;
-    if (isOpen) {
-        updateWeeklyPreview();
-        if (elStatusPopover) elStatusPopover.hidden = true;
-        if (elConnectionPill) elConnectionPill.setAttribute("aria-expanded", "false");
-        if (elAiSlotPopover) elAiSlotPopover.hidden = true;
-        if (elBtnAiSlotMenu) elBtnAiSlotMenu.setAttribute("aria-expanded", "false");
-    }
-    elWeeklyModal.hidden = !isOpen;
-    if (elBtnWeeklySummary) {
-        elBtnWeeklySummary.classList.toggle("is-active", isOpen);
-        elBtnWeeklySummary.setAttribute("aria-expanded", String(isOpen));
-    }
-}
-
-if (elBtnWeeklySummary && elWeeklyModal) {
-    elBtnWeeklySummary.addEventListener("click", (e) => {
-        e.stopPropagation();
-        setWeeklyModalOpen(elWeeklyModal.hidden);
-    });
-}
-
-if (elBtnCloseWeekly) {
-    elBtnCloseWeekly.addEventListener("click", () => {
-        setWeeklyModalOpen(false);
-    });
-}
-
-if (elWeeklyModal) {
-    elWeeklyModal.addEventListener("click", (e) => {
-        if (e.target === elWeeklyModal) {
-            setWeeklyModalOpen(false);
-        }
-    });
-}
-
-document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && elWeeklyModal && !elWeeklyModal.hidden) {
-        setWeeklyModalOpen(false);
-    }
-});
 
 document.addEventListener("click", (e) => {
     if (elStatusPopover && !elStatusPopover.hidden && elStatusMenuWrap && !elStatusMenuWrap.contains(e.target)) {
@@ -1830,11 +2702,18 @@ if (elBtnRefresh) {
         conditionUiState.forceCheckingNext = true;
         conditionUiState.forceCountFromZero = true;
         fetchSensorData();
+        if (currentAppPage === "weekly") {
+            loadWeeklySummary();
+        }
     });
 }
 
 window.addEventListener("resize", () => {
-    drawChart();
+    if (currentAppPage === "weekly") {
+        drawWeeklyBarChart();
+    } else {
+        drawChart();
+    }
 });
 
 // ==================== SIDEBAR NAVIGATION & SCROLLSPY ====================
@@ -1853,8 +2732,13 @@ navItems.forEach(item => {
         const target = document.getElementById(id);
         if (!target) return;
         event.preventDefault();
+        if (currentAppPage !== "dashboard") {
+            setAppPage("dashboard");
+        }
         setActiveNav(id);
-        target.scrollIntoView({ behavior: "smooth", block: "start" });
+        requestAnimationFrame(() => {
+            target.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
     });
 });
 

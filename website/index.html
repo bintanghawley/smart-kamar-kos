@@ -24,7 +24,7 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
         rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=21">
+    <link rel="stylesheet" href="style.css?v=25">
 
     <script type="importmap">
     {
@@ -34,7 +34,7 @@
       }
     }
     </script>
-    <script type="module" src="room3d.js?v=17"></script>
+    <script type="module" src="room3d.js?v=18"></script>
 </head>
 
 <body>
@@ -148,10 +148,10 @@
                         </div>
                     </div>
 
-                    <!-- Weekly Summary Button (Desktop: between Status & Date; Mobile: beside Status) -->
+                    <!-- Weekly Summary Page Switch Button (Desktop: between Status & Date; Mobile: beside Status) -->
                     <button type="button" id="btn-weekly-summary" class="header-stat-btn"
-                        aria-label="Rekap Data Mingguan" aria-haspopup="dialog" aria-expanded="false"
-                        title="Rekap Data Mingguan">
+                        aria-label="Buka Weekly Report" aria-pressed="false"
+                        title="Weekly Report (Rekap Mingguan)">
                         <span class="material-symbols-rounded" aria-hidden="true">bar_chart</span>
                     </button>
 
@@ -176,19 +176,26 @@
                             <div class="stage-3d-card" id="room-3d-stage">
                                 <div class="stage-canvas-wrapper" id="room-3d-container">
                                     <div class="stage-top-controls">
-                                        <!-- Top-Left Segmented Toggle: Luar Kamar / Dalam Kamar (Icons) -->
-                                        <div class="room-view-switch" role="group" aria-label="Tampilan Atap Kamar">
-                                            <button type="button" class="view-switch-btn is-active" id="btn-view-outside"
-                                                data-view="outside" title="Luar Kamar (Atap Tertutup)"
-                                                aria-label="Luar Kamar">
-                                                <span class="material-symbols-rounded icon-filled view-switch-icon"
-                                                    aria-hidden="true">home</span>
-                                            </button>
-                                            <button type="button" class="view-switch-btn" id="btn-view-inside"
-                                                data-view="inside" title="Dalam Kamar (Atap Terbuka)"
-                                                aria-label="Dalam Kamar">
-                                                <span class="material-symbols-rounded icon-filled view-switch-icon"
-                                                    aria-hidden="true">meeting_room</span>
+                                        <!-- Top-Left Segmented Toggle: Luar Kamar / Dalam Kamar + Fullscreen Expand Button -->
+                                        <div class="stage-top-left-actions">
+                                            <div class="room-view-switch" role="group" aria-label="Tampilan Atap Kamar">
+                                                <button type="button" class="view-switch-btn is-active"
+                                                    id="btn-view-outside" data-view="outside"
+                                                    title="Luar Kamar (Atap Tertutup)" aria-label="Luar Kamar">
+                                                    <span class="material-symbols-rounded icon-filled view-switch-icon"
+                                                        aria-hidden="true">home</span>
+                                                </button>
+                                                <button type="button" class="view-switch-btn" id="btn-view-inside"
+                                                    data-view="inside" title="Dalam Kamar (Atap Terbuka)"
+                                                    aria-label="Dalam Kamar">
+                                                    <span class="material-symbols-rounded icon-filled view-switch-icon"
+                                                        aria-hidden="true">meeting_room</span>
+                                                </button>
+                                            </div>
+
+                                            <button type="button" class="stage-action-btn" id="btn-stage-fullscreen"
+                                                title="Perbesar Layar Penuh (Aktifkan Rotasi 360°)" aria-label="Perbesar Layar Penuh">
+                                                <span class="material-symbols-rounded" id="icon-stage-fullscreen" aria-hidden="true">open_in_full</span>
                                             </button>
                                         </div>
 
@@ -205,6 +212,12 @@
                                             <button type="button" class="sun-btn" data-sun="malam"
                                                 title="Suasana Malam (Cahaya Bulan)">Malam</button>
                                         </div>
+                                    </div>
+
+                                    <!-- Fullscreen 360 Mode Hint Pill -->
+                                    <div class="stage-fullscreen-hint" id="stage-fullscreen-hint" hidden>
+                                        <span class="material-symbols-rounded" aria-hidden="true">360</span>
+                                        <span>Mode 360&deg; Aktif &middot; Geser untuk memutar</span>
                                     </div>
                                 </div>
 
@@ -316,7 +329,10 @@
                             <section class="card condition-card" aria-label="Kondisi Saat Ini">
                                 <div class="condition-header">
                                     <h2 class="card-heading">Kondisi Saat Ini</h2>
-                                    <span class="condition-verdict state-checking" id="condition-verdict" aria-live="polite">Checking<span class="checking-dots" aria-hidden="true"><span class="checking-dot">.</span><span class="checking-dot">.</span><span class="checking-dot">.</span></span></span>
+                                    <span class="condition-verdict state-checking" id="condition-verdict"
+                                        aria-live="polite">Checking<span class="checking-dots" aria-hidden="true"><span
+                                                class="checking-dot">.</span><span class="checking-dot">.</span><span
+                                                class="checking-dot">.</span></span></span>
                                 </div>
 
                                 <div class="stats-grid-2x2">
@@ -379,7 +395,15 @@
                             <!-- CARD 2: AI PENDETEKSI (UNIFIED AI & CALIBRATION) -->
                             <section class="card ai-detector-card" id="ai" aria-label="AI Pendeteksi">
                                 <div class="ai-detector-header">
-                                    <h2 class="card-heading">AI Pendeteksi</h2>
+                                    <h2 class="card-heading ai-detector-heading">
+                                        <span class="ai-detector-title-gradient">AI Pendeteksi</span>
+                                        <svg class="ai-sparkle-stars" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                            <!-- Main 5-point Star (Azure blue matching right side of gradient) -->
+                                            <path fill="#009eff" d="M 9 5.8 L 10.9 10.3 L 15.7 10.7 L 12 13.9 L 13.1 18.6 L 9 16.1 L 4.9 18.6 L 6 13.9 L 2.3 10.7 L 7.1 10.3 Z" />
+                                            <!-- Sparkle Star (Bright Cyan matching left side of gradient) -->
+                                            <path fill="#0fe3c3" d="M 19.5 1 Q 19.5 4.5 23 4.5 Q 19.5 4.5 19.5 8 Q 19.5 4.5 16 4.5 Q 19.5 4.5 19.5 1 Z" />
+                                        </svg>
+                                    </h2>
                                     <button type="button" class="ai-slot-trigger" id="btn-ai-slot-menu"
                                         aria-expanded="false" aria-haspopup="true"
                                         title="Lihat Status Data Kalibrasi (Pagi / Siang / Sore / Malam)">
@@ -529,51 +553,154 @@
                         </div>
                     </div>
                 </section>
+
+                <!-- ==================== WEEKLY REPORT SUBPAGE ==================== -->
+                <section class="weekly-report-page" id="weekly-report" aria-label="Weekly Report" hidden>
+                    <div class="weekly-header-bar" id="weekly-header-bar">
+                        <div class="weekly-header-top">
+                            <button type="button" class="weekly-back-btn" id="btn-weekly-back"
+                                aria-label="Kembali ke Dashboard" title="Kembali ke Dashboard">
+                                <span class="material-symbols-rounded" aria-hidden="true">chevron_left</span>
+                            </button>
+                            <div class="weekly-title-group">
+                                <h2 class="weekly-page-title">Weekly Report</h2>
+                                <span class="weekly-source-pill" id="weekly-source-pill" hidden>Simulasi</span>
+                            </div>
+                        </div>
+                        <div class="weekly-week-strip" id="weekly-week-tabs" role="tablist"
+                            aria-label="Pilih Minggu Laporan"></div>
+                    </div>
+
+                    <div class="weekly-range-bar">
+                        <p class="weekly-range-text" id="weekly-range-text">Memuat rentang minggu...</p>
+                    </div>
+
+                    <div class="weekly-grid">
+                        <!-- Card 1: Data per-Minggu -->
+                        <article class="card weekly-trend-card" id="weekly-trend-card">
+                            <div class="weekly-card-head">
+                                <h3 class="card-heading weekly-card-title">Data per-Minggu</h3>
+                                <span class="weekly-hero-range" id="weekly-hero-range">Min -- &middot; Maks --</span>
+                            </div>
+
+                            <div class="filter-chips weekly-metric-tabs" role="tablist"
+                                aria-label="Filter Parameter Mingguan">
+                                <button type="button" class="chart-tab active" data-weekly-metric="suhu">Suhu</button>
+                                <button type="button" class="chart-tab"
+                                    data-weekly-metric="kelembapan">Kelembapan</button>
+                                <button type="button" class="chart-tab" data-weekly-metric="gas">Gas</button>
+                                <button type="button" class="chart-tab" data-weekly-metric="cahaya">Cahaya</button>
+                            </div>
+
+                            <div class="weekly-hero-stat">
+                                <div class="weekly-hero-value-row">
+                                    <span class="weekly-hero-value" id="weekly-hero-value">--</span>
+                                    <span class="weekly-hero-unit" id="weekly-hero-unit">&deg;C</span>
+                                </div>
+                                <span class="weekly-hero-label" id="weekly-hero-label">Rata-rata Suhu</span>
+                            </div>
+
+                            <div class="weekly-chart-wrap" id="weekly-chart-wrap">
+                                <canvas id="weekly-bar-chart"
+                                    aria-label="Diagram Batang Statistik Mingguan"></canvas>
+                                <div class="weekly-chart-tooltip" id="weekly-chart-tooltip" hidden></div>
+                            </div>
+                            <p class="weekly-empty-hint" id="weekly-empty-hint" hidden></p>
+                        </article>
+
+                        <!-- Card 2 (Desktop Row 1 Right / Mobile Order 3): Ringkasan AI -->
+                        <article class="card weekly-ai-card" id="weekly-ai-card">
+                            <div class="weekly-card-head">
+                                <h3 class="card-heading ai-detector-heading">
+                                    <span class="ai-detector-title-gradient">Ringkasan AI</span>
+                                    <svg class="ai-sparkle-stars" viewBox="0 0 24 24" aria-hidden="true"
+                                        focusable="false">
+                                        <path fill="#009eff"
+                                            d="M 9 5.8 L 10.9 10.3 L 15.7 10.7 L 12 13.9 L 13.1 18.6 L 9 16.1 L 4.9 18.6 L 6 13.9 L 2.3 10.7 L 7.1 10.3 Z" />
+                                        <path fill="#0fe3c3"
+                                            d="M 19.5 1 Q 19.5 4.5 23 4.5 Q 19.5 4.5 19.5 8 Q 19.5 4.5 16 4.5 Q 19.5 4.5 19.5 1 Z" />
+                                    </svg>
+                                </h3>
+                                <span class="weekly-ai-status-pill" id="weekly-ai-status-pill">Stabilitas --%</span>
+                            </div>
+
+                            <div class="weekly-ai-narrative-box">
+                                <p class="weekly-ai-narrative" id="weekly-ai-narrative">Menganalisis pola sensor
+                                    mingguan kamar kos...</p>
+                            </div>
+
+                            <div class="weekly-slots-section">
+                                <span class="weekly-sublabel">Pola 4 Slot Waktu</span>
+                                <div class="weekly-slots-grid" id="weekly-slots-grid"></div>
+                            </div>
+
+                            <ul class="weekly-ai-bullets" id="weekly-ai-bullets"></ul>
+                        </article>
+
+                        <!-- Card 3 (Desktop Row 2 Full Width / Mobile Order 2): Rekap 7 Hari -->
+                        <article class="card weekly-recap-card" id="weekly-recap-card">
+                            <div class="weekly-card-head">
+                                <h3 class="card-heading weekly-card-title">Rekap 7 Hari</h3>
+                                <button type="button" class="popover-btn weekly-export-btn" id="btn-weekly-export"
+                                    title="Unduh Rekap Mingguan CSV">
+                                    <span class="material-symbols-rounded" aria-hidden="true">download</span>
+                                    <span>CSV</span>
+                                </button>
+                            </div>
+
+                            <div class="weekly-highlights-grid" id="weekly-highlights-grid">
+                                <div class="weekly-hl-box hl-pink">
+                                    <div class="weekly-hl-top">
+                                        <span>Suhu Ekstrem</span>
+                                        <span class="material-symbols-rounded" aria-hidden="true">device_thermostat</span>
+                                    </div>
+                                    <strong id="weekly-hl-temp">-- / --&deg;C</strong>
+                                </div>
+                                <div class="weekly-hl-box hl-turq">
+                                    <div class="weekly-hl-top">
+                                        <span>Kipas Aktif</span>
+                                        <span class="material-symbols-rounded" aria-hidden="true">mode_fan</span>
+                                    </div>
+                                    <strong id="weekly-hl-fan">--%</strong>
+                                </div>
+                                <div class="weekly-hl-box hl-yellow">
+                                    <div class="weekly-hl-top">
+                                        <span>Lampu Aktif</span>
+                                        <span class="material-symbols-rounded" aria-hidden="true">lightbulb</span>
+                                    </div>
+                                    <strong id="weekly-hl-led">--%</strong>
+                                </div>
+                                <div class="weekly-hl-box hl-flame">
+                                    <div class="weekly-hl-top">
+                                        <span>Gas &amp; Anomali</span>
+                                        <span class="material-symbols-rounded" aria-hidden="true">warning</span>
+                                    </div>
+                                    <strong id="weekly-hl-inc">0 Gas &middot; 0 AI</strong>
+                                </div>
+                            </div>
+
+                            <div class="table-wrapper weekly-table-wrap">
+                                <table class="history-table weekly-daily-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Hari</th>
+                                            <th>Suhu</th>
+                                            <th>Lembap</th>
+                                            <th>Gas Maks</th>
+                                            <th>AI</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="weekly-daily-tbody"></tbody>
+                                </table>
+                            </div>
+                        </article>
+                    </div>
+                </section>
             </main>
         </div>
     </div>
 
-    <!-- Modal Pratinjau Rekap Mingguan -->
-    <div class="weekly-modal-backdrop" id="weekly-modal" role="dialog" aria-modal="true"
-        aria-labelledby="weekly-modal-title" hidden>
-        <div class="weekly-modal-card">
-            <div class="weekly-modal-header">
-                <div class="weekly-modal-title-wrap">
-                    <span class="material-symbols-rounded weekly-title-icon" aria-hidden="true">bar_chart</span>
-                    <div>
-                        <h2 id="weekly-modal-title">Rekap Mingguan</h2>
-                        <small>Ringkasan statistik kamar kos (7 hari terakhir)</small>
-                    </div>
-                </div>
-                <button type="button" class="weekly-close-btn" id="btn-close-weekly" aria-label="Tutup Rekap Mingguan">
-                    <span class="material-symbols-rounded" aria-hidden="true">close</span>
-                </button>
-            </div>
-            <div class="weekly-preview-grid">
-                <div class="weekly-metric-box">
-                    <span>Rata-rata Suhu</span>
-                    <strong id="weekly-avg-temp">-- &deg;C</strong>
-                </div>
-                <div class="weekly-metric-box">
-                    <span>Rata-rata Kelembapan</span>
-                    <strong id="weekly-avg-hum">-- %</strong>
-                </div>
-                <div class="weekly-metric-box">
-                    <span>Suhu Puncak</span>
-                    <strong id="weekly-max-temp">-- &deg;C</strong>
-                </div>
-                <div class="weekly-metric-box">
-                    <span>Sampel Tercatat</span>
-                    <strong id="weekly-sample-count">0 data</strong>
-                </div>
-            </div>
-            <p class="weekly-modal-note" id="weekly-modal-note">
-                Tombol &amp; tampilan dasar siap dihubungkan ke endpoint rekap 7 hari saat modul rekap mingguan diaktifkan.
-            </p>
-        </div>
-    </div>
-
-    <script src="script.js?v=18" defer></script>
+    <script src="script.js?v=20" defer></script>
     <script>
         // Registrasi PWA Service Worker
         if ('serviceWorker' in navigator) {

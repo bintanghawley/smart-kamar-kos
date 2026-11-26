@@ -8,6 +8,12 @@ let scene, camera, renderer, cssRenderer, controls;
 let container;
 let isInitialized = false;
 
+let is3DFullscreen = false;
+let elStageCard = null;
+let elBtnFullscreen = null;
+let elIconFullscreen = null;
+let elFullscreenHint = null;
+
 let houseGroup, roofGroup, interiorGroup;
 let fanImpeller, fanHousing;
 let fanParticles = [];
@@ -1854,7 +1860,7 @@ function bindInteractiveRaycaster() {
     });
 
     dom.addEventListener('pointermove', e => {
-        if (pointerIsDownOnCanvas) {
+        if (pointerIsDownOnCanvas && controls && controls.enableRotate) {
             const dist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
             if (dist >= 5) {
                 if (activeCameraTween) {
@@ -2045,6 +2051,26 @@ export function init(containerElement) {
     controls.maxDistance = 16.0;
     controls.target.copy(VIEW_PRESETS.outside.target);
 
+    elStageCard = document.getElementById('room-3d-stage');
+    elBtnFullscreen = document.getElementById('btn-stage-fullscreen');
+    elIconFullscreen = document.getElementById('icon-stage-fullscreen');
+    elFullscreenHint = document.getElementById('stage-fullscreen-hint');
+
+    if (elBtnFullscreen) {
+        elBtnFullscreen.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggle3DFullscreen();
+        });
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && is3DFullscreen) {
+            set3DFullscreen(false);
+        }
+    });
+
+    updateControlInteractivity();
+
     controls.addEventListener('start', () => {
         // Ignore simple click starts; real camera drags (>5px) and wheels are handled explicitly
         if (!pointerIsDownOnCanvas && activeCameraTween) {
@@ -2120,8 +2146,66 @@ function showFallback(message) {
     `;
 }
 
+export function updateControlInteractivity() {
+    if (!controls || !renderer) return;
+    const isMobile = window.innerWidth <= 760;
+    if (is3DFullscreen) {
+        controls.enableRotate = true;
+        controls.enableZoom = true;
+        renderer.domElement.style.touchAction = 'none';
+    } else if (isMobile) {
+        controls.enableRotate = false;
+        controls.enableZoom = true;
+        renderer.domElement.style.touchAction = 'pan-y';
+    } else {
+        controls.enableRotate = true;
+        controls.enableZoom = true;
+        renderer.domElement.style.touchAction = 'none';
+    }
+}
+
+export function set3DFullscreen(active) {
+    is3DFullscreen = Boolean(active);
+    if (!elStageCard) elStageCard = document.getElementById('room-3d-stage');
+    if (!elBtnFullscreen) elBtnFullscreen = document.getElementById('btn-stage-fullscreen');
+    if (!elIconFullscreen) elIconFullscreen = document.getElementById('icon-stage-fullscreen');
+    if (!elFullscreenHint) elFullscreenHint = document.getElementById('stage-fullscreen-hint');
+
+    if (elStageCard) {
+        elStageCard.classList.toggle('is-fullscreen', is3DFullscreen);
+    }
+    document.body.classList.toggle('is-3d-fullscreen', is3DFullscreen);
+
+    if (elIconFullscreen) {
+        elIconFullscreen.textContent = is3DFullscreen ? 'close' : 'open_in_full';
+    }
+    if (elBtnFullscreen) {
+        elBtnFullscreen.setAttribute('aria-label', is3DFullscreen ? 'Tutup Layar Penuh' : 'Perbesar Layar Penuh');
+        elBtnFullscreen.title = is3DFullscreen ? 'Tutup Layar Penuh' : 'Perbesar Layar Penuh (Aktifkan Rotasi 360°)';
+    }
+    if (elFullscreenHint) {
+        elFullscreenHint.hidden = !is3DFullscreen;
+    }
+
+    updateControlInteractivity();
+    onWindowResize();
+
+    if (is3DFullscreen) {
+        setTimeout(() => {
+            if (elFullscreenHint && is3DFullscreen) {
+                elFullscreenHint.hidden = true;
+            }
+        }, 3600);
+    }
+}
+
+export function toggle3DFullscreen() {
+    set3DFullscreen(!is3DFullscreen);
+}
+
 function onWindowResize() {
     if (!container || !renderer || !camera) return;
+    updateControlInteractivity();
     const w = container.clientWidth;
     const h = container.clientHeight;
     if (!w || !h) return;
@@ -2607,5 +2691,8 @@ window.Room3D = {
     focusScenario,
     setViewMode,
     resetView,
-    setSunTime
+    setSunTime,
+    set3DFullscreen,
+    toggle3DFullscreen,
+    is3DFullscreen: () => is3DFullscreen
 };

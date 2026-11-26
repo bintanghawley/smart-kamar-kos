@@ -310,124 +310,6 @@ body {
     font-size: 20px;
 }
 
-.weekly-modal-backdrop[hidden] {
-    display: none;
-}
-
-.weekly-modal-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 160;
-    background: rgba(10, 9, 8, 0.72);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    display: grid;
-    place-items: center;
-    padding: 18px;
-}
-
-.weekly-modal-card {
-    width: min(440px, 100%);
-    background: #1d1918;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-lg);
-    padding: 20px;
-    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.72);
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
-.weekly-modal-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
-}
-
-.weekly-modal-title-wrap {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.weekly-title-icon {
-    width: 38px;
-    height: 38px;
-    border-radius: 12px;
-    background: rgba(19, 202, 182, 0.15);
-    color: var(--turq);
-    display: grid;
-    place-items: center;
-    font-size: 21px;
-}
-
-.weekly-modal-title-wrap h2 {
-    font-family: var(--font-display);
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--text-primary);
-    line-height: 1.2;
-}
-
-.weekly-modal-title-wrap small {
-    display: block;
-    font-size: 12px;
-    color: var(--text-secondary);
-    margin-top: 2px;
-}
-
-.weekly-close-btn {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    border: none;
-    background: rgba(255, 255, 255, 0.08);
-    color: var(--text-secondary);
-    display: grid;
-    place-items: center;
-    cursor: pointer;
-    transition: background 0.16s ease, color 0.16s ease;
-}
-
-.weekly-close-btn:hover {
-    background: rgba(255, 255, 255, 0.16);
-    color: #ffffff;
-}
-
-.weekly-preview-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-}
-
-.weekly-metric-box {
-    background: #26211f;
-    border-radius: 14px;
-    padding: 12px 14px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.weekly-metric-box span {
-    font-size: 11.5px;
-    color: var(--text-secondary);
-}
-
-.weekly-metric-box strong {
-    font-family: var(--font-display);
-    font-size: 20px;
-    font-weight: 700;
-    color: #ffffff;
-}
-
-.weekly-modal-note {
-    font-size: 12px;
-    line-height: 1.5;
-    color: var(--text-muted);
-}
-
 .dt-cal-icon {
     font-size: 19px;
     color: #eae6e1;
@@ -722,6 +604,112 @@ body {
     flex-wrap: wrap;
     gap: 8px;
     pointer-events: none;
+}
+
+.stage-top-left-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    pointer-events: none;
+}
+
+.stage-action-btn {
+    pointer-events: auto;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.36);
+    background: rgba(24, 21, 19, 0.78);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: #e9e5e0;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease, border-color 0.2s ease;
+}
+
+.stage-action-btn:hover {
+    background: rgba(48, 42, 39, 0.95);
+    border-color: rgba(255, 255, 255, 0.6);
+    color: #ffffff;
+    transform: scale(1.05);
+}
+
+.stage-action-btn:active {
+    transform: scale(0.95);
+}
+
+.stage-action-btn .material-symbols-rounded {
+    font-size: 20px;
+}
+
+body.is-3d-fullscreen {
+    overflow: hidden !important;
+}
+
+.stage-3d-card.is-fullscreen {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    max-width: none !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    border: none !important;
+    z-index: 500 !important;
+    background: #0d0b0a !important;
+}
+
+.stage-3d-card.is-fullscreen .stage-canvas-wrapper {
+    height: 100% !important;
+    min-height: 100% !important;
+    border-radius: 0 !important;
+}
+
+.stage-fullscreen-hint {
+    position: absolute;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 30;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: var(--radius-pill);
+    background: rgba(20, 18, 16, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 500;
+    pointer-events: none;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    animation: fadeInHint 0.25s ease forwards;
+}
+
+.stage-fullscreen-hint[hidden] {
+    display: none !important;
+}
+
+.stage-fullscreen-hint .material-symbols-rounded {
+    font-size: 19px;
+    color: var(--turq);
+}
+
+@keyframes fadeInHint {
+    from {
+        opacity: 0;
+        transform: translate(-50%, 12px);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, 0);
+    }
 }
 
 .room-view-switch {
@@ -1544,6 +1532,36 @@ body {
     gap: 10px;
 }
 
+.ai-detector-heading {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin: 0;
+}
+
+.ai-detector-title-gradient {
+    font-family: var(--font-display);
+    font-size: 21px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    background: linear-gradient(90deg, #0fe3c3 0%, #0abfe6 55%, #0099ff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    display: inline-block;
+    line-height: 1.2;
+}
+
+.ai-sparkle-stars {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    display: inline-block;
+    vertical-align: middle;
+    margin-top: -1px;
+    filter: drop-shadow(0 0 6px rgba(0, 180, 255, 0.28));
+}
+
 .ai-slot-trigger {
     width: 34px;
     height: 34px;
@@ -1940,6 +1958,508 @@ body {
     color: var(--yellow);
 }
 
+/* ==================== WEEKLY REPORT SUBPAGE ==================== */
+body.is-weekly-page .page-section {
+    display: none;
+}
+
+.weekly-report-page {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+}
+
+.weekly-report-page[hidden] {
+    display: none !important;
+}
+
+.weekly-header-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.weekly-header-top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+
+.weekly-back-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--surface);
+    color: var(--text-primary);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.18s ease, color 0.18s ease, transform 0.15s ease;
+}
+
+.weekly-back-btn:hover {
+    background: var(--surface-3);
+    color: #ffffff;
+    transform: translateX(-2px);
+}
+
+.weekly-back-btn .material-symbols-rounded {
+    font-size: 20px;
+}
+
+.weekly-title-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.weekly-page-title {
+    font-family: var(--font-display);
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    color: var(--text-primary);
+    line-height: 1.3;
+}
+
+.weekly-source-pill {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: var(--radius-pill);
+    background: rgba(255, 214, 52, 0.14);
+    color: var(--yellow);
+    border: 1px solid rgba(255, 214, 52, 0.35);
+    white-space: nowrap;
+}
+
+.weekly-source-pill[hidden] {
+    display: none;
+}
+
+.weekly-week-strip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px;
+    border-radius: var(--radius-pill);
+    background: var(--surface);
+    border: 1px solid var(--border);
+}
+
+.weekly-week-btn {
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 7px 16px;
+    border-radius: var(--radius-pill);
+    cursor: pointer;
+    transition: background 0.16s ease, color 0.16s ease;
+    white-space: nowrap;
+}
+
+.weekly-week-btn:hover {
+    color: var(--text-primary);
+}
+
+.weekly-week-btn.is-active {
+    background: var(--surface-3);
+    color: #ffffff;
+}
+
+.weekly-range-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: -6px;
+}
+
+.weekly-range-text {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    letter-spacing: -0.01em;
+}
+
+/* Desktop Grid: Row 1 = [Data per-Minggu | Ringkasan AI], Row 2 = [Rekap 7 Hari] */
+.weekly-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.24fr) minmax(0, 1fr);
+    gap: 20px;
+    align-items: stretch;
+}
+
+.weekly-trend-card,
+.weekly-ai-card,
+.weekly-recap-card {
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    padding: 22px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+}
+
+.weekly-recap-card {
+    grid-column: 1 / -1;
+}
+
+.weekly-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.weekly-card-title {
+    margin: 0;
+}
+
+.weekly-hero-range {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: rgba(255, 255, 255, 0.05);
+    padding: 5px 12px;
+    border-radius: var(--radius-pill);
+    white-space: nowrap;
+}
+
+.weekly-metric-tabs {
+    align-self: flex-start;
+    max-width: 100%;
+}
+
+.weekly-hero-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.weekly-hero-value-row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+}
+
+.weekly-hero-value {
+    font-family: var(--font-display);
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+    font-variant-numeric: tabular-nums;
+    color: #ffffff;
+}
+
+.weekly-hero-unit {
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.weekly-hero-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.weekly-chart-wrap {
+    position: relative;
+    width: 100%;
+    height: 248px;
+    min-height: 220px;
+    margin-top: auto;
+}
+
+#weekly-bar-chart {
+    width: 100%;
+    height: 100%;
+    display: block;
+    cursor: pointer;
+}
+
+.weekly-chart-tooltip {
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(16, 14, 13, 0.94);
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    padding: 6px 12px;
+    font-size: 12px;
+    color: var(--text-primary);
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.55);
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 15;
+}
+
+.weekly-chart-tooltip[hidden] {
+    display: none;
+}
+
+.weekly-empty-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.45;
+}
+
+.weekly-empty-hint[hidden] {
+    display: none;
+}
+
+/* Ringkasan AI Card */
+.weekly-ai-status-pill {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 5px 12px;
+    border-radius: var(--radius-pill);
+    background: rgba(19, 202, 182, 0.14);
+    color: var(--turq);
+    white-space: nowrap;
+}
+
+.weekly-ai-status-pill.is-warning {
+    background: rgba(255, 214, 52, 0.16);
+    color: var(--yellow);
+}
+
+.weekly-ai-status-pill.is-danger {
+    background: rgba(254, 98, 60, 0.18);
+    color: var(--flame);
+}
+
+.weekly-ai-narrative-box {
+    background: var(--surface-2);
+    border-left: 3px solid var(--turq);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    padding: 13px 15px;
+}
+
+.weekly-ai-narrative {
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: #eae6e1;
+}
+
+.weekly-slots-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.weekly-sublabel {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.weekly-slots-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.weekly-slot-tile {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 13px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.weekly-slot-tile .material-symbols-rounded {
+    font-size: 20px;
+    color: var(--yellow);
+    flex-shrink: 0;
+}
+
+.weekly-slot-tile-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.weekly-slot-tile-info span {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.weekly-slot-tile-info strong {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+}
+
+.weekly-ai-bullets {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: auto;
+}
+
+.weekly-ai-bullets li {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: var(--text-secondary);
+}
+
+.weekly-ai-bullets .material-symbols-rounded {
+    font-size: 17px;
+    margin-top: 1px;
+    flex-shrink: 0;
+    color: var(--turq);
+}
+
+.weekly-ai-bullets li.is-warn .material-symbols-rounded {
+    color: var(--yellow);
+}
+
+.weekly-ai-bullets li.is-alert .material-symbols-rounded {
+    color: var(--flame);
+}
+
+/* Rekap 7 Hari Card */
+.weekly-export-btn {
+    flex: 0 0 auto;
+    padding: 7px 14px;
+    border-radius: var(--radius-pill);
+}
+
+.weekly-highlights-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.weekly-hl-box {
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+}
+
+.weekly-hl-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.weekly-hl-top .material-symbols-rounded {
+    font-size: 19px;
+}
+
+.weekly-hl-box strong {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 700;
+    color: #ffffff;
+    font-variant-numeric: tabular-nums;
+}
+
+.weekly-hl-box.hl-pink {
+    border-top: 2px solid var(--pink);
+}
+
+.weekly-hl-box.hl-pink .material-symbols-rounded {
+    color: var(--pink);
+}
+
+.weekly-hl-box.hl-turq {
+    border-top: 2px solid var(--turq);
+}
+
+.weekly-hl-box.hl-turq .material-symbols-rounded {
+    color: var(--turq);
+}
+
+.weekly-hl-box.hl-yellow {
+    border-top: 2px solid var(--yellow);
+}
+
+.weekly-hl-box.hl-yellow .material-symbols-rounded {
+    color: var(--yellow);
+}
+
+.weekly-hl-box.hl-flame {
+    border-top: 2px solid var(--flame);
+}
+
+.weekly-hl-box.hl-flame .material-symbols-rounded {
+    color: var(--flame);
+}
+
+.weekly-daily-table tbody tr {
+    cursor: pointer;
+    transition: background 0.14s ease;
+}
+
+.weekly-daily-table tbody tr.is-selected-day {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.weekly-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 2px 9px;
+    border-radius: var(--radius-pill);
+}
+
+.weekly-badge.is-ok {
+    background: rgba(19, 202, 182, 0.14);
+    color: var(--turq);
+}
+
+.weekly-badge.is-warn {
+    background: rgba(255, 214, 52, 0.16);
+    color: var(--yellow);
+}
+
+.weekly-badge.is-danger {
+    background: rgba(254, 98, 60, 0.18);
+    color: var(--flame);
+}
+
+.weekly-badge.is-muted {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-muted);
+}
+
 /* ==================== ANIMATIONS ==================== */
 @keyframes pulseDot {
 
@@ -2115,6 +2635,28 @@ body {
     .stage-canvas-wrapper {
         height: 400px;
     }
+
+    .weekly-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .weekly-trend-card {
+        order: 1;
+    }
+
+    .weekly-ai-card {
+        order: 2;
+    }
+
+    .weekly-recap-card {
+        order: 3;
+        grid-column: auto;
+    }
+
+    .weekly-highlights-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 }
 
 @media (max-width: 760px) {
@@ -2259,6 +2801,23 @@ body {
         height: 36px;
     }
 
+    .stage-action-btn {
+        width: 36px;
+        height: 36px;
+    }
+
+    .stage-action-btn .material-symbols-rounded {
+        font-size: 18px;
+    }
+
+    .stage-canvas-wrapper canvas {
+        touch-action: pan-y !important;
+    }
+
+    .stage-3d-card.is-fullscreen .stage-canvas-wrapper canvas {
+        touch-action: none !important;
+    }
+
     .hotspot-icon-circle {
         width: 34px;
         height: 34px;
@@ -2280,6 +2839,15 @@ body {
     .card-heading,
     .condition-verdict {
         font-size: 18.5px;
+    }
+
+    .ai-detector-title-gradient {
+        font-size: 18.5px;
+    }
+
+    .ai-sparkle-stars {
+        width: 19px;
+        height: 19px;
     }
 
     .stats-grid-2x2 {
@@ -2392,6 +2960,178 @@ body {
     .info-item {
         padding: 12px 0;
         font-size: 13.5px;
+    }
+
+    /* Mobile Weekly Report: Fixed Top Header (Back + Week Filter Strip) */
+    body.is-weekly-page .topbar,
+    body.is-weekly-page .sidebar-rail {
+        display: none !important;
+    }
+
+    body.is-weekly-page .app-shell {
+        padding: 0 14px 36px;
+        gap: 0;
+    }
+
+    .weekly-report-page {
+        padding-top: 98px;
+        gap: 14px;
+    }
+
+    .weekly-header-bar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 95;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+        padding: 10px 14px 8px;
+        background: rgba(7, 6, 4, 0.92);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .weekly-header-top {
+        gap: 6px;
+    }
+
+    .weekly-back-btn {
+        width: 32px;
+        height: 32px;
+        border: none;
+        background: transparent;
+    }
+
+    .weekly-back-btn:hover {
+        background: rgba(255, 255, 255, 0.08);
+        transform: none;
+    }
+
+    .weekly-page-title {
+        font-size: 18px;
+    }
+
+    .weekly-week-strip {
+        width: 100%;
+        justify-content: space-between;
+        background: transparent;
+        border: none;
+        padding: 0;
+        gap: 4px;
+    }
+
+    .weekly-week-btn {
+        flex: 1 1 0;
+        text-align: center;
+        font-size: 13px;
+        padding: 6px 4px;
+        border-radius: 10px;
+    }
+
+    .weekly-week-btn.is-active {
+        background: rgba(255, 255, 255, 0.1);
+        color: #ffffff;
+    }
+
+    .weekly-range-bar {
+        margin-top: 2px;
+        padding: 0 2px;
+    }
+
+    .weekly-range-text {
+        font-size: 13px;
+    }
+
+    .weekly-trend-card,
+    .weekly-recap-card,
+    .weekly-ai-card {
+        padding: 18px 16px;
+        gap: 14px;
+    }
+
+    .weekly-card-head .card-heading {
+        font-size: 17.5px;
+    }
+
+    .weekly-hero-range {
+        font-size: 11px;
+        padding: 4px 9px;
+    }
+
+    .weekly-metric-tabs {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .weekly-metric-tabs .chart-tab {
+        flex: 1 1 0;
+        padding: 5px 6px;
+        font-size: 11.5px;
+        text-align: center;
+    }
+
+    .weekly-hero-value {
+        font-size: 31px;
+    }
+
+    .weekly-chart-wrap {
+        height: 204px;
+        min-height: 190px;
+    }
+
+    .weekly-highlights-grid {
+        gap: 8px;
+    }
+
+    .weekly-hl-box {
+        padding: 11px 12px;
+        gap: 5px;
+        border-radius: 14px;
+    }
+
+    .weekly-hl-top {
+        font-size: 11px;
+    }
+
+    .weekly-hl-top .material-symbols-rounded {
+        font-size: 16px;
+    }
+
+    .weekly-hl-box strong {
+        font-size: 15px;
+    }
+
+    .weekly-daily-table {
+        min-width: 0;
+        width: 100%;
+        font-size: 11.5px;
+    }
+
+    .weekly-daily-table thead th {
+        padding: 8px 4px 10px;
+        font-size: 11px;
+    }
+
+    .weekly-daily-table tbody td {
+        padding: 9px 4px;
+        height: 36px;
+    }
+
+    .weekly-badge {
+        font-size: 10.5px;
+        padding: 2px 7px;
+    }
+
+    .weekly-slots-grid {
+        gap: 7px;
+    }
+
+    .weekly-slot-tile {
+        padding: 9px 10px;
+        gap: 8px;
     }
 }
 

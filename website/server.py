@@ -557,6 +557,9 @@ event_lock = threading.Lock()
 prev_gas_danger = False
 prev_actuators = {"led": "OFF", "kipas": "OFF", "buzzer": "OFF"}
 prev_ai_status = "MENUNGGU DATA"
+memory_telemetry_history = deque(maxlen=5000)
+memory_incident_history = deque(maxlen=500)
+_last_memory_telemetry_ts = 0.0
 
 calibration_samples = []
 last_calibration_sample_time = 0
@@ -1880,6 +1883,34 @@ class SmartKosServer(BaseHTTPRequestHandler):
                     prev_ai_status = current_ai_status
 
                 db.record_telemetry(current_data, ai_pay, force=force_db_save)
+
+                global _last_memory_telemetry_ts
+                now_mem_ts = time.time()
+                if force_db_save or (now_mem_ts - _last_memory_telemetry_ts >= 15):
+                    _last_memory_telemetry_ts = now_mem_ts
+                    memory_telemetry_history.append({
+                        "suhu": current_data.get("suhu", 0),
+                        "kelembapan": current_data.get("kelembapan", 0),
+                        "cahaya": current_data.get("cahaya", 0),
+                        "gas": current_data.get("gas", 0),
+                        "led": current_led,
+                        "kipas": current_fan,
+                        "buzzer": current_buzz,
+                        "time_slot": ai_pay.get("ai_active_slot", "siang"),
+                        "ai_score": ai_pay.get("ai_score"),
+                        "ai_status": ai_pay.get("ai_status", "NORMAL"),
+                        "created_at": datetime.now().isoformat(),
+                    })
+                if is_gas_danger:
+                    memory_incident_history.append({
+                        "event_type": "GAS_DANGER",
+                        "created_at": datetime.now().isoformat(),
+                    })
+                elif current_ai_status == "ANOMALI":
+                    memory_incident_history.append({
+                        "event_type": "AI_ANOMALY",
+                        "created_at": datetime.now().isoformat(),
+                    })
             except Exception as db_err:
                 print("Peringatan, logging DB dilewati:", db_err)
 
@@ -2050,6 +2081,61 @@ class SmartKosServer(BaseHTTPRequestHandler):
                             pass
             calibrations = db.get_calibration_history(limit=limit)
             self.send_json(200, {"status": "OK", "count": len(calibrations), "data": calibrations})
+            return
+
+        def _parse_week_params():
+            iso_year = None
+            iso_week = None
+            if "?" in self.path:
+                for param in self.path.split("?", 1)[1].split("&"):
+                    if param.startswith("year="):
+                        try:
+                            iso_year = int(param.split("=", 1)[1])
+                        except ValueError:
+                            pass
+                    elif param.startswith("week="):
+                        try:
+                            iso_week = int(param.split("=", 1)[1])
+                        except ValueError:
+                            pass
+            return iso_year, iso_week
+
+        def _get_weekly_payload():
+            iso_year, iso_week = _parse_week_params()
+            if db.is_db_connected():
+                summary = db.get_weekly_summary(iso_year=iso_year, iso_week=iso_week)
+                if summary.get("has_data"):
+                    return summary
+            with event_lock:
+                mem_rows = list(memory_telemetry_history)
+                mem_inc = list(memory_incident_history)
+            if mem_rows:
+                mem_summary = db.build_weekly_summary_from_rows(
+                    mem_rows, mem_inc, iso_year=iso_year, iso_week=iso_week, source="memory"
+                )
+                if mem_summary.get("has_data"):
+                    return mem_summary
+            return db.build_weekly_summary_from_rows([], [], iso_year=iso_year, iso_week=iso_week, source="empty")
+
+        if clean_path == "/api/summary/weekly":
+            self.send_json(200, _get_weekly_payload())
+            return
+
+        if clean_path == "/api/export/weekly-csv":
+            summary = _get_weekly_payload()
+            csv_content = db.export_weekly_summary_csv(summary)
+            csv_bytes = csv_content.encode("utf-8")
+            wk_label = summary.get("week", {}).get("label", "weekly")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/csv; charset=utf-8")
+            self.send_header("Content-Length", str(len(csv_bytes)))
+            self.send_header("Content-Disposition", f"attachment; filename=rekap_mingguan_{wk_label}.csv")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            try:
+                self.wfile.write(csv_bytes)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
             return
 
         if clean_path == "/api/export/csv":
