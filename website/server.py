@@ -104,6 +104,11 @@ GAS_THRESHOLD = 3500
 LDR_THRESHOLD = 2000
 HUMIDITY_THRESHOLD = 60
 FAN_OFF_DELAY = 10000
+FAN_MANUAL_SNOOZE_SECONDS = 1800
+FAN_HUMIDITY_CLEAR_THRESHOLD = HUMIDITY_THRESHOLD - 2
+LED_OFF_SNOOZE_SECONDS = 8 * 3600
+LED_ON_SNOOZE_SECONDS = 2 * 3600
+LED_BRIGHT_CLEAR_THRESHOLD = LDR_THRESHOLD - 200
 
 STATUS_BELUM_DIKALIBRASI = "BELUM DIKALIBRASI"
 STATUS_KALIBRASI_BERLANGSUNG = "KALIBRASI BERLANGSUNG"
@@ -282,6 +287,10 @@ state_lock = threading.RLock()
 model_lock = threading.RLock()
 
 buzzer_muted = False
+fan_manual_off_until = 0.0
+fan_wait_humid_clear = False
+led_manual_until = 0.0
+led_wait_dark_clear = False
 
 manual_overrides = {
     "led": None,
@@ -301,9 +310,56 @@ sensor_data = {
 }
 
 
+def _clear_fan_manual_override_locked():
+    """Clear manual Exhaust Fan override along with its snooze and cycle-wait state."""
+    global fan_manual_off_until, fan_wait_humid_clear
+    manual_overrides["kipas"] = None
+    fan_manual_off_until = 0.0
+    fan_wait_humid_clear = False
+
+
+def _clear_led_manual_override_locked():
+    """Clear manual Lamp override along with its snooze and light-cycle wait state."""
+    global led_manual_until, led_wait_dark_clear
+    manual_overrides["led"] = None
+    led_manual_until = 0.0
+    led_wait_dark_clear = False
+
+
+def _get_snooze_remaining_locked(device_override, until_ts):
+    if not device_override or until_ts <= 0:
+        return 0
+    return max(0, int(round(until_ts - time.time())))
+
+
+def _get_fan_snooze_remaining_locked():
+    """Return remaining manual OFF snooze seconds for Exhaust Fan (0 if inactive)."""
+    if manual_overrides.get("kipas") != "OFF":
+        return 0
+    return _get_snooze_remaining_locked("OFF", fan_manual_off_until)
+
+
+def _get_led_snooze_remaining_locked():
+    """Return remaining manual snooze seconds for Lamp (0 if inactive)."""
+    return _get_snooze_remaining_locked(manual_overrides.get("led"), led_manual_until)
+
+
+def _release_expired_snoozes_locked():
+    """Clear any expired timed manual snoozes; returns True if any override was released."""
+    now_ts = time.time()
+    released = False
+    if manual_overrides.get("kipas") == "OFF" and fan_manual_off_until > 0 and now_ts >= fan_manual_off_until:
+        _clear_fan_manual_override_locked()
+        released = True
+    if manual_overrides.get("led") in ("ON", "OFF") and led_manual_until > 0 and now_ts >= led_manual_until:
+        _clear_led_manual_override_locked()
+        released = True
+    return released
+
+
 def _evaluate_auto_actuators_locked(payload=None):
     """Evaluate server-side automatic rules for kipas, led, and buzzer while respecting manual overrides."""
-    global buzzer_muted
+    global buzzer_muted, fan_wait_humid_clear
 
     payload = payload or {}
     current_gas = sensor_data.get("gas", 0)
@@ -314,9 +370,25 @@ def _evaluate_auto_actuators_locked(payload=None):
     humid_high = isinstance(current_humid, (int, float)) and current_humid >= HUMIDITY_THRESHOLD
     ldr_dark = isinstance(current_ldr, (int, float)) and current_ldr >= LDR_THRESHOLD
 
-    # Safety auto-release: do not allow stale manual OFF override to keep Exhaust Fan off on gas danger
-    if gas_danger and manual_overrides.get("kipas") == "OFF":
-        manual_overrides["kipas"] = None
+    _release_expired_snoozes_locked()
+
+    # Auto-release manual Exhaust Fan OFF on gas danger, snooze expiry, or a fresh humid cycle
+    if manual_overrides.get("kipas") == "OFF":
+        if gas_danger:
+            _clear_fan_manual_override_locked()
+        elif fan_wait_humid_clear:
+            if isinstance(current_humid, (int, float)) and current_humid < FAN_HUMIDITY_CLEAR_THRESHOLD:
+                fan_wait_humid_clear = False
+        elif humid_high:
+            _clear_fan_manual_override_locked()
+
+    # Auto-release manual Lamp ON/OFF on snooze expiry or when lighting enters the next day/night phase
+    if manual_overrides.get("led") in ("ON", "OFF"):
+        if led_wait_dark_clear:
+            if isinstance(current_ldr, (int, float)) and current_ldr < LED_BRIGHT_CLEAR_THRESHOLD:
+                _clear_led_manual_override_locked()
+        elif ldr_dark:
+            _clear_led_manual_override_locked()
 
     if manual_overrides.get("kipas") in ("ON", "OFF"):
         sensor_data["kipas"] = manual_overrides["kipas"]
@@ -342,7 +414,7 @@ def _evaluate_auto_actuators_locked(payload=None):
 
 def set_manual_device_state(device, state=None):
     """Set or toggle manual override state ('ON', 'OFF', or 'AUTO') for an actuator or 'all'."""
-    global buzzer_muted
+    global buzzer_muted, fan_manual_off_until, fan_wait_humid_clear, led_manual_until, led_wait_dark_clear
 
     device_key = str(device or "").strip().lower()
     if device_key not in ("led", "kipas", "buzzer", "all"):
@@ -353,8 +425,8 @@ def set_manual_device_state(device, state=None):
             target_state = str(state or "AUTO").strip().upper()
             if target_state != "AUTO":
                 return 400, {"status": "ERROR", "message": "Perangkat 'all' hanya mendukung status AUTO."}
-            manual_overrides["led"] = None
-            manual_overrides["kipas"] = None
+            _clear_led_manual_override_locked()
+            _clear_fan_manual_override_locked()
             manual_overrides["buzzer"] = None
             buzzer_muted = False
             sensor_data["buzzer_muted"] = False
@@ -364,7 +436,9 @@ def set_manual_device_state(device, state=None):
                 "status": "OK",
                 "device": "all",
                 "mode": "AUTO",
-                "manual_overrides": overrides_copy
+                "manual_overrides": overrides_copy,
+                "kipas_snooze_remaining_sec": 0,
+                "led_snooze_remaining_sec": 0
             }
 
         current_val = str(sensor_data.get(device_key, "OFF")).upper()
@@ -377,14 +451,41 @@ def set_manual_device_state(device, state=None):
             return 400, {"status": "ERROR", "message": "Status harus ON, OFF, atau AUTO."}
 
         if target_state == "AUTO":
-            manual_overrides[device_key] = None
+            if device_key == "kipas":
+                _clear_fan_manual_override_locked()
+            elif device_key == "led":
+                _clear_led_manual_override_locked()
+            else:
+                manual_overrides[device_key] = None
             if device_key == "buzzer":
                 buzzer_muted = False
                 sensor_data["buzzer_muted"] = False
             _evaluate_auto_actuators_locked()
         else:
             manual_overrides[device_key] = target_state
-            if device_key == "buzzer":
+            if device_key == "kipas":
+                if target_state == "OFF":
+                    current_humid = sensor_data.get("kelembapan", 0)
+                    fan_manual_off_until = time.time() + FAN_MANUAL_SNOOZE_SECONDS
+                    fan_wait_humid_clear = (
+                        isinstance(current_humid, (int, float))
+                        and current_humid >= HUMIDITY_THRESHOLD
+                    )
+                    _evaluate_auto_actuators_locked()
+                else:
+                    _clear_fan_manual_override_locked()
+                    manual_overrides["kipas"] = "ON"
+                    sensor_data["kipas"] = "ON"
+            elif device_key == "led":
+                current_ldr = sensor_data.get("cahaya", 0)
+                snooze_dur = LED_OFF_SNOOZE_SECONDS if target_state == "OFF" else LED_ON_SNOOZE_SECONDS
+                led_manual_until = time.time() + snooze_dur
+                led_wait_dark_clear = (
+                    isinstance(current_ldr, (int, float))
+                    and current_ldr >= LDR_THRESHOLD
+                )
+                sensor_data["led"] = target_state
+            elif device_key == "buzzer":
                 if target_state == "OFF":
                     buzzer_muted = True
                     sensor_data["buzzer_muted"] = True
@@ -396,11 +497,11 @@ def set_manual_device_state(device, state=None):
                     buzzer_muted = False
                     sensor_data["buzzer_muted"] = False
                     sensor_data["buzzer"] = "ON"
-            else:
-                sensor_data[device_key] = target_state
 
         overrides_copy = {k: (v if v is not None else "AUTO") for k, v in manual_overrides.items()}
         applied_val = sensor_data[device_key]
+        fan_snooze_rem = _get_fan_snooze_remaining_locked()
+        led_snooze_rem = _get_led_snooze_remaining_locked()
 
     try:
         db.record_incident(
@@ -418,7 +519,9 @@ def set_manual_device_state(device, state=None):
         "device": device_key,
         "state": applied_val,
         "mode": target_state,
-        "manual_overrides": overrides_copy
+        "manual_overrides": overrides_copy,
+        "kipas_snooze_remaining_sec": fan_snooze_rem,
+        "led_snooze_remaining_sec": led_snooze_rem
     }
 
 last_received_timestamp = 0
@@ -1870,6 +1973,9 @@ class SmartKosServer(BaseHTTPRequestHandler):
 
         if clean_path == "/api/data":
             with state_lock:
+                if _release_expired_snoozes_locked():
+                    _evaluate_auto_actuators_locked()
+
                 online = (
                     last_received_timestamp > 0
                     and time.time() - last_received_timestamp
@@ -1886,6 +1992,8 @@ class SmartKosServer(BaseHTTPRequestHandler):
                     k: (v if v is not None else "AUTO")
                     for k, v in manual_overrides.items()
                 }
+                response["kipas_snooze_remaining_sec"] = _get_fan_snooze_remaining_locked()
+                response["led_snooze_remaining_sec"] = _get_led_snooze_remaining_locked()
                 response["gas_threshold"] = GAS_THRESHOLD
                 response["ldr_threshold"] = LDR_THRESHOLD
                 response["humidity_threshold"] = HUMIDITY_THRESHOLD

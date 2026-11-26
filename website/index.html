@@ -24,7 +24,7 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
         rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=12">
+    <link rel="stylesheet" href="style.css?v=21">
 
     <script type="importmap">
     {
@@ -34,7 +34,7 @@
       }
     }
     </script>
-    <script type="module" src="room3d.js?v=13"></script>
+    <script type="module" src="room3d.js?v=17"></script>
 </head>
 
 <body>
@@ -148,6 +148,13 @@
                         </div>
                     </div>
 
+                    <!-- Weekly Summary Button (Desktop: between Status & Date; Mobile: beside Status) -->
+                    <button type="button" id="btn-weekly-summary" class="header-stat-btn"
+                        aria-label="Rekap Data Mingguan" aria-haspopup="dialog" aria-expanded="false"
+                        title="Rekap Data Mingguan">
+                        <span class="material-symbols-rounded" aria-hidden="true">bar_chart</span>
+                    </button>
+
                     <!-- Date & Time Pill with Time-of-Day Icon -->
                     <div class="datetime-pill" id="datetime-pill" title="Waktu Lokal (WIB)">
                         <span class="material-symbols-rounded dt-cal-icon" aria-hidden="true">calendar_month</span>
@@ -199,10 +206,6 @@
                                                 title="Suasana Malam (Cahaya Bulan)">Malam</button>
                                         </div>
                                     </div>
-                                </div>
-
-                                <div class="stage-3d-hint" id="stage-3d-hint">
-                                    <span>Klik pintu/jendela untuk buka-tutup &middot; Geser untuk rotasi 360&deg;</span>
                                 </div>
 
                                 <!-- Simulation Quick Preset Bar (Visible only when Simulation Mode is ON) -->
@@ -313,7 +316,7 @@
                             <section class="card condition-card" aria-label="Kondisi Saat Ini">
                                 <div class="condition-header">
                                     <h2 class="card-heading">Kondisi Saat Ini</h2>
-                                    <span class="condition-verdict state-offline" id="condition-verdict">Siaga</span>
+                                    <span class="condition-verdict state-checking" id="condition-verdict" aria-live="polite">Checking<span class="checking-dots" aria-hidden="true"><span class="checking-dot">.</span><span class="checking-dot">.</span><span class="checking-dot">.</span></span></span>
                                 </div>
 
                                 <div class="stats-grid-2x2">
@@ -530,7 +533,47 @@
         </div>
     </div>
 
-    <script src="script.js?v=12" defer></script>
+    <!-- Modal Pratinjau Rekap Mingguan -->
+    <div class="weekly-modal-backdrop" id="weekly-modal" role="dialog" aria-modal="true"
+        aria-labelledby="weekly-modal-title" hidden>
+        <div class="weekly-modal-card">
+            <div class="weekly-modal-header">
+                <div class="weekly-modal-title-wrap">
+                    <span class="material-symbols-rounded weekly-title-icon" aria-hidden="true">bar_chart</span>
+                    <div>
+                        <h2 id="weekly-modal-title">Rekap Mingguan</h2>
+                        <small>Ringkasan statistik kamar kos (7 hari terakhir)</small>
+                    </div>
+                </div>
+                <button type="button" class="weekly-close-btn" id="btn-close-weekly" aria-label="Tutup Rekap Mingguan">
+                    <span class="material-symbols-rounded" aria-hidden="true">close</span>
+                </button>
+            </div>
+            <div class="weekly-preview-grid">
+                <div class="weekly-metric-box">
+                    <span>Rata-rata Suhu</span>
+                    <strong id="weekly-avg-temp">-- &deg;C</strong>
+                </div>
+                <div class="weekly-metric-box">
+                    <span>Rata-rata Kelembapan</span>
+                    <strong id="weekly-avg-hum">-- %</strong>
+                </div>
+                <div class="weekly-metric-box">
+                    <span>Suhu Puncak</span>
+                    <strong id="weekly-max-temp">-- &deg;C</strong>
+                </div>
+                <div class="weekly-metric-box">
+                    <span>Sampel Tercatat</span>
+                    <strong id="weekly-sample-count">0 data</strong>
+                </div>
+            </div>
+            <p class="weekly-modal-note" id="weekly-modal-note">
+                Tombol &amp; tampilan dasar siap dihubungkan ke endpoint rekap 7 hari saat modul rekap mingguan diaktifkan.
+            </p>
+        </div>
+    </div>
+
+    <script src="script.js?v=18" defer></script>
     <script>
         // Registrasi PWA Service Worker
         if ('serviceWorker' in navigator) {

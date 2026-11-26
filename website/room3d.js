@@ -23,7 +23,7 @@ let streetLight, streetLampBulbMat;
 let doorPivot, windowPivot, cubicleDoorPivot;
 let interactiveTargets = [];
 const doorAnimState = {
-    frontDoor: { open: false, current: 0, startVal: 0, target: 0, startTime: 0, animating: false, openAngle: -Math.PI * (85 / 180) },
+    frontDoor: { open: false, current: 0, startVal: 0, target: 0, startTime: 0, animating: false, openAngle: Math.PI * (85 / 180) },
     frontWindow: { open: false, current: 0, startVal: 0, target: 0, startTime: 0, animating: false, openAngle: -Math.PI * (75 / 180) },
     cubicleDoor: { open: false, current: 0, startVal: 0, target: 0, startTime: 0, animating: false, openAngle: Math.PI * (80 / 180) }
 };
@@ -646,13 +646,13 @@ function buildBedroomFurniture(parent, mats) {
     bedGroup.add(bedFrame, mattress, pillow, blanket);
     parent.add(bedGroup);
 
-    // Relocated study desk, chair, and laptop against left wall (-X), rotated 90 deg facing +X
+    // Relocated study desk, chair, and laptop against left wall (-X), shifted slightly back for wardrobe + clothes rack
     const deskGroup = new THREE.Group();
-    deskGroup.position.set(-1.56, 0, -1.06);
-    const deskTop = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.07, 1.04), mats.doorMat);
+    deskGroup.position.set(-1.56, 0, -1.16);
+    const deskTop = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.07, 0.96), mats.doorMat);
     deskTop.position.y = 0.66;
     deskGroup.add(deskTop);
-    [[-0.22, -0.45], [0.22, -0.45], [-0.22, 0.45], [0.22, 0.45]].forEach(([lx, lz]) => {
+    [[-0.22, -0.41], [0.22, -0.41], [-0.22, 0.41], [0.22, 0.41]].forEach(([lx, lz]) => {
         const leg = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.66, 0.06), mats.doorMat);
         leg.position.set(lx, 0.33, lz);
         deskGroup.add(leg);
@@ -676,7 +676,7 @@ function buildBedroomFurniture(parent, mats) {
     parent.add(deskGroup);
 
     const chairGroup = new THREE.Group();
-    chairGroup.position.set(-1.02, 0, -1.06);
+    chairGroup.position.set(-1.02, 0, -1.16);
     const chairSeat = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.05, 0.4), mats.doorMat);
     chairSeat.position.y = 0.38;
     const chairBack = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.36, 0.4), mats.doorMat);
@@ -689,30 +689,88 @@ function buildBedroomFurniture(parent, mats) {
     });
     parent.add(chairGroup);
 
-    // 2-door wood wardrobe against left wall beside desk (X: -1.85..-1.31, Z: -0.31..+0.61)
+    // 2-door wood wardrobe against left wall beside desk (X: -1.85..-1.31, Z: -0.60..+0.30)
     const wardrobeGroup = new THREE.Group();
-    wardrobeGroup.position.set(-1.58, 0, 0.15);
-    const wBody = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.5, 0.9), mats.darkFrameMat);
+    wardrobeGroup.position.set(-1.58, 0, -0.15);
+    const wBody = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.5, 0.86), mats.darkFrameMat);
     wBody.position.set(-0.01, 0.76, 0);
-    const wPlinth = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.05, 0.92), mats.darkFrameMat);
+    const wPlinth = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.05, 0.88), mats.darkFrameMat);
     wPlinth.position.set(0, 0.025, 0);
-    const wCrown = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.04, 0.94), mats.darkFrameMat);
+    const wCrown = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.04, 0.90), mats.darkFrameMat);
     wCrown.position.set(0.005, 1.51, 0);
     const wSeam = new THREE.Mesh(
         new THREE.BoxGeometry(0.012, 1.4, 0.015),
         new THREE.MeshStandardMaterial({ color: 0x1e130c, roughness: 0.9 })
     );
     wSeam.position.set(0.245, 0.77, 0);
-    const wDoorL = new THREE.Mesh(new THREE.BoxGeometry(0.025, 1.4, 0.43), mats.doorMat);
-    wDoorL.position.set(0.252, 0.77, -0.225);
-    const wDoorR = new THREE.Mesh(new THREE.BoxGeometry(0.025, 1.4, 0.43), mats.doorMat);
-    wDoorR.position.set(0.252, 0.77, 0.225);
+    const wDoorL = new THREE.Mesh(new THREE.BoxGeometry(0.025, 1.4, 0.41), mats.doorMat);
+    wDoorL.position.set(0.252, 0.77, -0.215);
+    const wDoorR = new THREE.Mesh(new THREE.BoxGeometry(0.025, 1.4, 0.41), mats.doorMat);
+    wDoorR.position.set(0.252, 0.77, 0.215);
     const wHandleL = new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.14, 0.02), mats.handleMat);
     wHandleL.position.set(0.272, 0.8, -0.055);
     const wHandleR = new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.14, 0.02), mats.handleMat);
     wHandleR.position.set(0.272, 0.8, 0.055);
     wardrobeGroup.add(wBody, wPlinth, wCrown, wSeam, wDoorL, wDoorR, wHandleL, wHandleR);
     parent.add(wardrobeGroup);
+
+    // Standing clothes hanger rack right beside wood wardrobe (X: -1.62, Z: +0.51, clear of inward front door swing)
+    const rackFrameMat = new THREE.MeshStandardMaterial({ color: 0x22252b, roughness: 0.45, metalness: 0.65 });
+    const chromeRodMat = new THREE.MeshStandardMaterial({ color: 0xd8dde4, roughness: 0.25, metalness: 0.85 });
+    const clothesRackGroup = new THREE.Group();
+    clothesRackGroup.position.set(-1.62, 0, 0.51);
+
+    const rackBottomShelf = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.026, 0.36), mats.doorMat);
+    rackBottomShelf.position.y = 0.08;
+    clothesRackGroup.add(rackBottomShelf);
+
+    [-0.17, 0.17].forEach(rz => {
+        const footSkid = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.024, 0.03), rackFrameMat);
+        footSkid.position.set(0, 0.012, rz);
+        const upright = new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.013, 1.42, 10), rackFrameMat);
+        upright.position.set(0, 0.72, rz);
+        clothesRackGroup.add(footSkid, upright);
+    });
+
+    const hangRod = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.38, 12), chromeRodMat);
+    hangRod.rotation.x = Math.PI / 2;
+    hangRod.position.set(0, 1.42, 0);
+    clothesRackGroup.add(hangRod);
+
+    // 3 hanging garments on hangers along Z rod
+    const garmentSpecs = [
+        { z: -0.095, color: 0x254e70, len: 0.48, rotY: 0.04 },
+        { z: 0.0, color: 0x2c8c7c, len: 0.52, rotY: -0.03 },
+        { z: 0.095, color: 0xe2dcd0, len: 0.45, rotY: 0.05 }
+    ];
+    garmentSpecs.forEach(({ z, color, len, rotY }) => {
+        const gItem = new THREE.Group();
+        gItem.position.set(0, 1.42, z);
+        gItem.rotation.y = rotY;
+
+        const hook = new THREE.Mesh(new THREE.TorusGeometry(0.02, 0.005, 8, 14, Math.PI * 1.35), chromeRodMat);
+        hook.rotation.y = Math.PI / 2;
+        hook.position.set(0, -0.005, 0);
+
+        const hangerShoulder = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.018, 0.014), mats.doorMat);
+        hangerShoulder.position.set(0, -0.042, 0);
+
+        const clothMat = new THREE.MeshStandardMaterial({ color, roughness: 0.85 });
+        const shirtTorso = new THREE.Mesh(new THREE.BoxGeometry(0.28, len, 0.052), clothMat);
+        shirtTorso.position.set(0, -0.045 - len / 2, 0);
+
+        const sleeveL = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.19, 0.045), clothMat);
+        sleeveL.position.set(-0.155, -0.13, 0);
+        sleeveL.rotation.z = -0.22;
+
+        const sleeveR = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.19, 0.045), clothMat);
+        sleeveR.position.set(0.155, -0.13, 0);
+        sleeveR.rotation.z = 0.22;
+
+        gItem.add(hook, hangerShoulder, shirtTorso, sleeveL, sleeveR);
+        clothesRackGroup.add(gItem);
+    });
+    parent.add(clothesRackGroup);
 }
 
 /** Builds exterior yard streetlamp (front-left) and 2-tier shoe rack + sneakers right of front door. */
@@ -787,6 +845,52 @@ function buildExteriorFixtures(parent, mats) {
         rackGroup.add(shoe);
     });
     parent.add(rackGroup);
+
+    // Pair of classic flip-flops (sandal jepit) neatly placed on front exterior doormat
+    const sandalSoleBotMat = new THREE.MeshStandardMaterial({ color: 0x183c54, roughness: 0.78 });
+    const sandalSoleTopMat = new THREE.MeshStandardMaterial({ color: 0xf4f6f8, roughness: 0.65 });
+    const sandalStrapMat = new THREE.MeshStandardMaterial({ color: 0x13cab6, roughness: 0.55 });
+    const sandalsGroup = new THREE.Group();
+    sandalsGroup.position.set(-1.125, 0.018, 2.09);
+
+    [
+        { sx: -0.068, rotY: -0.09 },
+        { sx: 0.068, rotY: 0.07 }
+    ].forEach(({ sx, rotY }) => {
+        const sandal = new THREE.Group();
+        sandal.position.set(sx, 0, 0);
+        sandal.rotation.y = rotY;
+
+        const botSole = new THREE.Mesh(new THREE.BoxGeometry(0.082, 0.01, 0.16), sandalSoleBotMat);
+        botSole.position.y = 0.005;
+        const botToe = new THREE.Mesh(new THREE.CylinderGeometry(0.041, 0.041, 0.01, 16), sandalSoleBotMat);
+        botToe.position.set(0, 0.005, 0.08);
+        const botHeel = new THREE.Mesh(new THREE.CylinderGeometry(0.037, 0.037, 0.01, 16), sandalSoleBotMat);
+        botHeel.position.set(0, 0.005, -0.08);
+
+        const topSole = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.009, 0.156), sandalSoleTopMat);
+        topSole.position.y = 0.0145;
+        const topToe = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.009, 16), sandalSoleTopMat);
+        topToe.position.set(0, 0.0145, 0.078);
+        const topHeel = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.036, 0.009, 16), sandalSoleTopMat);
+        topHeel.position.set(0, 0.0145, -0.078);
+
+        // Y-strap (tali jepit)
+        const toePost = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.026, 10), sandalStrapMat);
+        toePost.position.set(0, 0.03, 0.048);
+
+        [-1, 1].forEach(side => {
+            const strap = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.008, 0.095), sandalStrapMat);
+            strap.position.set(side * 0.018, 0.031, 0.006);
+            strap.rotation.y = -side * 0.42;
+            strap.rotation.x = 0.24;
+            sandal.add(strap);
+        });
+
+        sandal.add(botSole, botToe, botHeel, topSole, topToe, topHeel, toePost);
+        sandalsGroup.add(sandal);
+    });
+    parent.add(sandalsGroup);
 }
 
 function buildModel() {
@@ -893,10 +997,10 @@ function buildModel() {
     frontShape.holes.push(doorHole);
 
     const windowHole = new THREE.Path();
-    windowHole.moveTo(0.79, 1.18);
-    windowHole.lineTo(1.41, 1.18);
-    windowHole.lineTo(1.41, 1.74);
-    windowHole.lineTo(0.79, 1.74);
+    windowHole.moveTo(-0.50, 1.18);
+    windowHole.lineTo(0.06, 1.18);
+    windowHole.lineTo(0.06, 1.74);
+    windowHole.lineTo(-0.50, 1.74);
     windowHole.closePath();
     frontShape.holes.push(windowHole);
 
@@ -954,9 +1058,9 @@ function buildModel() {
     doorFrameR.position.set(-0.65, 0.91, houseD / 2 - wallThick / 2);
     houseGroup.add(doorFrameT, doorFrameL, doorFrameR);
 
-    // Interactive hinged front door pivot at left jamb
+    // Interactive hinged front door pivot at inner-left jamb (swings INWARD into bedroom)
     doorPivot = new THREE.Group();
-    doorPivot.position.set(-1.57, 0.032, houseD / 2 - 0.04);
+    doorPivot.position.set(-1.57, 0.032, houseD / 2 - wallThick + 0.035);
     const doorLeaf = new THREE.Mesh(new THREE.BoxGeometry(0.89, 1.74, 0.055), doorMat);
     doorLeaf.position.set(0.445, 0.87, 0);
     doorLeaf.userData.interactiveType = 'frontDoor';
@@ -965,8 +1069,8 @@ function buildModel() {
     doorHandlePlate.position.set(0.79, 0.86, 0);
     doorHandlePlate.userData.interactiveType = 'frontDoor';
 
-    const doorHandleLever = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.035, 0.095), handleMat);
-    doorHandleLever.position.set(0.75, 0.86, 0.02);
+    const doorHandleLever = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.035, 0.12), handleMat);
+    doorHandleLever.position.set(0.75, 0.86, 0);
     doorHandleLever.userData.interactiveType = 'frontDoor';
 
     doorPivot.add(doorLeaf, doorHandlePlate, doorHandleLever);
@@ -981,23 +1085,23 @@ function buildModel() {
     doormatMesh.position.set(-1.125, 0.009, houseD / 2 + 0.28);
     houseGroup.add(doormatMesh);
 
-    // Profiled outer window frame & sill (proportional 0.62 x 0.56)
-    const winTop = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.055, 0.16), darkFrameMat);
-    winTop.position.set(1.1, 1.745, houseD / 2 - wallThick / 2);
-    const winBottom = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.06, 0.19), darkFrameMat);
-    winBottom.position.set(1.1, 1.17, houseD / 2 - wallThick / 2 + 0.01);
+    // Profiled outer window frame & sill positioned above light switch (-0.22, outside bathroom cubicle)
+    const winTop = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.055, 0.16), darkFrameMat);
+    winTop.position.set(-0.22, 1.745, houseD / 2 - wallThick / 2);
+    const winBottom = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.06, 0.19), darkFrameMat);
+    winBottom.position.set(-0.22, 1.17, houseD / 2 - wallThick / 2 + 0.01);
     const winLeft = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.58, 0.16), darkFrameMat);
-    winLeft.position.set(0.78, 1.46, houseD / 2 - wallThick / 2);
+    winLeft.position.set(-0.51, 1.46, houseD / 2 - wallThick / 2);
     const winRight = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.58, 0.16), darkFrameMat);
-    winRight.position.set(1.42, 1.46, houseD / 2 - wallThick / 2);
+    winRight.position.set(0.07, 1.46, houseD / 2 - wallThick / 2);
     houseGroup.add(winTop, winBottom, winLeft, winRight);
 
-    // Interactive hinged casement window sash at left jamb (0.80, 1.46, 1.77)
+    // Interactive hinged casement window sash at left jamb (-0.49, 1.46, 1.77)
     windowPivot = new THREE.Group();
-    windowPivot.position.set(0.8, 1.46, houseD / 2 - 0.03);
+    windowPivot.position.set(-0.49, 1.46, houseD / 2 - 0.03);
 
     const sashThick = 0.045;
-    const sashW = 0.58;
+    const sashW = 0.54;
     const sashH = 0.52;
     const sashTop = new THREE.Mesh(new THREE.BoxGeometry(sashW, 0.045, sashThick), darkFrameMat);
     sashTop.position.set(sashW / 2, sashH / 2 - 0.0225, 0);
@@ -1421,26 +1525,33 @@ function buildModel() {
     });
 
     const roofOverhangX = 4.38;
-    const roofSlopeLen = 2.34;
     const roofPitch = Math.atan2(roofPeakY - houseH, houseD / 2);
+    const slopeToWall = Math.hypot(houseD / 2, roofPeakY - houseH);
+    const roofSlopeLen = slopeToWall + 0.34;
+    const ridgeBaseY = roofPeakY + 0.025;
+    const sCenter = roofSlopeLen / 2;
+    const cosP = Math.cos(roofPitch);
+    const sinP = Math.sin(roofPitch);
 
     const roofFront = new THREE.Mesh(new THREE.BoxGeometry(roofOverhangX, 0.06, roofSlopeLen), roofMat);
     roofFront.rotation.x = roofPitch;
-    roofFront.position.set(0, (roofPeakY + houseH) / 2 - 0.01, houseD / 4 + 0.06);
+    roofFront.position.set(0, ridgeBaseY - sCenter * sinP, sCenter * cosP);
 
     const roofBack = new THREE.Mesh(new THREE.BoxGeometry(roofOverhangX, 0.06, roofSlopeLen), roofMat);
     roofBack.rotation.x = -roofPitch;
-    roofBack.position.set(0, (roofPeakY + houseH) / 2 - 0.01, -houseD / 4 - 0.06);
+    roofBack.position.set(0, ridgeBaseY - sCenter * sinP, -sCenter * cosP);
 
     const ridgeMat = new THREE.MeshStandardMaterial({ color: 0x916023, roughness: 0.68, metalness: 0.05 });
     const ridgeCap = new THREE.Mesh(new THREE.BoxGeometry(roofOverhangX + 0.04, 0.085, 0.24), ridgeMat);
-    ridgeCap.position.set(0, roofPeakY + 0.04, 0);
+    ridgeCap.position.set(0, ridgeBaseY + 0.032, 0);
 
-    // Fascia trim along eaves
-    const fasciaFront = new THREE.Mesh(new THREE.BoxGeometry(roofOverhangX + 0.04, 0.085, 0.04), ridgeMat);
-    fasciaFront.position.set(0, houseH - 0.14, houseD / 2 + 0.25);
-    const fasciaBack = new THREE.Mesh(new THREE.BoxGeometry(roofOverhangX + 0.04, 0.085, 0.04), ridgeMat);
-    fasciaBack.position.set(0, houseH - 0.14, -houseD / 2 - 0.25);
+    // Flush fascia trim directly meeting exact front and back eave tips (no floating gap)
+    const eaveZ = roofSlopeLen * cosP;
+    const eaveY = ridgeBaseY - roofSlopeLen * sinP;
+    const fasciaFront = new THREE.Mesh(new THREE.BoxGeometry(roofOverhangX + 0.04, 0.09, 0.045), ridgeMat);
+    fasciaFront.position.set(0, eaveY - 0.012, eaveZ + 0.005);
+    const fasciaBack = new THREE.Mesh(new THREE.BoxGeometry(roofOverhangX + 0.04, 0.09, 0.045), ridgeMat);
+    fasciaBack.position.set(0, eaveY - 0.012, -eaveZ - 0.005);
 
     roofGroup.add(roofFront, roofBack, ridgeCap, fasciaFront, fasciaBack);
 
@@ -1952,8 +2063,8 @@ export function init(containerElement) {
     });
 
     createSunAndSkyRig();
-    triggerSunTransitionIfNeeded(true);
     buildModel();
+    triggerSunTransitionIfNeeded(true);
     initHotspots();
 
     window.addEventListener('resize', onWindowResize);

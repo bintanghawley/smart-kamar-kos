@@ -6,6 +6,11 @@ const MIN_HISTORY_ROWS = 8;
 const GAS_THRESHOLD = 3500;
 const LDR_THRESHOLD = 2000;
 const HUMIDITY_THRESHOLD = 60;
+const FAN_MANUAL_SNOOZE_MS = 30 * 60 * 1000;
+const FAN_HUMIDITY_CLEAR_OFFSET = 2;
+const LED_OFF_SNOOZE_MS = 8 * 60 * 60 * 1000;
+const LED_ON_SNOOZE_MS = 2 * 60 * 60 * 1000;
+const LED_BRIGHT_CLEAR_OFFSET = 200;
 const ARC_LENGTH = 259.71;
 
 const DAYS_ID = [
@@ -52,6 +57,22 @@ const manualDeviceState = {
     led: null,
     buzzer: null
 };
+let simFanSnoozeUntil = 0;
+let simFanWaitHumidClear = false;
+let simLedSnoozeUntil = 0;
+let simLedWaitDarkClear = false;
+
+function clearFanManualMeta() {
+    manualDeviceState.kipas = null;
+    simFanSnoozeUntil = 0;
+    simFanWaitHumidClear = false;
+}
+
+function clearLedManualMeta() {
+    manualDeviceState.led = null;
+    simLedSnoozeUntil = 0;
+    simLedWaitDarkClear = false;
+}
 
 let currentTargetSlotKey = "pagi";
 let currentTargetSlotLabel = "Pagi";
@@ -89,6 +110,13 @@ const elSimulationBar = document.getElementById("simulation-bar");
 const elStageSimStrip = document.getElementById("stage-sim-strip");
 const elSunCycleSwitch = document.getElementById("sun-cycle-switch");
 const elBtnRefresh = document.getElementById("btn-refresh");
+const elBtnWeeklySummary = document.getElementById("btn-weekly-summary");
+const elWeeklyModal = document.getElementById("weekly-modal");
+const elBtnCloseWeekly = document.getElementById("btn-close-weekly");
+const elWeeklyAvgTemp = document.getElementById("weekly-avg-temp");
+const elWeeklyAvgHum = document.getElementById("weekly-avg-hum");
+const elWeeklyMaxTemp = document.getElementById("weekly-max-temp");
+const elWeeklySampleCount = document.getElementById("weekly-sample-count");
 
 // Kondisi Saat Ini
 const elConditionVerdict = document.getElementById("condition-verdict");
@@ -251,9 +279,36 @@ function getEffectiveActuatorState(serverData) {
     const ldrThreshold = Number(serverData.ldr_threshold ?? LDR_THRESHOLD);
     const humidThreshold = Number(serverData.humidity_threshold ?? HUMIDITY_THRESHOLD);
 
-    // Safety auto-release when gas hazard overrides a stale OFF lock
-    if (online && gasVal >= gasThreshold && manualDeviceState.kipas === "OFF") {
-        manualDeviceState.kipas = null;
+    // Auto-release manual Exhaust Fan OFF & Lampu ON/OFF saat bahaya, snooze habis, atau siklus baru
+    const nowMs = Date.now();
+    if (online && manualDeviceState.kipas === "OFF") {
+        if (gasVal >= gasThreshold) {
+            clearFanManualMeta();
+        } else if (simFanSnoozeUntil > 0 && nowMs >= simFanSnoozeUntil) {
+            clearFanManualMeta();
+        } else if (isSimulationMode) {
+            if (simFanWaitHumidClear) {
+                if (humidVal < humidThreshold - FAN_HUMIDITY_CLEAR_OFFSET) {
+                    simFanWaitHumidClear = false;
+                }
+            } else if (humidVal >= humidThreshold) {
+                clearFanManualMeta();
+            }
+        }
+    }
+
+    if (online && (manualDeviceState.led === "ON" || manualDeviceState.led === "OFF")) {
+        if (simLedSnoozeUntil > 0 && nowMs >= simLedSnoozeUntil) {
+            clearLedManualMeta();
+        } else if (isSimulationMode) {
+            if (simLedWaitDarkClear) {
+                if (ldrVal < ldrThreshold - LED_BRIGHT_CLEAR_OFFSET) {
+                    clearLedManualMeta();
+                }
+            } else if (ldrVal >= ldrThreshold) {
+                clearLedManualMeta();
+            }
+        }
     }
 
     const autoFan = gasVal >= gasThreshold || humidVal >= humidThreshold;
@@ -392,44 +447,97 @@ function handleDataError() {
 }
 
 // ==================== CONNECTION UI ====================
+const mobileStatusQuery = window.matchMedia ? window.matchMedia("(max-width: 760px)") : null;
+
 function updateConnectionUI() {
     if (!elConnectionPill || !elConnectionText) return;
 
+    const isCompactMobile = mobileStatusQuery ? mobileStatusQuery.matches : window.innerWidth <= 760;
+
     if (isSimulationMode) {
         elConnectionPill.className = "status-pill status-sim";
-        elConnectionText.textContent = "Mode Simulasi";
+        elConnectionText.textContent = isCompactMobile ? "Simulasi" : "Mode Simulasi";
     } else if (!isServerConnected) {
         elConnectionPill.className = "status-pill status-disconnected";
-        elConnectionText.textContent = "Server Terputus";
+        elConnectionText.textContent = isCompactMobile ? "Offline" : "Server Terputus";
     } else if (isEsp32Online) {
         elConnectionPill.className = "status-pill status-connected";
-        elConnectionText.textContent = "ESP32 Online";
+        elConnectionText.textContent = isCompactMobile ? "Online" : "ESP32 Online";
     } else {
         elConnectionPill.className = "status-pill status-disconnected";
-        elConnectionText.textContent = "Perangkat Offline";
+        elConnectionText.textContent = isCompactMobile ? "Offline" : "Perangkat Offline";
     }
 }
 
+if (mobileStatusQuery && mobileStatusQuery.addEventListener) {
+    mobileStatusQuery.addEventListener("change", updateConnectionUI);
+}
+updateConnectionUI();
+
 // ==================== KONDISI SAAT INI ====================
-function updateConditionSection(norm, raw, isOffline) {
+const CHECKING_DURATION_MS = 1000;
+const OFFLINE_CHECK_DURATION_MS = 750;
+const NUMERIC_GLIDE_DURATION_MS = 450;
+const VERDICT_CHAR_STAGGER_MS = 80;
+
+const conditionUiState = {
+    hasCompletedFirstCheck: false,
+    forceCheckingNext: true,
+    forceCountFromZero: true,
+    isChecking: false,
+    animActive: false,
+    wasOffline: null,
+    lastVerdictText: null,
+    lastSimScenario: null,
+    rafId: null,
+    displayedSuhu: null,
+    displayedKelembapan: null,
+    displayedAiScore: null,
+    pendingTarget: null
+};
+
+function easeOutCubicVal(t) {
+    return 1 - Math.pow(1 - t, 3);
+}
+
+function renderCheckingVerdict() {
     if (!elConditionVerdict) return;
+    elConditionVerdict.className = "condition-verdict state-checking";
+    elConditionVerdict.innerHTML = 'Checking<span class="checking-dots" aria-hidden="true"><span class="checking-dot">.</span><span class="checking-dot">.</span><span class="checking-dot">.</span></span>';
+}
 
+function renderVerdictPerChar(text, stateClass) {
+    if (!elConditionVerdict) return;
+    elConditionVerdict.className = `condition-verdict ${stateClass}`;
+    elConditionVerdict.replaceChildren();
+
+    Array.from(String(text || "")).forEach((ch, idx) => {
+        const span = document.createElement("span");
+        span.className = ch === " " ? "verdict-char is-space" : "verdict-char";
+        span.style.animationDelay = `${idx * VERDICT_CHAR_STAGGER_MS}ms`;
+        span.textContent = ch;
+        elConditionVerdict.appendChild(span);
+    });
+}
+
+function resolveConditionMeta(norm, raw, isOffline) {
     if (isOffline) {
-        elConditionVerdict.textContent = "Siaga";
-        elConditionVerdict.className = "condition-verdict state-offline";
-
-        if (elStatSuhu) elStatSuhu.textContent = "--";
-        if (elStatKelembapan) elStatKelembapan.textContent = "--";
-        if (elStatGas) elStatGas.textContent = "--";
-        if (elStatCahaya) elStatCahaya.textContent = "--";
-        if (elTrendGas) elTrendGas.textContent = "trending_flat";
-        if (elTrendCahaya) elTrendCahaya.textContent = "trending_flat";
-
-        if (elCardStatSuhu) elCardStatSuhu.title = "Menunggu data DHT11";
-        if (elCardStatKelembapan) elCardStatKelembapan.title = "Menunggu data DHT11";
-        if (elCardStatGas) elCardStatGas.title = "Menunggu data sensor gas MQ-2";
-        if (elCardStatCahaya) elCardStatCahaya.title = "Menunggu data sensor cahaya LDR";
-        return;
+        return {
+            isOffline: true,
+            text: "Siaga",
+            cls: "state-offline",
+            suhu: null,
+            kelembapan: null,
+            aiScore: null,
+            gasText: "--",
+            gasTrend: "trending_flat",
+            cahayaText: "--",
+            cahayaTrend: "trending_flat",
+            suhuTitle: "Menunggu data DHT11",
+            humTitle: "Menunggu data DHT11",
+            gasTitle: "Menunggu data sensor gas MQ-2",
+            cahayaTitle: "Menunggu data sensor cahaya LDR"
+        };
     }
 
     const aiStatus = String(raw?.ai_status || "").toUpperCase();
@@ -437,55 +545,265 @@ function updateConditionSection(norm, raw, isOffline) {
     const isDanger = norm.gas >= GAS_THRESHOLD || norm.buzzer === "ON";
     const isWarning = norm.kelembapan >= HUMIDITY_THRESHOLD || norm.suhu > 30 || norm.gas >= 2200 || aiStatus === "ANOMALI";
 
+    let text = "Luar Biasa";
+    let cls = "state-excellent";
     if (isEmergency) {
-        elConditionVerdict.textContent = "Darurat";
-        elConditionVerdict.className = "condition-verdict state-emergency";
+        text = "Darurat";
+        cls = "state-emergency";
     } else if (isDanger) {
-        elConditionVerdict.textContent = "Bahaya";
-        elConditionVerdict.className = "condition-verdict state-danger";
+        text = "Bahaya";
+        cls = "state-danger";
     } else if (isWarning) {
-        elConditionVerdict.textContent = "Waspada";
-        elConditionVerdict.className = "condition-verdict state-warning";
-    } else {
-        elConditionVerdict.textContent = "Luar Biasa";
-        elConditionVerdict.className = "condition-verdict state-excellent";
+        text = "Waspada";
+        cls = "state-warning";
     }
 
-    if (elStatSuhu) elStatSuhu.textContent = Number(norm.suhu).toFixed(1);
-    if (elStatKelembapan) elStatKelembapan.textContent = String(Math.round(norm.kelembapan));
+    let gasText = "Rendah";
+    let gasTrend = "trending_down";
+    if (norm.gas >= GAS_THRESHOLD) {
+        gasText = "Tinggi";
+        gasTrend = "trending_up";
+    } else if (norm.gas >= 2200) {
+        gasText = "Sedang";
+        gasTrend = "trending_up";
+    }
 
-    if (elCardStatSuhu) elCardStatSuhu.title = `Suhu Kamar: ${Number(norm.suhu).toFixed(1)}°C`;
-    if (elCardStatKelembapan) elCardStatKelembapan.title = `Kelembapan: ${norm.kelembapan}% (Ambang kipas ≥ ${HUMIDITY_THRESHOLD}%)`;
+    let cahayaText = "Tinggi";
+    let cahayaTrend = "trending_up";
+    if (norm.cahaya >= LDR_THRESHOLD) {
+        cahayaText = "Rendah";
+        cahayaTrend = "trending_down";
+    } else if (norm.cahaya >= 1200) {
+        cahayaText = "Sedang";
+        cahayaTrend = "trending_flat";
+    }
 
-    // Indikasi Gas
+    const rawAi = raw?.ai_score;
+    const aiScore = (rawAi !== null && rawAi !== undefined && Number.isFinite(Number(rawAi)))
+        ? Number(rawAi)
+        : null;
+
+    return {
+        isOffline: false,
+        text,
+        cls,
+        suhu: Number(norm.suhu),
+        kelembapan: Math.round(Number(norm.kelembapan)),
+        aiScore,
+        gasText,
+        gasTrend,
+        cahayaText,
+        cahayaTrend,
+        suhuTitle: `Suhu Kamar: ${Number(norm.suhu).toFixed(1)}°C`,
+        humTitle: `Kelembapan: ${norm.kelembapan}% (Ambang kipas ≥ ${HUMIDITY_THRESHOLD}%)`,
+        gasTitle: `Sensor MQ-2: ${norm.gas} ADC (Ambang bahaya ≥ ${GAS_THRESHOLD} ADC)`,
+        cahayaTitle: `Sensor LDR: ${norm.cahaya} ADC (Ambang gelap ≥ ${LDR_THRESHOLD} ADC)`
+    };
+}
+
+function triggerSoftWordRise(el) {
+    if (!el) return;
+    el.classList.remove("is-revealing");
+    void el.offsetWidth;
+    el.classList.add("is-revealing");
+}
+
+function applyGasAndLightCards(meta, animateChanged = false) {
+    if (elCardStatSuhu) elCardStatSuhu.title = meta.suhuTitle;
+    if (elCardStatKelembapan) elCardStatKelembapan.title = meta.humTitle;
+    if (elCardStatGas) elCardStatGas.title = meta.gasTitle;
+    if (elCardStatCahaya) elCardStatCahaya.title = meta.cahayaTitle;
+
     if (elStatGas && elTrendGas) {
-        if (norm.gas >= GAS_THRESHOLD) {
-            elStatGas.textContent = "Tinggi";
-            elTrendGas.textContent = "trending_up";
-        } else if (norm.gas >= 2200) {
-            elStatGas.textContent = "Sedang";
-            elTrendGas.textContent = "trending_up";
-        } else {
-            elStatGas.textContent = "Rendah";
-            elTrendGas.textContent = "trending_down";
+        const changed = elStatGas.textContent !== meta.gasText;
+        elStatGas.textContent = meta.gasText;
+        elTrendGas.textContent = meta.gasTrend;
+        if (animateChanged && (changed || meta.gasText !== "--")) {
+            triggerSoftWordRise(elStatGas);
         }
-        if (elCardStatGas) elCardStatGas.title = `Sensor MQ-2: ${norm.gas} ADC (Ambang bahaya ≥ ${GAS_THRESHOLD} ADC)`;
     }
 
-    // Intensitas Cahaya (LDR tinggi = gelap, LDR rendah = terang)
     if (elStatCahaya && elTrendCahaya) {
-        if (norm.cahaya >= LDR_THRESHOLD) {
-            elStatCahaya.textContent = "Rendah";
-            elTrendCahaya.textContent = "trending_down";
-        } else if (norm.cahaya >= 1200) {
-            elStatCahaya.textContent = "Sedang";
-            elTrendCahaya.textContent = "trending_flat";
-        } else {
-            elStatCahaya.textContent = "Tinggi";
-            elTrendCahaya.textContent = "trending_up";
+        const changed = elStatCahaya.textContent !== meta.cahayaText;
+        elStatCahaya.textContent = meta.cahayaText;
+        elTrendCahaya.textContent = meta.cahayaTrend;
+        if (animateChanged && (changed || meta.cahayaText !== "--")) {
+            triggerSoftWordRise(elStatCahaya);
         }
-        if (elCardStatCahaya) elCardStatCahaya.title = `Sensor LDR: ${norm.cahaya} ADC (Ambang gelap ≥ ${LDR_THRESHOLD} ADC)`;
     }
+}
+
+function renderNumericFrame(suhuVal, humVal, aiVal) {
+    if (suhuVal !== null && Number.isFinite(suhuVal)) {
+        conditionUiState.displayedSuhu = suhuVal;
+        if (elStatSuhu) elStatSuhu.textContent = suhuVal.toFixed(1);
+    } else {
+        conditionUiState.displayedSuhu = null;
+        if (elStatSuhu) elStatSuhu.textContent = "--";
+    }
+
+    if (humVal !== null && Number.isFinite(humVal)) {
+        conditionUiState.displayedKelembapan = humVal;
+        if (elStatKelembapan) elStatKelembapan.textContent = String(Math.round(humVal));
+    } else {
+        conditionUiState.displayedKelembapan = null;
+        if (elStatKelembapan) elStatKelembapan.textContent = "--";
+    }
+
+    if (aiVal !== null && Number.isFinite(aiVal)) {
+        conditionUiState.displayedAiScore = aiVal;
+        if (elAiScoreValue) elAiScoreValue.textContent = String(Math.round(aiVal));
+    } else if (conditionUiState.pendingTarget?.isOffline) {
+        conditionUiState.displayedAiScore = null;
+        if (elAiScoreValue) elAiScoreValue.textContent = "--";
+    }
+}
+
+function stopConditionAnim() {
+    if (conditionUiState.rafId !== null) {
+        cancelAnimationFrame(conditionUiState.rafId);
+        conditionUiState.rafId = null;
+    }
+    conditionUiState.animActive = false;
+}
+
+function startConditionAnimation({ duration, withChecking, fromZero, initialMeta }) {
+    stopConditionAnim();
+
+    conditionUiState.pendingTarget = { ...initialMeta };
+    conditionUiState.animActive = true;
+    conditionUiState.isChecking = Boolean(withChecking);
+
+    const startSuhu = initialMeta.isOffline ? null : (fromZero || conditionUiState.displayedSuhu === null ? 0 : conditionUiState.displayedSuhu);
+    const startHum = initialMeta.isOffline ? null : (fromZero || conditionUiState.displayedKelembapan === null ? 0 : conditionUiState.displayedKelembapan);
+    const startAi = (initialMeta.isOffline || initialMeta.aiScore === null)
+        ? null
+        : (fromZero || conditionUiState.displayedAiScore === null ? 0 : conditionUiState.displayedAiScore);
+
+    if (initialMeta.isOffline) {
+        renderNumericFrame(null, null, null);
+        applyGasAndLightCards(initialMeta, false);
+    } else {
+        if (fromZero) {
+            renderNumericFrame(0, 0, startAi);
+        }
+        if (elCardStatSuhu) elCardStatSuhu.title = initialMeta.suhuTitle;
+        if (elCardStatKelembapan) elCardStatKelembapan.title = initialMeta.humTitle;
+        if (elCardStatGas) elCardStatGas.title = initialMeta.gasTitle;
+        if (elCardStatCahaya) elCardStatCahaya.title = initialMeta.cahayaTitle;
+    }
+
+    if (withChecking) {
+        renderCheckingVerdict();
+    }
+
+    const startTime = performance.now();
+
+    function step(now) {
+        const target = conditionUiState.pendingTarget;
+        if (!target) {
+            stopConditionAnim();
+            conditionUiState.isChecking = false;
+            return;
+        }
+
+        const rawT = duration > 0 ? Math.min(1, (now - startTime) / duration) : 1;
+        const ease = easeOutCubicVal(rawT);
+
+        if (!target.isOffline) {
+            const curSuhu = startSuhu !== null ? startSuhu + (target.suhu - startSuhu) * ease : target.suhu;
+            const curHum = startHum !== null ? startHum + (target.kelembapan - startHum) * ease : target.kelembapan;
+            const curAi = (target.aiScore !== null && startAi !== null)
+                ? startAi + (target.aiScore - startAi) * ease
+                : target.aiScore;
+            renderNumericFrame(curSuhu, curHum, curAi);
+        }
+
+        if (rawT < 1) {
+            conditionUiState.rafId = requestAnimationFrame(step);
+            return;
+        }
+
+        conditionUiState.rafId = null;
+        conditionUiState.animActive = false;
+        conditionUiState.isChecking = false;
+
+        renderNumericFrame(target.suhu, target.kelembapan, target.aiScore);
+        if (!target.isOffline) {
+            applyGasAndLightCards(target, withChecking);
+        }
+        if (withChecking) {
+            renderVerdictPerChar(target.text, target.cls);
+            conditionUiState.lastVerdictText = target.text;
+        }
+    }
+
+    conditionUiState.rafId = requestAnimationFrame(step);
+}
+
+function updateConditionSection(norm, raw, isOffline) {
+    if (!elConditionVerdict) return;
+
+    const meta = resolveConditionMeta(norm, raw, isOffline);
+    const currentScenario = isSimulationMode ? simulationScenario : null;
+
+    const expectedVerdict = (conditionUiState.isChecking && conditionUiState.pendingTarget)
+        ? conditionUiState.pendingTarget.text
+        : conditionUiState.lastVerdictText;
+    const isInitial = !conditionUiState.hasCompletedFirstCheck;
+    const offlineToggled = conditionUiState.wasOffline !== null && conditionUiState.wasOffline !== isOffline;
+    const scenarioChanged = isSimulationMode && conditionUiState.lastSimScenario !== currentScenario;
+    const verdictChanged = expectedVerdict !== null && expectedVerdict !== meta.text;
+    const forced = conditionUiState.forceCheckingNext;
+
+    const needsChecking = isInitial || forced || offlineToggled || scenarioChanged || verdictChanged;
+    const fromZero = !isOffline && (
+        conditionUiState.forceCountFromZero ||
+        isInitial ||
+        conditionUiState.wasOffline === true ||
+        conditionUiState.displayedSuhu === null
+    );
+
+    conditionUiState.hasCompletedFirstCheck = true;
+    conditionUiState.forceCheckingNext = false;
+    conditionUiState.forceCountFromZero = false;
+    conditionUiState.wasOffline = isOffline;
+    conditionUiState.lastSimScenario = currentScenario;
+
+    if (needsChecking) {
+        startConditionAnimation({
+            duration: isOffline ? OFFLINE_CHECK_DURATION_MS : CHECKING_DURATION_MS,
+            withChecking: true,
+            fromZero,
+            initialMeta: meta
+        });
+        return;
+    }
+
+    if (conditionUiState.isChecking && conditionUiState.animActive) {
+        conditionUiState.pendingTarget = { ...meta };
+        return;
+    }
+
+    conditionUiState.lastVerdictText = meta.text;
+
+    if (isOffline) {
+        stopConditionAnim();
+        renderNumericFrame(null, null, null);
+        applyGasAndLightCards(meta, false);
+        if (elConditionVerdict.classList.contains("state-checking") || elConditionVerdict.textContent !== meta.text) {
+            renderVerdictPerChar(meta.text, meta.cls);
+        }
+        return;
+    }
+
+    applyGasAndLightCards(meta, true);
+    startConditionAnimation({
+        duration: NUMERIC_GLIDE_DURATION_MS,
+        withChecking: false,
+        fromZero: false,
+        initialMeta: meta
+    });
 }
 
 // ==================== 3 MANUAL ACTUATOR CARDS ====================
@@ -510,6 +828,17 @@ function updateActuatorCards(data) {
     }
 }
 
+function formatSnoozeRemaining(remSec) {
+    if (!Number.isFinite(remSec) || remSec <= 0) return "";
+    const totalMins = Math.max(1, Math.ceil(remSec / 60));
+    if (totalMins >= 60) {
+        const hours = Math.floor(totalMins / 60);
+        const mins = totalMins % 60;
+        return mins > 0 ? `${hours} jam ${mins} mnt` : `${hours} jam`;
+    }
+    return `${totalMins} mnt`;
+}
+
 function updateActuatorAutoBar(serverData = latestServerData) {
     if (!elActuatorAutoBar || !elActuatorAutoText) return;
 
@@ -520,7 +849,26 @@ function updateActuatorAutoBar(serverData = latestServerData) {
             const val = (manualDeviceState[dev] === "ON" || manualDeviceState[dev] === "OFF")
                 ? manualDeviceState[dev]
                 : (overrides[dev] === "ON" || overrides[dev] === "OFF" ? overrides[dev] : null);
-            return val ? `${labels[dev]} (${val})` : null;
+            if (!val) return null;
+            if (dev === "kipas" && val === "OFF") {
+                const remSec = isSimulationMode
+                    ? (simFanSnoozeUntil > Date.now() ? Math.ceil((simFanSnoozeUntil - Date.now()) / 1000) : 0)
+                    : Number(serverData?.kipas_snooze_remaining_sec ?? 0);
+                const dur = formatSnoozeRemaining(remSec);
+                return dur
+                    ? `${labels[dev]} (OFF · auto lembap baru / ${dur})`
+                    : `${labels[dev]} (OFF · auto lembap baru)`;
+            }
+            if (dev === "led") {
+                const remSec = isSimulationMode
+                    ? (simLedSnoozeUntil > Date.now() ? Math.ceil((simLedSnoozeUntil - Date.now()) / 1000) : 0)
+                    : Number(serverData?.led_snooze_remaining_sec ?? 0);
+                const dur = formatSnoozeRemaining(remSec);
+                return dur
+                    ? `${labels[dev]} (${val} · auto siklus cahaya / ${dur})`
+                    : `${labels[dev]} (${val} · auto siklus cahaya)`;
+            }
+            return `${labels[dev]} (${val})`;
         })
         .filter(Boolean);
 
@@ -531,8 +879,8 @@ function updateActuatorAutoBar(serverData = latestServerData) {
 }
 
 async function resetActuatorsToAuto() {
-    manualDeviceState.kipas = null;
-    manualDeviceState.led = null;
+    clearFanManualMeta();
+    clearLedManualMeta();
     manualDeviceState.buzzer = null;
 
     if (isSimulationMode) {
@@ -544,6 +892,8 @@ async function resetActuatorsToAuto() {
         latestServerData = {
             ...latestServerData,
             buzzer_muted: false,
+            kipas_snooze_remaining_sec: 0,
+            led_snooze_remaining_sec: 0,
             manual_overrides: { led: "AUTO", kipas: "AUTO", buzzer: "AUTO" }
         };
     }
@@ -585,6 +935,27 @@ async function toggleActuatorManual(device) {
         buzzer: manualDeviceState.buzzer || "OFF",
         esp32_online: false
     };
+
+    if (device === "kipas") {
+        if (nextState === "OFF") {
+            const curHumid = Number(baseData.kelembapan ?? 0);
+            const humidThresh = Number(baseData.humidity_threshold ?? HUMIDITY_THRESHOLD);
+            simFanSnoozeUntil = Date.now() + FAN_MANUAL_SNOOZE_MS;
+            simFanWaitHumidClear = curHumid >= humidThresh;
+            baseData.kipas_snooze_remaining_sec = Math.round(FAN_MANUAL_SNOOZE_MS / 1000);
+        } else {
+            simFanSnoozeUntil = 0;
+            simFanWaitHumidClear = false;
+            baseData.kipas_snooze_remaining_sec = 0;
+        }
+    } else if (device === "led") {
+        const curLdr = Number(baseData.cahaya ?? 0);
+        const ldrThresh = Number(baseData.ldr_threshold ?? LDR_THRESHOLD);
+        const snoozeMs = nextState === "OFF" ? LED_OFF_SNOOZE_MS : LED_ON_SNOOZE_MS;
+        simLedSnoozeUntil = Date.now() + snoozeMs;
+        simLedWaitDarkClear = curLdr >= ldrThresh;
+        baseData.led_snooze_remaining_sec = Math.round(snoozeMs / 1000);
+    }
 
     baseData[device] = nextState;
     if (device === "buzzer") {
@@ -751,7 +1122,15 @@ function updateAIUI(data, isOffline = false) {
         : null;
 
     if (elAiScoreValue) {
-        elAiScoreValue.textContent = scoreVal !== null ? String(Math.round(scoreVal)) : "--";
+        if (scoreVal === null) {
+            conditionUiState.displayedAiScore = null;
+            elAiScoreValue.textContent = "--";
+        } else if (conditionUiState.animActive && conditionUiState.pendingTarget) {
+            conditionUiState.pendingTarget.aiScore = scoreVal;
+        } else {
+            conditionUiState.displayedAiScore = scoreVal;
+            elAiScoreValue.textContent = String(Math.round(scoreVal));
+        }
     }
 
     if (elAiArcProgress) {
@@ -1246,8 +1625,8 @@ const SIM_SCENARIOS = {
 function toggleSimulationMode() {
     isSimulationMode = !isSimulationMode;
     window.isSimulationModeActive = isSimulationMode;
-    manualDeviceState.kipas = null;
-    manualDeviceState.led = null;
+    clearFanManualMeta();
+    clearLedManualMeta();
     manualDeviceState.buzzer = null;
 
     if (elBtnToggleDemo) {
@@ -1258,7 +1637,9 @@ function toggleSimulationMode() {
     if (elStageSimStrip) elStageSimStrip.hidden = !isSimulationMode;
     if (elSunCycleSwitch) elSunCycleSwitch.hidden = !isSimulationMode;
 
+    conditionUiState.forceCheckingNext = true;
     if (isSimulationMode) {
+        conditionUiState.forceCountFromZero = true;
         applySimulationStep();
         if (simulationInterval) clearInterval(simulationInterval);
         simulationInterval = setInterval(applySimulationStep, 2000);
@@ -1331,12 +1712,17 @@ if (elBtnToggleDemo) {
 document.querySelectorAll(".sim-preset-btn[data-sim]").forEach(btn => {
     btn.addEventListener("click", () => {
         simulationScenario = btn.dataset.sim;
-        manualDeviceState.kipas = null;
-        manualDeviceState.led = null;
+        conditionUiState.forceCheckingNext = true;
+        clearFanManualMeta();
+        clearLedManualMeta();
         manualDeviceState.buzzer = null;
         document.querySelectorAll(".sim-preset-btn[data-sim]").forEach(b => {
             b.classList.toggle("is-active", b.dataset.sim === simulationScenario);
         });
+        if (isSimulationMode) {
+            if (simulationInterval) clearInterval(simulationInterval);
+            simulationInterval = setInterval(applySimulationStep, 2000);
+        }
         applySimulationStep();
     });
 });
@@ -1352,6 +1738,82 @@ if (elConnectionPill && elStatusPopover) {
     });
 }
 
+function updateWeeklyPreview() {
+    if (!elWeeklyAvgTemp || !elWeeklyAvgHum || !elWeeklyMaxTemp || !elWeeklySampleCount) return;
+
+    const valid = Array.isArray(historyData)
+        ? historyData.filter((d) => Number.isFinite(Number(d?.suhu)) && Number.isFinite(Number(d?.kelembapan)))
+        : [];
+
+    if (!valid.length) {
+        elWeeklyAvgTemp.textContent = "-- °C";
+        elWeeklyAvgHum.textContent = "-- %";
+        elWeeklyMaxTemp.textContent = "-- °C";
+        elWeeklySampleCount.textContent = "0 data";
+        return;
+    }
+
+    let sumTemp = 0;
+    let sumHum = 0;
+    let maxTemp = -Infinity;
+
+    for (const item of valid) {
+        const t = Number(item.suhu);
+        const h = Number(item.kelembapan);
+        sumTemp += t;
+        sumHum += h;
+        if (t > maxTemp) maxTemp = t;
+    }
+
+    elWeeklyAvgTemp.textContent = `${(sumTemp / valid.length).toFixed(1)} °C`;
+    elWeeklyAvgHum.textContent = `${Math.round(sumHum / valid.length)} %`;
+    elWeeklyMaxTemp.textContent = `${maxTemp.toFixed(1)} °C`;
+    elWeeklySampleCount.textContent = `${valid.length} data`;
+}
+
+function setWeeklyModalOpen(isOpen) {
+    if (!elWeeklyModal) return;
+    if (isOpen) {
+        updateWeeklyPreview();
+        if (elStatusPopover) elStatusPopover.hidden = true;
+        if (elConnectionPill) elConnectionPill.setAttribute("aria-expanded", "false");
+        if (elAiSlotPopover) elAiSlotPopover.hidden = true;
+        if (elBtnAiSlotMenu) elBtnAiSlotMenu.setAttribute("aria-expanded", "false");
+    }
+    elWeeklyModal.hidden = !isOpen;
+    if (elBtnWeeklySummary) {
+        elBtnWeeklySummary.classList.toggle("is-active", isOpen);
+        elBtnWeeklySummary.setAttribute("aria-expanded", String(isOpen));
+    }
+}
+
+if (elBtnWeeklySummary && elWeeklyModal) {
+    elBtnWeeklySummary.addEventListener("click", (e) => {
+        e.stopPropagation();
+        setWeeklyModalOpen(elWeeklyModal.hidden);
+    });
+}
+
+if (elBtnCloseWeekly) {
+    elBtnCloseWeekly.addEventListener("click", () => {
+        setWeeklyModalOpen(false);
+    });
+}
+
+if (elWeeklyModal) {
+    elWeeklyModal.addEventListener("click", (e) => {
+        if (e.target === elWeeklyModal) {
+            setWeeklyModalOpen(false);
+        }
+    });
+}
+
+document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && elWeeklyModal && !elWeeklyModal.hidden) {
+        setWeeklyModalOpen(false);
+    }
+});
+
 document.addEventListener("click", (e) => {
     if (elStatusPopover && !elStatusPopover.hidden && elStatusMenuWrap && !elStatusMenuWrap.contains(e.target)) {
         elStatusPopover.hidden = true;
@@ -1365,6 +1827,8 @@ document.addEventListener("click", (e) => {
 
 if (elBtnRefresh) {
     elBtnRefresh.addEventListener("click", () => {
+        conditionUiState.forceCheckingNext = true;
+        conditionUiState.forceCountFromZero = true;
         fetchSensorData();
     });
 }
