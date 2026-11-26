@@ -138,6 +138,28 @@ _last_wa_alert_time = 0
 WA_ALERT_COOLDOWN_SEC = 180  # Cooldown 3 menit antar notifikasi untuk mencegah spam
 
 
+def format_human_anomaly_reason(trigger_raw, snapshot):
+    suhu = float(snapshot.get("suhu", 0)) if snapshot else 0
+    kelembapan = float(snapshot.get("kelembapan", 0)) if snapshot else 0
+    t_lower = (trigger_raw or "").lower()
+
+    if "cahaya" in t_lower:
+        if "+" in t_lower or "gelap" in t_lower:
+            return "Pencahayaan kamar jauh lebih GELAP dari kebiasaan waktu ini."
+        return "Pencahayaan kamar jauh lebih TERANG dari kebiasaan waktu ini."
+    if "suhu" in t_lower:
+        if "+" in t_lower or "panas" in t_lower:
+            return f"Suhu kamar ({suhu:.1f}°C) terdeteksi melonjak lebih PANAS dari biasanya."
+        return f"Suhu kamar ({suhu:.1f}°C) terdeteksi menurun lebih DINGIN dari biasanya."
+    if "kelembapan" in t_lower:
+        if "+" in t_lower or "lembap" in t_lower:
+            return f"Kelembapan udara ({kelembapan:.0f}%) meningkat jauh lebih LEMBAP dari biasanya."
+        return f"Kelembapan udara ({kelembapan:.0f}%) menurun KERING dari biasanya."
+    if "gas" in t_lower:
+        return "Terdeteksi sedikit peningkatan indikasi asap atau gas di dalam kamar."
+    return trigger_raw or "Pola kondisi ruangan menyimpang dari kebiasaan normal pada jam ini."
+
+
 def send_whatsapp_alert(title, detail, sensor_snapshot=None, force=False):
     global _last_wa_alert_time
     if not FONNTE_TOKEN or not FONNTE_TARGET:
@@ -153,19 +175,85 @@ def send_whatsapp_alert(title, detail, sensor_snapshot=None, force=False):
             import urllib.request
             import urllib.parse
             waktu_str = datetime.now().strftime("%d-%m-%Y %H:%M:%S WIB")
+
+            snap = sensor_snapshot or {}
+            try:
+                suhu = float(snap.get("suhu", 0))
+            except (ValueError, TypeError):
+                suhu = 0.0
+            try:
+                kelembapan = float(snap.get("kelembapan", 0))
+            except (ValueError, TypeError):
+                kelembapan = 0.0
+            try:
+                gas = int(snap.get("gas", 0))
+            except (ValueError, TypeError):
+                gas = 0
+            try:
+                cahaya = int(snap.get("cahaya", 0))
+            except (ValueError, TypeError):
+                cahaya = 0
+
+            kipas = snap.get("kipas", "OFF")
+            led = snap.get("led", "OFF")
+            buzzer = snap.get("buzzer", "OFF")
+
+            # Indikator Suhu
+            if suhu >= 33:
+                status_suhu = "Panas"
+            elif suhu >= 26:
+                status_suhu = "Normal / Nyaman"
+            else:
+                status_suhu = "Sejuk"
+
+            # Indikator Kelembapan
+            if kelembapan >= 60:
+                status_lembap = "Tinggi (Lembap / Pengap)"
+            elif kelembapan >= 40:
+                status_lembap = "Normal"
+            else:
+                status_lembap = "Rendah (Kering)"
+
+            # Indikator Gas
+            if gas >= GAS_THRESHOLD:
+                status_gas = "Tinggi (Bahaya Gas/Asap!)"
+            elif gas >= 2200:
+                status_gas = "Sedang (Waspada Asap)"
+            else:
+                status_gas = "Rendah (Aman)"
+
+            # Indikator Cahaya (LDR: nilai tinggi = gelap)
+            if cahaya >= LDR_THRESHOLD:
+                status_cahaya = "Rendah (Ruangan Gelap)"
+            elif cahaya >= 1200:
+                status_cahaya = "Sedang (Ruangan Redup)"
+            else:
+                status_cahaya = "Tinggi (Ruangan Terang)"
+
+            penyebab_ramah = format_human_anomaly_reason(detail, snap)
+
+            kipas_desc = "Menyala (Aktif menyerap udara lembap)" if kipas == "ON" else "Mati"
+            led_desc = "Menyala (Aktif menerangi kamar)" if led == "ON" else "Mati"
+            buzzer_desc = "Berbunyi Darurat" if buzzer == "ON" else "Mati (Aman)"
+
             msg_lines = [
                 f"🚨 *{title}* 🚨",
                 f"🕒 *Waktu:* {waktu_str}",
-                f"📌 *Keterangan:* {detail}"
+                f"📌 *Penyebab:* {penyebab_ramah}",
+                "",
+                "📊 *Indikator Kondisi Kamar:*",
+                f"• 🌡️ *Suhu:* {suhu:.1f}°C ({status_suhu})",
+                f"• 💧 *Kelembapan:* {kelembapan:.0f}% ({status_lembap})",
+                f"• 💨 *Indikasi Gas:* {status_gas}",
+                f"• 💡 *Pencahayaan:* {status_cahaya}",
+                "",
+                "⚡ *Tindakan Otomatis Perangkat:*",
+                f"• Kipas: {kipas_desc}",
+                f"• Lampu: {led_desc}",
+                f"• Alarm Buzzer: {buzzer_desc}",
+                "",
+                "🌐 *Cek Dashboard:* https://skk.kradev.my.id"
             ]
-            if sensor_snapshot:
-                msg_lines.append(
-                    f"📊 *Sensor:* Suhu {sensor_snapshot.get('suhu')}°C | "
-                    f"Lembap {sensor_snapshot.get('kelembapan')}% | "
-                    f"Gas {sensor_snapshot.get('gas')} ADC | "
-                    f"Cahaya {sensor_snapshot.get('cahaya')} ADC"
-                )
-            msg_lines.append("🌐 *Dashboard:* https://skk.kradev.my.id")
             pesan_text = "\n".join(msg_lines)
 
             post_data = urllib.parse.urlencode({
