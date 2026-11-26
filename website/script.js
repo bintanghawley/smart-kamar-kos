@@ -8,6 +8,10 @@ const LDR_THRESHOLD = 2000;
 const HUMIDITY_THRESHOLD = 60;
 const ARC_LENGTH = 259.71;
 
+const DAYS_ID = [
+    "Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"
+];
+
 const MONTHS_ID = [
     "Januari", "Februari", "Maret", "April", "Mei", "Juni",
     "Juli", "Agustus", "September", "Oktober", "November", "Desember"
@@ -152,12 +156,13 @@ function getTimeSlotKeyForDate(date = new Date()) {
 
 function updateClock() {
     const now = new Date();
+    const dayName = DAYS_ID[now.getDay()];
     const day = now.getDate();
     const monthName = MONTHS_ID[now.getMonth()];
     const hh = String(now.getHours()).padStart(2, "0");
     const mm = String(now.getMinutes()).padStart(2, "0");
 
-    if (elHeaderDate) elHeaderDate.textContent = `${day} ${monthName}`;
+    if (elHeaderDate) elHeaderDate.textContent = `${dayName}, ${day} ${monthName}`;
     if (elHeaderClock) elHeaderClock.textContent = `${hh} : ${mm} WIB`;
 
     const slotKey = getTimeSlotKeyForDate(now);
