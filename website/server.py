@@ -139,28 +139,26 @@ WA_ALERT_COOLDOWN_SEC = 180  # Cooldown 3 menit antar notifikasi untuk mencegah 
 
 
 def format_human_anomaly_reason(trigger_raw, snapshot):
-    suhu = float(snapshot.get("suhu", 0)) if snapshot else 0
-    kelembapan = float(snapshot.get("kelembapan", 0)) if snapshot else 0
     t_lower = (trigger_raw or "").lower()
 
     if "cahaya" in t_lower:
         if "+" in t_lower or "gelap" in t_lower:
-            return "Pencahayaan kamar jauh lebih GELAP dari kebiasaan waktu ini."
-        return "Pencahayaan kamar jauh lebih TERANG dari kebiasaan waktu ini."
+            return "Kamar jauh lebih gelap dari biasanya."
+        return "Kamar jauh lebih terang dari biasanya."
     if "suhu" in t_lower:
         if "+" in t_lower or "panas" in t_lower:
-            return f"Suhu kamar ({suhu:.1f}°C) terdeteksi melonjak lebih PANAS dari biasanya."
-        return f"Suhu kamar ({suhu:.1f}°C) terdeteksi menurun lebih DINGIN dari biasanya."
+            return "Suhu kamar lebih panas dari biasanya."
+        return "Suhu kamar lebih dingin dari biasanya."
     if "kelembapan" in t_lower:
         if "+" in t_lower or "lembap" in t_lower:
-            return f"Kelembapan udara ({kelembapan:.0f}%) meningkat jauh lebih LEMBAP dari biasanya."
-        return f"Kelembapan udara ({kelembapan:.0f}%) menurun KERING dari biasanya."
+            return "Udara kamar terasa lebih lembap."
+        return "Udara kamar terasa lebih kering."
     if "gas" in t_lower:
-        return "Terdeteksi sedikit peningkatan indikasi asap atau gas di dalam kamar."
-    return trigger_raw or "Pola kondisi ruangan menyimpang dari kebiasaan normal pada jam ini."
+        return "Indikasi asap/gas meningkat di kamar."
+    return "Pola kondisi kamar tidak seperti biasa."
 
 
-def send_whatsapp_alert(title, detail, sensor_snapshot=None, force=False):
+def send_whatsapp_alert(title, detail, sensor_snapshot=None, force=False, emoji="⚠️"):
     global _last_wa_alert_time
     if not FONNTE_TOKEN or not FONNTE_TARGET:
         return
@@ -174,7 +172,13 @@ def send_whatsapp_alert(title, detail, sensor_snapshot=None, force=False):
         try:
             import urllib.request
             import urllib.parse
-            waktu_str = datetime.now().strftime("%d-%m-%Y %H:%M:%S WIB")
+
+            now_dt = datetime.now()
+            bulan_id = (
+                "Jan", "Feb", "Mar", "Apr", "Mei", "Jun",
+                "Jul", "Agu", "Sep", "Okt", "Nov", "Des"
+            )
+            waktu_str = f"{now_dt.strftime('%H:%M')} WIB • {now_dt.day} {bulan_id[now_dt.month - 1]}"
 
             snap = sensor_snapshot or {}
             try:
@@ -198,67 +202,64 @@ def send_whatsapp_alert(title, detail, sensor_snapshot=None, force=False):
             led = snap.get("led", "OFF")
             buzzer = snap.get("buzzer", "OFF")
 
-            # Indikator Suhu
             if suhu >= 33:
                 status_suhu = "Panas"
             elif suhu >= 26:
-                status_suhu = "Normal / Nyaman"
+                status_suhu = "Normal"
             else:
                 status_suhu = "Sejuk"
 
-            # Indikator Kelembapan
             if kelembapan >= 60:
-                status_lembap = "Tinggi (Lembap / Pengap)"
+                status_lembap = "Lembap"
             elif kelembapan >= 40:
                 status_lembap = "Normal"
             else:
-                status_lembap = "Rendah (Kering)"
+                status_lembap = "Kering"
 
-            # Indikator Gas
             if gas >= GAS_THRESHOLD:
-                status_gas = "Tinggi (Bahaya Gas/Asap!)"
+                status_gas = "Tinggi (Bahaya!)"
             elif gas >= 2200:
-                status_gas = "Sedang (Waspada Asap)"
+                status_gas = "Sedang (Waspada)"
             else:
                 status_gas = "Rendah (Aman)"
 
-            # Indikator Cahaya (LDR: nilai tinggi = gelap)
             if cahaya >= LDR_THRESHOLD:
-                status_cahaya = "Rendah (Ruangan Gelap)"
+                status_cahaya = "Gelap"
             elif cahaya >= 1200:
-                status_cahaya = "Sedang (Ruangan Redup)"
+                status_cahaya = "Redup"
             else:
-                status_cahaya = "Tinggi (Ruangan Terang)"
+                status_cahaya = "Terang"
 
-            penyebab_ramah = format_human_anomaly_reason(detail, snap)
+            aktif_list = []
+            if kipas == "ON":
+                aktif_list.append("Kipas")
+            if led == "ON":
+                aktif_list.append("Lampu")
+            if buzzer == "ON":
+                aktif_list.append("Alarm")
+            aktif_str = ", ".join(aktif_list) if aktif_list else "Semua Mati"
 
-            kipas_desc = "Menyala (Aktif menyerap udara lembap)" if kipas == "ON" else "Mati"
-            led_desc = "Menyala (Aktif menerangi kamar)" if led == "ON" else "Mati"
-            buzzer_desc = "Berbunyi Darurat" if buzzer == "ON" else "Mati (Aman)"
+            suhu_str = f"{suhu:.0f}°C" if suhu == int(suhu) else f"{suhu:.1f}°C"
 
             msg_lines = [
-                f"🚨 *{title}* 🚨",
-                f"🕒 *Waktu:* {waktu_str}",
-                f"📌 *Penyebab:* {penyebab_ramah}",
+                f"{emoji} *{title}*",
+                f"{detail}",
                 "",
-                "📊 *Indikator Kondisi Kamar:*",
-                f"• 🌡️ *Suhu:* {suhu:.1f}°C ({status_suhu})",
-                f"• 💧 *Kelembapan:* {kelembapan:.0f}% ({status_lembap})",
-                f"• 💨 *Indikasi Gas:* {status_gas}",
-                f"• 💡 *Pencahayaan:* {status_cahaya}",
+                f"🌡️ Suhu: *{suhu_str}* ({status_suhu})",
+                f"💧 Lembap: *{kelembapan:.0f}%* ({status_lembap})",
+                f"💨 Gas: *{status_gas}*",
+                f"💡 Cahaya: *{status_cahaya}*",
+                f"⚡ Aktif: *{aktif_str}*",
                 "",
-                "⚡ *Tindakan Otomatis Perangkat:*",
-                f"• Kipas: {kipas_desc}",
-                f"• Lampu: {led_desc}",
-                f"• Alarm Buzzer: {buzzer_desc}",
-                "",
-                "🌐 *Cek Dashboard:* https://skk.kradev.my.id"
+                f"🕒 {waktu_str}",
+                "🌐 https://skk.kradev.my.id"
             ]
             pesan_text = "\n".join(msg_lines)
 
             post_data = urllib.parse.urlencode({
                 "target": FONNTE_TARGET,
-                "message": pesan_text
+                "message": pesan_text,
+                "preview": "false"
             }).encode("utf-8")
 
             req = urllib.request.Request(
@@ -1710,6 +1711,12 @@ class SmartKosServer(BaseHTTPRequestHandler):
                             ai_score=current_ai_score
                         )
                         force_db_save = True
+                        send_whatsapp_alert(
+                            "Bahaya Kebocoran Gas!",
+                            "Kadar gas tinggi, kipas & alarm aktif.",
+                            sensor_snapshot=current_data,
+                            emoji="🚨"
+                        )
                     prev_gas_danger = is_gas_danger
 
                     if current_fan != prev_actuators.get("kipas"):
@@ -1750,11 +1757,6 @@ class SmartKosServer(BaseHTTPRequestHandler):
                                 gas_value=current_gas_val,
                                 ai_score=current_ai_score
                             )
-                            send_whatsapp_alert(
-                                "SMART KAMAR KOS: BAHAYA GAS TINGGI",
-                                f"Nilai sensor gas ({current_gas_val} ADC) mencapai atau melebihi batas aman ({GAS_THRESHOLD} ADC)! Kipas dan alarm telah aktif otomatis.",
-                                sensor_snapshot=current_data
-                            )
                         prev_actuators["buzzer"] = current_buzz
 
                     if current_ai_status == "ANOMALI" and prev_ai_status != "ANOMALI":
@@ -1767,9 +1769,10 @@ class SmartKosServer(BaseHTTPRequestHandler):
                         )
                         force_db_save = True
                         send_whatsapp_alert(
-                            "SMART KAMAR KOS: ANOMALI TERDETEKSI",
-                            f"Model AI mendeteksi ketidakwajaran pola ruangan! {ai_pay.get('ai_trigger_desc')} (Skor Keselarasan: {ai_pay.get('ai_score_percent', '--')})",
-                            sensor_snapshot=current_data
+                            "Anomali Kamar Terdeteksi",
+                            format_human_anomaly_reason(ai_pay.get("ai_trigger_desc"), current_data),
+                            sensor_snapshot=current_data,
+                            emoji="⚠️"
                         )
                     prev_ai_status = current_ai_status
 
@@ -1966,10 +1969,11 @@ class SmartKosServer(BaseHTTPRequestHandler):
 
         if clean_path == "/api/test/whatsapp":
             send_whatsapp_alert(
-                "SMART KAMAR KOS: UJI COBA NOTIFIKASI",
-                "Integrasi WhatsApp via Fonnte berjalan normal dan siap menerima peringatan anomali.",
+                "Uji Coba Notifikasi Kamar",
+                "Sistem pengingat WhatsApp berjalan normal.",
                 sensor_snapshot=sensor_data,
-                force=True
+                force=True,
+                emoji="🔔"
             )
             self.send_json(200, {
                 "status": "OK",
