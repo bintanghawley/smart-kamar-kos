@@ -25,7 +25,7 @@
       }
     }
     </script>
-    <script type="module" src="room3d.js?v=9"></script>
+    <script type="module" src="room3d.js?v=13"></script>
 </head>
 
 <body>
@@ -159,21 +159,41 @@
                             <!-- 3D DIGITAL TWIN STAGE -->
                             <div class="stage-3d-card" id="room-3d-stage">
                                 <div class="stage-canvas-wrapper" id="room-3d-container">
-                                    <!-- Top-Left Segmented Toggle: Luar Kamar / Dalam Kamar (Icons) -->
-                                    <div class="room-view-switch" role="group" aria-label="Tampilan Atap Kamar">
-                                        <button type="button" class="view-switch-btn is-active" id="btn-view-outside"
-                                            data-view="outside" title="Luar Kamar (Atap Tertutup)"
-                                            aria-label="Luar Kamar">
-                                            <span class="material-symbols-rounded icon-filled view-switch-icon"
-                                                aria-hidden="true">home</span>
-                                        </button>
-                                        <button type="button" class="view-switch-btn" id="btn-view-inside"
-                                            data-view="inside" title="Dalam Kamar (Atap Terbuka)"
-                                            aria-label="Dalam Kamar">
-                                            <span class="material-symbols-rounded icon-filled view-switch-icon"
-                                                aria-hidden="true">meeting_room</span>
-                                        </button>
+                                    <div class="stage-top-controls">
+                                        <!-- Top-Left Segmented Toggle: Luar Kamar / Dalam Kamar (Icons) -->
+                                        <div class="room-view-switch" role="group" aria-label="Tampilan Atap Kamar">
+                                            <button type="button" class="view-switch-btn is-active" id="btn-view-outside"
+                                                data-view="outside" title="Luar Kamar (Atap Tertutup)"
+                                                aria-label="Luar Kamar">
+                                                <span class="material-symbols-rounded icon-filled view-switch-icon"
+                                                    aria-hidden="true">home</span>
+                                            </button>
+                                            <button type="button" class="view-switch-btn" id="btn-view-inside"
+                                                data-view="inside" title="Dalam Kamar (Atap Terbuka)"
+                                                aria-label="Dalam Kamar">
+                                                <span class="material-symbols-rounded icon-filled view-switch-icon"
+                                                    aria-hidden="true">meeting_room</span>
+                                            </button>
+                                        </div>
+
+                                        <div class="sun-cycle-switch" id="sun-cycle-switch" role="group"
+                                            aria-label="Simulasi Waktu Matahari" hidden>
+                                            <button type="button" class="sun-btn is-active" data-sun="auto"
+                                                title="Ikuti waktu WIB atau skenario simulasi">Auto</button>
+                                            <button type="button" class="sun-btn" data-sun="pagi"
+                                                title="Matahari Pagi (Timur 25 derajat)">Pagi</button>
+                                            <button type="button" class="sun-btn" data-sun="siang"
+                                                title="Matahari Siang (Tinggi 75 derajat)">Siang</button>
+                                            <button type="button" class="sun-btn" data-sun="sore"
+                                                title="Matahari Sore (Barat 20 derajat)">Sore</button>
+                                            <button type="button" class="sun-btn" data-sun="malam"
+                                                title="Suasana Malam (Cahaya Bulan)">Malam</button>
+                                        </div>
                                     </div>
+                                </div>
+
+                                <div class="stage-3d-hint" id="stage-3d-hint">
+                                    <span>Klik pintu/jendela untuk buka-tutup &middot; Geser untuk rotasi 360&deg;</span>
                                 </div>
 
                                 <!-- Simulation Quick Preset Bar (Visible only when Simulation Mode is ON) -->
@@ -239,6 +259,13 @@
                                             aria-hidden="true">notification_sound</span>
                                     </div>
                                 </article>
+                            </div>
+
+                            <div class="actuator-auto-bar" id="actuator-auto-bar" hidden>
+                                <span class="actuator-auto-text" id="actuator-auto-text">Kendali manual aktif</span>
+                                <button type="button" class="actuator-auto-btn" id="btn-actuators-auto">
+                                    Kembali Auto
+                                </button>
                             </div>
 
                             <!-- CHART CARD -->
