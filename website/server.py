@@ -131,6 +131,64 @@ DEFAULT_BASELINE = {
     "gas": {"mean": 600.0, "std": 50.0, "margin": 350.0, "min": 250.0, "max": 950.0}
 }
 
+# Konfigurasi Notifikasi WhatsApp (Fonnte)
+FONNTE_TOKEN = os.environ.get("FONNTE_TOKEN", "inH5BdbMuMuj23XLyevE").strip()
+FONNTE_TARGET = os.environ.get("FONNTE_TARGET", "081230220688").strip()
+_last_wa_alert_time = 0
+WA_ALERT_COOLDOWN_SEC = 180  # Cooldown 3 menit antar notifikasi untuk mencegah spam
+
+
+def send_whatsapp_alert(title, detail, sensor_snapshot=None, force=False):
+    global _last_wa_alert_time
+    if not FONNTE_TOKEN or not FONNTE_TARGET:
+        return
+
+    now = time.time()
+    if not force and now - _last_wa_alert_time < WA_ALERT_COOLDOWN_SEC:
+        return
+    _last_wa_alert_time = now
+
+    def _worker():
+        try:
+            import urllib.request
+            import urllib.parse
+            waktu_str = datetime.now().strftime("%d-%m-%Y %H:%M:%S WIB")
+            msg_lines = [
+                f"🚨 *{title}* 🚨",
+                f"🕒 *Waktu:* {waktu_str}",
+                f"📌 *Keterangan:* {detail}"
+            ]
+            if sensor_snapshot:
+                msg_lines.append(
+                    f"📊 *Sensor:* Suhu {sensor_snapshot.get('suhu')}°C | "
+                    f"Lembap {sensor_snapshot.get('kelembapan')}% | "
+                    f"Gas {sensor_snapshot.get('gas')} ADC | "
+                    f"Cahaya {sensor_snapshot.get('cahaya')} ADC"
+                )
+            msg_lines.append("🌐 *Dashboard:* https://skk.kradev.my.id")
+            pesan_text = "\n".join(msg_lines)
+
+            post_data = urllib.parse.urlencode({
+                "target": FONNTE_TARGET,
+                "message": pesan_text
+            }).encode("utf-8")
+
+            req = urllib.request.Request(
+                "https://api.fonnte.com/send",
+                data=post_data,
+                headers={
+                    "Authorization": FONNTE_TOKEN,
+                    "User-Agent": "SmartKamarKos-IoT/1.0"
+                }
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                pass
+        except Exception as err:
+            print("Gagal mengirim notifikasi WhatsApp Fonnte:", err)
+
+    threading.Thread(target=_worker, daemon=True).start()
+
+
 state_lock = threading.RLock()
 model_lock = threading.RLock()
 
@@ -1565,6 +1623,11 @@ class SmartKosServer(BaseHTTPRequestHandler):
                                 gas_value=current_gas_val,
                                 ai_score=current_ai_score
                             )
+                            send_whatsapp_alert(
+                                "SMART KAMAR KOS: BAHAYA GAS TINGGI",
+                                f"Nilai sensor gas ({current_gas_val} ADC) mencapai atau melebihi batas aman ({GAS_THRESHOLD} ADC)! Kipas dan alarm telah aktif otomatis.",
+                                sensor_snapshot=current_data
+                            )
                         prev_actuators["buzzer"] = current_buzz
 
                     if current_ai_status == "ANOMALI" and prev_ai_status != "ANOMALI":
@@ -1576,6 +1639,11 @@ class SmartKosServer(BaseHTTPRequestHandler):
                             ai_score=current_ai_score
                         )
                         force_db_save = True
+                        send_whatsapp_alert(
+                            "SMART KAMAR KOS: ANOMALI TERDETEKSI",
+                            f"Model AI mendeteksi ketidakwajaran pola ruangan! {ai_pay.get('ai_trigger_desc')} (Skor Keselarasan: {ai_pay.get('ai_score_percent', '--')})",
+                            sensor_snapshot=current_data
+                        )
                     prev_ai_status = current_ai_status
 
                 db.record_telemetry(current_data, ai_pay, force=force_db_save)
@@ -1766,6 +1834,20 @@ class SmartKosServer(BaseHTTPRequestHandler):
                 self.wfile.write(csv_bytes)
             except (BrokenPipeError, ConnectionResetError):
                 pass
+            return
+
+        if clean_path == "/api/test/whatsapp":
+            send_whatsapp_alert(
+                "SMART KAMAR KOS: UJI COBA NOTIFIKASI",
+                "Integrasi WhatsApp via Fonnte berjalan normal dan siap menerima peringatan anomali.",
+                sensor_snapshot=sensor_data,
+                force=True
+            )
+            self.send_json(200, {
+                "status": "OK",
+                "message": "Pesan uji coba WhatsApp berhasil dikirim ke nomor target.",
+                "target": FONNTE_TARGET
+            })
             return
 
         if clean_path == "/api/health":

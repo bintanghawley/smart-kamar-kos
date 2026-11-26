@@ -41,6 +41,8 @@ services:
       DB_TELEMETRY_INTERVAL_SEC: ${DB_TELEMETRY_INTERVAL_SEC:-15}
       DEVICE_TOKEN: ${DEVICE_TOKEN:-}
       DEFAULT_DEVICE_ID: ${DEFAULT_DEVICE_ID:-esp32-kamar-01}
+      FONNTE_TOKEN: ${FONNTE_TOKEN:-inH5BdbMuMuj23XLyevE}
+      FONNTE_TARGET: ${FONNTE_TARGET:-081230220688}
     volumes:
       - ../website:/app/website
     networks:
