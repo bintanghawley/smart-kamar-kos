@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch: # Memungkinkan trigger manual dari tab Actions di GitHub
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -15,8 +15,8 @@ jobs:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.VPS_HOST }}
-          port: ${{ secrets.VPS_PORT || 20220 }}
+          host: ${{ secrets.VPS_HOST || '103.119.237.30' }}
+          port: 20220
           username: ${{ secrets.VPS_USERNAME || 'root' }}
           password: ${{ secrets.VPS_PASSWORD }}
           key: ${{ secrets.VPS_SSH_KEY }}
@@ -34,4 +34,4 @@ jobs:
             docker compose build app
             docker compose up -d app
 
-            echo "✅ Deployment berhasil! Layanan sudah aktif dengan versi terbaru."
+            echo "✅ Deployment berhasil! Layanan skk.kradev.my.id sudah aktif dengan versi terbaru."
