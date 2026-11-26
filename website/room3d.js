@@ -918,6 +918,14 @@ export function closeInspector() {
     });
 }
 
+function getResponsiveFov(width, height) {
+    const aspect = width / Math.max(1, height);
+    if (aspect >= 1.25) return 40;
+    const baseHalfTan = Math.tan(THREE.MathUtils.degToRad(40 / 2));
+    const adjusted = THREE.MathUtils.radToDeg(2 * Math.atan(baseHalfTan * (1.25 / Math.max(aspect, 0.85))));
+    return Math.min(54, Math.max(40, adjusted));
+}
+
 export function init(containerElement) {
     if (!containerElement) return false;
     container = containerElement;
@@ -941,7 +949,7 @@ export function init(containerElement) {
     scene.background = new THREE.Color(0x26221f);
 
     // 2. Camera
-    camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
+    camera = new THREE.PerspectiveCamera(getResponsiveFov(width, height), width / height, 0.1, 100);
     camera.position.copy(VIEW_PRESETS.outside.cam);
 
     // 3. WebGL Renderer
@@ -1072,6 +1080,7 @@ function onWindowResize() {
     if (!container || !renderer || !camera) return;
     const w = container.clientWidth;
     const h = container.clientHeight;
+    camera.fov = getResponsiveFov(w, h);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     renderer.setSize(w, h);
