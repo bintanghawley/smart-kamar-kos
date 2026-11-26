@@ -2001,6 +2001,8 @@ class SmartKosServer(BaseHTTPRequestHandler):
             self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
             self.send_header("Pragma", "no-cache")
             self.send_header("Expires", "0")
+            if clean_path == "/sw.js":
+                self.send_header("Service-Worker-Allowed", "/")
             self.end_headers()
 
             try:

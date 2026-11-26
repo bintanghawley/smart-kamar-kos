@@ -7,6 +7,14 @@
     <meta name="description"
         content="Dashboard Monitoring Smart Kamar Kos berbasis IoT ESP32, AI Anomaly Detection, dan 3D Digital Twin Interaktif">
     <title>Smart Kamar Kos - 3D Digital Twin &amp; Monitoring</title>
+
+    <!-- PWA & Mobile Web App Meta Tags -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0a0f1d">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SmartKos">
+    <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
@@ -495,6 +503,16 @@
     </div>
 
     <script src="script.js?v=12" defer></script>
+    <script>
+        // Registrasi PWA Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () {
+                navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function (err) {
+                    console.log('SW registration skipped:', err);
+                });
+            });
+        }
+    </script>
 </body>
 
 </html>
