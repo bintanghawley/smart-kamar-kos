@@ -1,20 +1,32 @@
 const API_URL = "/api/data";
 const POLLING_INTERVAL = 2000;
 const MAX_HISTORY = 40;
+const MIN_HISTORY_ROWS = 8;
 
-const GAS_THRESHOLD = 2000;
+const GAS_THRESHOLD = 3500;
 const LDR_THRESHOLD = 2000;
 const HUMIDITY_THRESHOLD = 60;
+const ARC_LENGTH = 259.71;
+
+const MONTHS_ID = [
+    "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+    "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+];
 
 const CHART_COLORS = {
-    suhu: "#F35BAA",
-    kelembapan: "#17C9B4",
-    gas: "#FF613F",
-    cahaya: "#FFD72F",
+    suhu: "#F55AA8",
+    kelembapan: "#13CAB6",
+    gas: "#FE623C",
+    cahaya: "#FFD634",
     grid: "rgba(255, 255, 255, 0.06)",
-    axis: "#9C9691",
-    danger: "#FF4D5E",
-    warning: "#FFB020"
+    axis: "#9C9691"
+};
+
+const SLOT_METAS = {
+    pagi: { label: "Pagi", range: "05:00 - 11:00", icon: "emoji_food_beverage" },
+    siang: { label: "Siang", range: "11:00 - 15:00", icon: "sunny" },
+    sore: { label: "Sore", range: "15:00 - 18:30", icon: "wb_twilight" },
+    malam: { label: "Malam", range: "18:30 - 05:00", icon: "bedtime" }
 };
 
 let historyData = [];
@@ -30,179 +42,150 @@ window.isSimulationModeActive = false;
 let simulationScenario = "normal";
 let simulationInterval = null;
 
-const ICON_SVG =
-    'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
-const ICONS = {
-    bot: `<svg viewBox="0 0 24 24" ${ICON_SVG}><rect x="7" y="7" width="10" height="10"></rect><rect x="10.5" y="10.5" width="3" height="3" fill="currentColor"></rect><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path></svg>`,
-    flask: `<svg viewBox="0 0 24 24" ${ICON_SVG}><path d="M9 3h6"></path><path d="M10 3v5.2L5.6 16a3 3 0 0 0 2.6 4.5h7.6a3 3 0 0 0 2.6-4.5L14 8.2V3"></path><path d="M7.8 15h8.4"></path></svg>`,
-    gear: `<svg viewBox="0 0 24 24" ${ICON_SVG}><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3h.2a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.3a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.5 1z"></path></svg>`,
-    check: `<svg viewBox="0 0 24 24" ${ICON_SVG}><path d="M4 12.5 9.5 18 20 6.5"></path></svg>`,
-    search: `<svg viewBox="0 0 24 24" ${ICON_SVG}><circle cx="11" cy="11" r="6.5"></circle><path d="m21 21-4.4-4.4"></path></svg>`,
-    shield: `<svg viewBox="0 0 24 24" ${ICON_SVG}><path d="M12 3l7 2.8V10c0 4.6-3 8.4-7 10-4-1.6-7-5.4-7-10V5.8z"></path></svg>`,
-    alert: `<svg viewBox="0 0 24 24" ${ICON_SVG}><path d="M12 4 2.7 20h18.6z"></path><path d="M12 9.5V14"></path><path d="M12 17h.01"></path></svg>`,
-    temp: `<svg viewBox="0 0 24 24" ${ICON_SVG}><path d="M14 4a2 2 0 1 0-4 0v9.5a4.5 4.5 0 1 0 4 0z"></path><path d="M12 9v4.2"></path></svg>`,
-    drop: `<svg viewBox="0 0 24 24" ${ICON_SVG}><path d="M12 2.5s6.5 6.6 6.5 11.2a6.5 6.5 0 0 1-13 0C5.5 9.1 12 2.5 12 2.5z"></path></svg>`,
-    stream: `<svg viewBox="0 0 24 24" ${ICON_SVG}><circle cx="12" cy="18" r="1.6"></circle><path d="M8 14.5a5.7 5.7 0 0 1 8 0"></path><path d="M5 11a9.7 9.7 0 0 1 14 0"></path><path d="M2 7.5a13.7 13.7 0 0 1 20 0"></path></svg>`,
-    siren: `<svg viewBox="0 0 24 24" ${ICON_SVG}><path d="M7.9 2.5h8.2L21.5 7.9v8.2L16.1 21.5H7.9L2.5 16.1V7.9z"></path><path d="M12 8v4.5"></path><path d="M12 16h.01"></path></svg>`,
-    wind: `<svg viewBox="0 0 24 24" ${ICON_SVG}><path d="M2 8.5h12.2a2.4 2.4 0 1 0-2.3-3"></path><path d="M2 12.5h14.5a2.4 2.4 0 1 1-2.3 3"></path><path d="M2 16.5h8.2a2.4 2.4 0 1 1-2.3 3"></path></svg>`,
-    bulb: `<svg viewBox="0 0 24 24" ${ICON_SVG}><path d="M9 18h6M10 21h4"></path><path d="M12 2.5a6 6 0 0 0-3.4 10.9c.7.5 1.1 1.3 1.1 2.1h4.6c0-.8.4-1.6 1.1-2.1A6 6 0 0 0 12 2.5z"></path></svg>`,
-    moon: `<svg viewBox="0 0 24 24" ${ICON_SVG}><path d="M20 14.5A8.7 8.7 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5z"></path></svg>`,
-    sunrise: `<svg viewBox="0 0 24 24" ${ICON_SVG}><path d="M12 2v4M4.93 10.93l2.83-2.83M19.07 10.93l-2.83-2.83M2 18h20M7 18a5 5 0 0 1 10 0"></path></svg>`,
-    sun: `<svg viewBox="0 0 24 24" ${ICON_SVG}><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>`,
-    sunset: `<svg viewBox="0 0 24 24" ${ICON_SVG}><path d="M17 18a5 5 0 0 0-10 0M12 9v7M9 13l3 3 3-3M2 18h20M4.93 7.93l1.41 1.41M19.07 7.93l-1.41 1.41"></path></svg>`,
-    target: `<svg viewBox="0 0 24 24" ${ICON_SVG}><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>`
+// Override manual perangkat (sinkron dengan server & simulasi/offline test)
+const manualDeviceState = {
+    kipas: null,
+    led: null,
+    buzzer: null
 };
 
-const elClock = document.getElementById("header-clock");
+let currentTargetSlotKey = "pagi";
+let currentTargetSlotLabel = "Pagi";
+let latestServerData = null;
+let calibrationActionInProgress = false;
+let calibrationNoticeTimer = null;
+
+// Simulasi pengumpulan data kalibrasi (untuk pratinjau state Collecting data... & 100%)
+let simCalibrationTimer = null;
+let simCalibrationState = {
+    active: false,
+    samples: 0,
+    target: 100,
+    slotKey: null,
+    calibratedSlots: { pagi: true, siang: true, sore: false, malam: false },
+    trainedAt: {
+        pagi: "2026-11-22T09:00:00",
+        siang: "2026-11-22T12:00:00",
+        sore: null,
+        malam: null
+    }
+};
+
+// DOM Elements
+const elHeaderDate = document.getElementById("header-date");
+const elHeaderClock = document.getElementById("header-clock");
+const elHeaderTimeIcon = document.getElementById("header-time-icon");
+
+const elStatusMenuWrap = document.getElementById("status-menu-wrap");
 const elConnectionPill = document.getElementById("connection-pill");
 const elConnectionText = document.getElementById("connection-text");
-
-const elHumanVerdictTitle = document.getElementById("human-verdict-title");
-const elHumanVerdictSub = document.getElementById("human-verdict-sub");
-const elHumanVerdictDot = document.getElementById("human-verdict-dot");
-const elStageActuatorTag = document.getElementById("stage-actuator-tag");
-const elOfflineHelperBanner = document.getElementById("offline-helper-banner");
-const elBtnActivateSim = document.getElementById("btn-activate-sim");
+const elStatusPopover = document.getElementById("status-popover");
 const elBtnToggleDemo = document.getElementById("btn-toggle-demo");
-const elBtnDemoText = document.getElementById("btn-demo-text");
 const elSimulationBar = document.getElementById("simulation-bar");
+const elStageSimStrip = document.getElementById("stage-sim-strip");
+const elBtnRefresh = document.getElementById("btn-refresh");
 
-const elAlertBanner = document.getElementById("alert-banner");
-const elAlertIcon = document.getElementById("alert-icon");
-const elAlertTitle = document.getElementById("alert-title");
-const elAlertMessage = document.getElementById("alert-message");
-const elAlertTime = document.getElementById("alert-time");
-
-const elSummaryBadge = document.getElementById("summary-badge");
-const elSummaryLead = document.getElementById("summary-lead");
-const elSummaryDetails = document.getElementById("summary-details");
-
-const elStatusSuhu = document.getElementById("status-suhu");
-const elMeterSuhu = document.getElementById("meter-suhu");
-const elFootSuhu = document.getElementById("foot-suhu");
-
-const elStatusKelembapan = document.getElementById("status-kelembapan");
-const elMeterKelembapan = document.getElementById("meter-kelembapan");
-const elFootKelembapan = document.getElementById("foot-kelembapan");
-
-const elStatusCahaya = document.getElementById("status-cahaya");
-const elMeterCahaya = document.getElementById("meter-cahaya");
-const elFootCahaya = document.getElementById("foot-cahaya");
-
-const elStatusGas = document.getElementById("status-gas");
-const elMeterGas = document.getElementById("meter-gas");
-const elFootGas = document.getElementById("foot-gas");
-
-const elCardLed = document.getElementById("card-actuator-led");
-const elStateLed = document.getElementById("state-text-led");
-const elPillLed = document.getElementById("pill-led");
-const elHumanStatusLed = document.getElementById("human-status-led");
-
-const elCardBuzzer = document.getElementById("card-actuator-buzzer");
-const elStateBuzzer = document.getElementById("state-text-buzzer");
-const elPillBuzzer = document.getElementById("pill-buzzer");
-const elHumanStatusBuzzer = document.getElementById("human-status-buzzer");
-const elBtnBuzzerMute = document.getElementById("btn-buzzer-mute");
-const elBtnBuzzerMuteText = document.getElementById("btn-buzzer-mute-text");
-let isBuzzerMuting = false;
-
-const ICONS_BUZZER_BTN = {
-    mute: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>`,
-    unmute: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>`,
-    idle: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>`
-};
-
-const elCardKipas = document.getElementById("card-actuator-kipas");
-const elStateKipas = document.getElementById("state-text-kipas");
-const elPillKipas = document.getElementById("pill-kipas");
-const elHumanStatusKipas = document.getElementById("human-status-kipas");
-
+// Kondisi Saat Ini
+const elConditionVerdict = document.getElementById("condition-verdict");
+const elCardStatSuhu = document.getElementById("card-stat-suhu");
+const elCardStatKelembapan = document.getElementById("card-stat-kelembapan");
+const elCardStatGas = document.getElementById("card-stat-gas");
+const elCardStatCahaya = document.getElementById("card-stat-cahaya");
 const elStatSuhu = document.getElementById("stat-suhu");
-const elStatSuhuBadge = document.getElementById("stat-suhu-badge");
 const elStatKelembapan = document.getElementById("stat-kelembapan");
-const elStatKelembapanBadge = document.getElementById("stat-kelembapan-badge");
-const elStatCahaya = document.getElementById("stat-cahaya");
-const elStatCahayaBadge = document.getElementById("stat-cahaya-badge");
 const elStatGas = document.getElementById("stat-gas");
-const elStatGasBadge = document.getElementById("stat-gas-badge");
+const elTrendGas = document.getElementById("trend-gas");
+const elStatCahaya = document.getElementById("stat-cahaya");
+const elTrendCahaya = document.getElementById("trend-cahaya");
 
-const elSidebar = document.getElementById("sidebar");
-const elSidebarOverlay = document.getElementById("sidebar-overlay");
-const elMenuToggle = document.getElementById("menu-toggle");
-const elSidebarDevice = document.getElementById("sidebar-device");
-const elSidebarDeviceText = document.getElementById("sidebar-device-text");
-const elSidebarLastSeen = document.getElementById("sidebar-last-seen");
-const elHeroStatus = document.getElementById("hero-status");
-const elHeroStatusText = document.getElementById("hero-status-text");
-const elPageTitle = document.getElementById("page-title");
-const elBreadcrumbCurrent = document.getElementById("breadcrumb-current");
-const navItems = document.querySelectorAll(".nav-item[data-nav]");
-const pageSections = document.querySelectorAll(".page-section[id]");
+// 3 Actuator Cards
+const elCardKipas = document.getElementById("card-actuator-kipas");
+const elToggleKipas = document.getElementById("toggle-kipas");
+const elCardLed = document.getElementById("card-actuator-led");
+const elToggleLed = document.getElementById("toggle-led");
+const elCardBuzzer = document.getElementById("card-actuator-buzzer");
+const elToggleBuzzer = document.getElementById("toggle-buzzer");
+
+// AI Pendeteksi
+const elBtnAiSlotMenu = document.getElementById("btn-ai-slot-menu");
+const elAiSlotHeaderIcon = document.getElementById("ai-slot-header-icon");
+const elAiSlotPopover = document.getElementById("ai-slot-popover");
+const elAiArcProgress = document.getElementById("ai-arc-progress");
+const elAiScoreValue = document.getElementById("ai-score-value");
+const elAiHumanSub = document.getElementById("ai-human-sub");
+const elAiModelDate = document.getElementById("ai-model-date");
+const elBtnCalibrationAction = document.getElementById("btn-calibration-action");
+const elBtnCalibrationReset = document.getElementById("btn-calibration-reset");
+const elCalibrationProgressTrack = document.getElementById("calibration-progress-track");
+const elCalibrationProgressFill = document.getElementById("calibration-progress-fill");
+const elCalibrationProgressLabel = document.getElementById("calibration-progress-label");
+const elCalibrationProgressPct = document.getElementById("calibration-progress-pct");
+const elCalibrationNotice = document.getElementById("calibration-notice");
+
+// Chart & Table & System
+const canvas = document.getElementById("monitoring-chart");
+const ctx = canvas.getContext("2d");
+const tabButtons = document.querySelectorAll(".chart-tab");
+const legendItems = document.querySelectorAll(".chart-legend .legend-item");
 
 const elHistoryTbody = document.getElementById("history-tbody");
-const elHistoryEmpty = document.getElementById("history-empty");
-const elHistoryCount = document.getElementById("history-count");
-
 const elSysServerStatus = document.getElementById("sys-server-status");
 const elSysEspStatus = document.getElementById("sys-esp-status");
 const elSysLastUpdate = document.getElementById("sys-last-update");
 const elSysApiUrl = document.getElementById("sys-api-url");
 const elSysPollRate = document.getElementById("sys-poll-rate");
-const elBtnRefresh = document.getElementById("btn-refresh");
 
-const elAiStatusBadge = document.getElementById("ai-status-badge");
-const elAiScoreValue = document.getElementById("ai-score-value");
-const elAiAnomalyCount = document.getElementById("ai-anomaly-count");
-const elAiTrainingSamples = document.getElementById("ai-training-samples");
-const elAiModelDate = document.getElementById("ai-model-date");
-const elAiDonutProgress = document.getElementById("ai-donut-progress");
-const elAiHumanTitle = document.getElementById("ai-human-title");
-const elAiHumanSub = document.getElementById("ai-human-sub");
-const elAiSlotNamePill = document.getElementById("ai-slot-name-pill");
-const elAiSlotSourcePill = document.getElementById("ai-slot-source-pill");
+const navItems = document.querySelectorAll(".nav-item[data-nav]");
+const pageSections = document.querySelectorAll(".page-section[id]");
 
-const elCalibrationStatusBadge = document.getElementById("calibration-status-badge");
-const elCalibrationMessage = document.getElementById("calibration-message");
-const elCalibrationCount = document.getElementById("calibration-count");
-const elCalibrationProgressTrack = document.getElementById("calibration-progress-track");
-const elCalibrationProgressFill = document.getElementById("calibration-progress-fill");
-const elCalibrationSkipped = document.getElementById("calibration-skipped");
-const elCalibrationFinished = document.getElementById("calibration-finished");
-const elCalibrationTargetName = document.getElementById("calibration-target-name");
-const elCalibrationTargetNote = document.getElementById("calibration-target-note");
-const elBtnCalibrationStart = document.getElementById("btn-calibration-start");
-const elBtnCalibrationCancel = document.getElementById("btn-calibration-cancel");
-const elBtnCalibrationReset = document.getElementById("btn-calibration-reset");
-let calibrationActionInProgress = false;
-let calibrationActionNotice = "";
+if (elSysApiUrl) elSysApiUrl.textContent = API_URL;
+if (elSysPollRate) elSysPollRate.textContent = `${Math.round(POLLING_INTERVAL / 1000)}dtk`;
 
-const SLOT_METAS = {
-    pagi: { label: "Pagi", range: "05:00 - 11:00" },
-    siang: { label: "Siang", range: "11:00 - 15:00" },
-    sore: { label: "Sore", range: "15:00 - 18:30" },
-    malam: { label: "Malam", range: "18:30 - 05:00" }
-};
-let currentTargetSlotKey = "siang";
-let currentTargetSlotLabel = "Siang";
-let manualSelectedSlotKey = null;
-let latestServerData = null;
-
-const canvas = document.getElementById("monitoring-chart");
-const ctx = canvas.getContext("2d");
-const elChartCount = document.getElementById("chart-data-count");
-const tabButtons = document.querySelectorAll(".chart-tab");
-
-elSysApiUrl.textContent = API_URL;
-elSysPollRate.textContent = (POLLING_INTERVAL / 1000).toFixed(1) + " detik";
+// ==================== CLOCK & TIME-OF-DAY ICON ====================
+function getTimeSlotKeyForDate(date = new Date()) {
+    const minutes = date.getHours() * 60 + date.getMinutes();
+    if (minutes >= 300 && minutes < 660) return "pagi";
+    if (minutes >= 660 && minutes < 900) return "siang";
+    if (minutes >= 900 && minutes < 1110) return "sore";
+    return "malam";
+}
 
 function updateClock() {
     const now = new Date();
-    elClock.textContent = now.toLocaleTimeString("id-ID", { hour12: false });
+    const day = now.getDate();
+    const monthName = MONTHS_ID[now.getMonth()];
+    const hh = String(now.getHours()).padStart(2, "0");
+    const mm = String(now.getMinutes()).padStart(2, "0");
+
+    if (elHeaderDate) elHeaderDate.textContent = `${day} ${monthName}`;
+    if (elHeaderClock) elHeaderClock.textContent = `${hh} : ${mm} WIB`;
+
+    const slotKey = getTimeSlotKeyForDate(now);
+    const meta = SLOT_METAS[slotKey] || SLOT_METAS.pagi;
+    if (elHeaderTimeIcon) {
+        elHeaderTimeIcon.textContent = meta.icon;
+    }
+
+    if (!latestServerData) {
+        currentTargetSlotKey = slotKey;
+        currentTargetSlotLabel = meta.label;
+        if (elAiSlotHeaderIcon) elAiSlotHeaderIcon.textContent = meta.icon;
+        if (elBtnCalibrationAction && !calibrationActionInProgress) {
+            elBtnCalibrationAction.textContent = `Ambil Data ${meta.label}`;
+        }
+        document.querySelectorAll(".slot-pop-item[data-slot]").forEach(itemEl => {
+            itemEl.classList.toggle("is-active-slot", itemEl.dataset.slot === slotKey);
+        });
+        if (elBtnCalibrationReset) {
+            elBtnCalibrationReset.textContent = `Reset ${meta.label}`;
+            elBtnCalibrationReset.disabled = true;
+        }
+    }
 }
 setInterval(updateClock, 1000);
 updateClock();
 
-// 3D Initialization Hook
+// ==================== 3D INITIALIZATION ====================
 function init3DStage() {
     const container = document.getElementById("room-3d-container");
     if (!container || is3DInitialized) return;
@@ -215,13 +198,13 @@ function init3DStage() {
     }
 }
 
-// Check Room3D module readiness
 if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => setTimeout(init3DStage, 100));
 } else {
     setTimeout(init3DStage, 100);
 }
 
+// ==================== DATA FETCHING ====================
 async function fetchSensorData() {
     if (isSimulationMode) return;
 
@@ -248,24 +231,63 @@ async function fetchSensorData() {
     }
 }
 
-function handleDataSuccess(data) {
+function getEffectiveActuatorState(serverData) {
+    const online = Boolean(serverData.esp32_online) || isSimulationMode;
+    const overrides = serverData.manual_overrides || {};
+
+    const resolveDevice = (key, rawVal) => {
+        if (manualDeviceState[key] === "ON" || manualDeviceState[key] === "OFF") {
+            return manualDeviceState[key];
+        }
+        if (overrides[key] === "ON" || overrides[key] === "OFF") {
+            return overrides[key];
+        }
+        if (!online) return "OFF";
+        return String(rawVal ?? "OFF").toUpperCase();
+    };
+
+    const led = resolveDevice("led", serverData.led);
+    const kipas = resolveDevice("kipas", serverData.kipas);
+    let buzzer = resolveDevice("buzzer", serverData.buzzer);
+    let buzzerMuted = Boolean(serverData.buzzer_muted) || buzzer === "MUTED";
+
+    if (manualDeviceState.buzzer === "OFF" || overrides.buzzer === "OFF") {
+        buzzerMuted = true;
+        buzzer = Number(serverData.gas ?? 0) >= GAS_THRESHOLD ? "MUTED" : "OFF";
+    } else if (manualDeviceState.buzzer === "ON" || overrides.buzzer === "ON") {
+        buzzerMuted = false;
+        buzzer = "ON";
+    }
+
+    return { led, kipas, buzzer, buzzerMuted };
+}
+
+function handleDataSuccess(data, { skipHistory = false } = {}) {
     latestServerData = data;
     isServerConnected = true;
     isEsp32Online = Boolean(data.esp32_online);
     lastSeenTime = data.last_seen || "-";
     const isOfflineLive = !data.esp32_online && !isSimulationMode;
 
+    // Sinkronkan override dari server jika ada
+    if (data.manual_overrides && !isSimulationMode) {
+        ["led", "kipas", "buzzer"].forEach(dev => {
+            const ov = data.manual_overrides[dev];
+            manualDeviceState[dev] = (ov === "ON" || ov === "OFF") ? ov : null;
+        });
+    }
+
     const suhu = Number(data.suhu ?? 0);
     const kelembapan = Number(data.kelembapan ?? 0);
     const cahaya = Number(data.cahaya ?? 0);
     const gas = Number(data.gas ?? 0);
 
-    const led = String(data.led ?? "OFF").toUpperCase();
-    const buzzer = String(data.buzzer ?? "OFF").toUpperCase();
-    const kipas = String(data.kipas ?? "OFF").toUpperCase();
+    const { led, kipas, buzzer, buzzerMuted } = getEffectiveActuatorState(data);
 
     const normalizedData = {
-        time: lastSeenTime !== "-" && lastSeenTime !== "Belum ada data" ? lastSeenTime : new Date().toLocaleTimeString("id-ID", { hour12: false }),
+        time: lastSeenTime !== "-" && lastSeenTime !== "Belum ada data"
+            ? lastSeenTime
+            : new Date().toLocaleTimeString("id-ID", { hour12: false }),
         suhu,
         kelembapan,
         cahaya,
@@ -273,12 +295,12 @@ function handleDataSuccess(data) {
         led,
         buzzer,
         kipas,
-        buzzer_muted: Boolean(data.buzzer_muted),
-        esp32_online: isEsp32Online,
+        buzzer_muted: buzzerMuted,
+        esp32_online: isEsp32Online || isSimulationMode,
         lastSeen: lastSeenTime
     };
 
-    if (isEsp32Online) {
+    if (!skipHistory && (isEsp32Online || isSimulationMode)) {
         historyData.push(normalizedData);
         if (historyData.length > MAX_HISTORY) {
             historyData.shift();
@@ -290,337 +312,425 @@ function handleDataSuccess(data) {
     }
 
     updateConnectionUI();
-    updateHumanVerdicts(normalizedData, data);
-    updateStatCards(normalizedData, isOfflineLive);
-    updateActuatorCards(normalizedData, isOfflineLive);
-    updateAlertBanner(normalizedData);
-    updateRoomSummary(normalizedData);
+    updateConditionSection(normalizedData, data, isOfflineLive);
+    updateActuatorCards(normalizedData);
     updateSystemInfo(true);
     updateAIUI(data, isOfflineLive);
-    updateCalibrationUI(data);
     renderHistoryTable();
     drawChart();
 }
 
-function handleDataError(error) {
+function handleDataError() {
     isServerConnected = false;
     isEsp32Online = false;
 
+    const localLed = manualDeviceState.led || "OFF";
+    const localKipas = manualDeviceState.kipas || "OFF";
+    const localBuzzer = manualDeviceState.buzzer || "OFF";
+
+    const offlineNorm = {
+        suhu: 0,
+        kelembapan: 0,
+        cahaya: 0,
+        gas: 0,
+        led: localLed,
+        kipas: localKipas,
+        buzzer: localBuzzer,
+        buzzer_muted: localBuzzer === "OFF",
+        esp32_online: false
+    };
+
+    if (window.Room3D && typeof window.Room3D.updateData === "function") {
+        window.Room3D.updateData(offlineNorm);
+    }
+
     updateConnectionUI();
-    updateHumanVerdictsOnOffline();
-    updateSystemInfo(false, error.message);
-    updateStatCards({ suhu: 0, kelembapan: 0, cahaya: 0, gas: 0 }, true);
-    updateActuatorCards({ led: "OFF", buzzer: "OFF", kipas: "OFF" }, true);
-    updateAIUI({ ai_available: false, ai_status: "TIDAK TERSEDIA", ai_error: "Server tidak dapat dihubungi." }, true);
-    updateCalibrationUI({
-        calibration_status: "UNKNOWN",
-        calibration_active: false,
-        calibration_busy: false,
-        calibration_samples: 0,
-        calibration_target: 100,
-        calibration_skipped: 0,
-        calibration_message: "Tidak dapat mengambil status kalibrasi karena server tidak terhubung."
-    });
-    updateAlertBannerOnDisconnect();
+    updateSystemInfo(false);
+    updateConditionSection(offlineNorm, { ai_status: "STANDBY" }, true);
+    updateActuatorCards(offlineNorm);
+    updateAIUI({ ai_available: false, ai_status: "TIDAK TERSEDIA" }, true);
 }
 
-function updateHumanVerdicts(norm, raw) {
-    if (!elHumanVerdictTitle) return;
+// ==================== CONNECTION UI ====================
+function updateConnectionUI() {
+    if (!elConnectionPill || !elConnectionText) return;
 
-    const isGasDanger = norm.gas >= GAS_THRESHOLD;
-    const isHumid = norm.kelembapan >= HUMIDITY_THRESHOLD;
-    const isAnomaly = String(raw.ai_status || "").toUpperCase() === "ANOMALI";
-    const online = norm.esp32_online || isSimulationMode;
-
-    if (!online) {
-        elHumanVerdictTitle.textContent = "Perangkat Belum Terhubung · Coba Mode Simulasi";
-        elHumanVerdictSub.textContent = "ESP32 belum terdeteksi. Aktifkan simulasi untuk mencoba visualisasi 3D.";
-        elHumanVerdictDot.className = "verdict-dot status-offline";
-        if (elOfflineHelperBanner) elOfflineHelperBanner.style.display = "flex";
-    } else if (isGasDanger) {
-        elHumanVerdictTitle.textContent = "Waspada! Asap / Gas Terdeteksi · Kipas & Alarm Aktif";
-        elHumanVerdictSub.textContent = `Nilai MQ-2 mencapai ${norm.gas} ADC. Exhaust fan dan alarm otomatis merespons.`;
-        elHumanVerdictDot.className = "verdict-dot status-danger";
-        if (elOfflineHelperBanner) elOfflineHelperBanner.style.display = "none";
-    } else if (isHumid) {
-        elHumanVerdictTitle.textContent = "Udara Terasa Lembap · Kipas Menyejukkan";
-        elHumanVerdictSub.textContent = `Kelembapan kamar ${norm.kelembapan}%. Exhaust fan otomatis menyedot udara.`;
-        elHumanVerdictDot.className = "verdict-dot status-warn";
-        if (elOfflineHelperBanner) elOfflineHelperBanner.style.display = "none";
-    } else if (isAnomaly) {
-        elHumanVerdictTitle.textContent = "Pola Kamar Tidak Biasa · Perlu Pemeriksaan";
-        elHumanVerdictSub.textContent = "AI mendeteksi kombinasi sensor menyimpang dari patokan normal slot aktif.";
-        elHumanVerdictDot.className = "verdict-dot status-warn";
-        if (elOfflineHelperBanner) elOfflineHelperBanner.style.display = "none";
+    if (isSimulationMode) {
+        elConnectionPill.className = "status-pill status-sim";
+        elConnectionText.textContent = "Mode Simulasi";
+    } else if (!isServerConnected) {
+        elConnectionPill.className = "status-pill status-disconnected";
+        elConnectionText.textContent = "Server Terputus";
+    } else if (isEsp32Online) {
+        elConnectionPill.className = "status-pill status-connected";
+        elConnectionText.textContent = "ESP32 Online";
     } else {
-        elHumanVerdictTitle.textContent = "Kamar Kos 01 Nyaman & Aman";
-        elHumanVerdictSub.textContent = "Suhu, kelembapan, pencahayaan, dan sirkulasi udara terpantau stabil.";
-        elHumanVerdictDot.className = "verdict-dot";
-        if (elOfflineHelperBanner) elOfflineHelperBanner.style.display = "none";
-    }
-
-    if (elStageActuatorTag) {
-        const fanStr = norm.kipas === "ON" ? "Kipas Menyedot Udara" : "Kipas Siaga";
-        const ledStr = norm.led === "ON" ? "Lampu Menyala Hangat" : "Lampu Padam (Hemat)";
-        elStageActuatorTag.textContent = `Aktuator: ${fanStr} • ${ledStr}`;
+        elConnectionPill.className = "status-pill status-disconnected";
+        elConnectionText.textContent = "Perangkat Offline";
     }
 }
 
-function updateHumanVerdictsOnOffline() {
-    if (!elHumanVerdictTitle) return;
-    elHumanVerdictTitle.textContent = "Perangkat Belum Terhubung : Aktifkan Mode Simulasi";
-    elHumanVerdictSub.textContent = "Server lokal atau ESP32 belum terhubung. Klik tombol 'Mode Simulasi' untuk menguji 3D.";
-    elHumanVerdictDot.className = "verdict-dot status-offline";
-    if (elOfflineHelperBanner && !isSimulationMode) {
-        elOfflineHelperBanner.style.display = "flex";
-    }
-}
-
-function setStatusPill(element, label, stateClass) {
-    if (!element) return;
-    element.textContent = label;
-    element.className = `ai-status-pill ${stateClass}`;
-}
-
-function formatModelDate(value) {
-    if (!value) return "Belum tersedia";
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return String(value);
-    return date.toLocaleString("id-ID", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false
-    });
-}
-
-function updateAIUI(data, isOffline = false) {
-    if (!elAiStatusBadge) return;
+// ==================== KONDISI SAAT INI ====================
+function updateConditionSection(norm, raw, isOffline) {
+    if (!elConditionVerdict) return;
 
     if (isOffline) {
-        setStatusPill(elAiStatusBadge, "STANDBY", "ai-state-neutral");
-        if (elAiHumanTitle) elAiHumanTitle.textContent = "AI Siaga (Menunggu Sensor ESP32)";
-        if (elAiHumanSub) elAiHumanSub.textContent = "Model AI siap menganalisis segera setelah perangkat ESP32 terhubung secara real-time.";
-        if (elAiScoreValue) elAiScoreValue.textContent = "--%";
-        if (elAiDonutProgress) {
-            const circ = 2 * Math.PI * 40;
-            elAiDonutProgress.style.strokeDashoffset = String(circ);
-            elAiDonutProgress.style.stroke = "rgba(255, 255, 255, 0.15)";
-        }
-        if (elAiSlotNamePill) {
-            const slotLabel = data.ai_active_slot_label || "Siang";
-            const slotRange = data.ai_active_slot_range || "11:00 - 15:00";
-            elAiSlotNamePill.textContent = `Slot ${slotLabel} (${slotRange})`;
-        }
-        if (elAiSlotSourcePill) {
-            const isCalibrated = Boolean(data.ai_is_slot_calibrated);
-            elAiSlotSourcePill.textContent = data.ai_model_source || (isCalibrated ? "Kalibrasi Ruangan" : "Model Default");
-        }
-        if (elAiAnomalyCount) elAiAnomalyCount.textContent = "0 / 5";
-        if (elAiTrainingSamples) elAiTrainingSamples.textContent = data.ai_training_samples ?? "100";
-        if (elAiModelDate) elAiModelDate.textContent = formatModelDate(data.ai_model_trained_at);
+        elConditionVerdict.textContent = "Siaga";
+        elConditionVerdict.className = "condition-verdict state-offline";
+
+        if (elStatSuhu) elStatSuhu.textContent = "--";
+        if (elStatKelembapan) elStatKelembapan.textContent = "--";
+        if (elStatGas) elStatGas.textContent = "--";
+        if (elStatCahaya) elStatCahaya.textContent = "--";
+        if (elTrendGas) elTrendGas.textContent = "trending_flat";
+        if (elTrendCahaya) elTrendCahaya.textContent = "trending_flat";
+
+        if (elCardStatSuhu) elCardStatSuhu.title = "Menunggu data DHT11";
+        if (elCardStatKelembapan) elCardStatKelembapan.title = "Menunggu data DHT11";
+        if (elCardStatGas) elCardStatGas.title = "Menunggu data sensor gas MQ-2";
+        if (elCardStatCahaya) elCardStatCahaya.title = "Menunggu data sensor cahaya LDR";
         return;
     }
 
-    const status = String(data.ai_status || "TIDAK TERSEDIA").toUpperCase();
-    const busy = Boolean(data.calibration_busy) || status === "KALIBRASI" || data.calibration_status === "KALIBRASI BERLANGSUNG" || data.calibration_status === "MELATIH MODEL";
-    const available = Boolean(data.ai_available);
+    const aiStatus = String(raw?.ai_status || "").toUpperCase();
+    const isEmergency = norm.gas >= 3900 || (norm.gas >= GAS_THRESHOLD && norm.suhu >= 35);
+    const isDanger = norm.gas >= GAS_THRESHOLD || norm.buzzer === "ON";
+    const isWarning = norm.kelembapan >= HUMIDITY_THRESHOLD || norm.suhu > 30 || norm.gas >= 2200 || aiStatus === "ANOMALI";
 
-    let title = "Pola Kamar Sedang Dianalisis";
-    let description = data.ai_status_desc || "Mengamati kestabilan sensor kamar kos.";
-    let badgeClass = "ai-state-neutral";
-
-    if (busy) {
-        title = "Kalibrasi Kamar Berlangsung";
-        description = data.calibration_message || "Sedang merekam sampel kondisi normal kamar.";
-        badgeClass = "ai-state-calibration";
-    } else if (!available || status === "TIDAK TERSEDIA") {
-        title = "AI Menunggu Data";
-        description = data.ai_error || "Model AI siap memproses setelah sensor terhubung.";
-        badgeClass = "ai-state-neutral";
-    } else if (status === "NORMAL") {
-        const slotLabel = data.ai_active_slot_label || "Siang";
-        title = `Pola Kamar Normal untuk ${slotLabel}`;
-        description = data.ai_status_desc || "Pola suhu, kelembapan, cahaya, dan gas selaras dengan patokan kamar.";
-        badgeClass = "ai-state-normal";
-    } else if (status === "ANOMALI") {
-        const slotLabel = data.ai_active_slot_label || "Saat Ini";
-        title = `Pola Tidak Biasa pada ${slotLabel}`;
-        description = data.ai_status_desc || "Terdapat perbedaan signifikan dibanding kebiasaan normal kamar kos.";
-        badgeClass = "ai-state-anomaly";
+    if (isEmergency) {
+        elConditionVerdict.textContent = "Darurat";
+        elConditionVerdict.className = "condition-verdict state-emergency";
+    } else if (isDanger) {
+        elConditionVerdict.textContent = "Bahaya";
+        elConditionVerdict.className = "condition-verdict state-danger";
+    } else if (isWarning) {
+        elConditionVerdict.textContent = "Waspada";
+        elConditionVerdict.className = "condition-verdict state-warning";
+    } else {
+        elConditionVerdict.textContent = "Luar Biasa";
+        elConditionVerdict.className = "condition-verdict state-excellent";
     }
 
-    setStatusPill(elAiStatusBadge, busy ? "KALIBRASI" : status, badgeClass);
-    if (elAiHumanTitle) elAiHumanTitle.textContent = title;
-    if (elAiHumanSub) elAiHumanSub.textContent = description;
+    if (elStatSuhu) elStatSuhu.textContent = Number(norm.suhu).toFixed(1);
+    if (elStatKelembapan) elStatKelembapan.textContent = String(Math.round(norm.kelembapan));
 
-    // AI Donut SVG Progress Score (Solar Status Style)
-    const scoreVal = (data.ai_score !== null && data.ai_score !== undefined && Number.isFinite(Number(data.ai_score)))
-        ? Number(data.ai_score)
-        : null;
+    if (elCardStatSuhu) elCardStatSuhu.title = `Suhu Kamar: ${Number(norm.suhu).toFixed(1)}°C`;
+    if (elCardStatKelembapan) elCardStatKelembapan.title = `Kelembapan: ${norm.kelembapan}% (Ambang kipas ≥ ${HUMIDITY_THRESHOLD}%)`;
 
-    if (elAiScoreValue) {
-        elAiScoreValue.textContent = scoreVal !== null ? `${scoreVal.toFixed(0)}%` : "--";
-    }
-
-    if (elAiDonutProgress) {
-        const circ = 2 * Math.PI * 40; // ~251.327
-        if (scoreVal !== null) {
-            const clamped = Math.min(100, Math.max(0, scoreVal));
-            const offset = circ * (1 - clamped / 100);
-            elAiDonutProgress.style.strokeDashoffset = String(offset);
-            elAiDonutProgress.style.stroke = clamped >= 75 ? "var(--color-success)" : (clamped >= 55 ? "var(--yellow)" : "var(--color-danger)");
+    // Indikasi Gas
+    if (elStatGas && elTrendGas) {
+        if (norm.gas >= GAS_THRESHOLD) {
+            elStatGas.textContent = "Tinggi";
+            elTrendGas.textContent = "trending_up";
+        } else if (norm.gas >= 2200) {
+            elStatGas.textContent = "Sedang";
+            elTrendGas.textContent = "trending_up";
         } else {
-            elAiDonutProgress.style.strokeDashoffset = String(circ * 0.9);
-            elAiDonutProgress.style.stroke = "rgba(255, 255, 255, 0.15)";
+            elStatGas.textContent = "Rendah";
+            elTrendGas.textContent = "trending_down";
         }
+        if (elCardStatGas) elCardStatGas.title = `Sensor MQ-2: ${norm.gas} ADC (Ambang bahaya ≥ ${GAS_THRESHOLD} ADC)`;
     }
 
-    if (elAiSlotNamePill) {
-        const slotLabel = data.ai_active_slot_label || "Siang";
-        const slotRange = data.ai_active_slot_range || "11:00 - 15:00";
-        elAiSlotNamePill.textContent = `Slot ${slotLabel} (${slotRange})`;
-    }
-
-    if (elAiSlotSourcePill) {
-        const isCalibrated = Boolean(data.ai_is_slot_calibrated);
-        elAiSlotSourcePill.textContent = data.ai_model_source || (isCalibrated ? "Kalibrasi Ruangan" : "Model Default");
-    }
-
-    if (elAiAnomalyCount) {
-        const anomalies = Number(data.ai_anomaly_count);
-        const checked = Number(data.ai_samples_checked);
-        if (Number.isFinite(anomalies) && Number.isFinite(checked) && checked > 0) {
-            elAiAnomalyCount.textContent = `${anomalies} / ${checked}`;
+    // Intensitas Cahaya (LDR tinggi = gelap, LDR rendah = terang)
+    if (elStatCahaya && elTrendCahaya) {
+        if (norm.cahaya >= LDR_THRESHOLD) {
+            elStatCahaya.textContent = "Rendah";
+            elTrendCahaya.textContent = "trending_down";
+        } else if (norm.cahaya >= 1200) {
+            elStatCahaya.textContent = "Sedang";
+            elTrendCahaya.textContent = "trending_flat";
         } else {
-            elAiAnomalyCount.textContent = "0 / 5";
+            elStatCahaya.textContent = "Tinggi";
+            elTrendCahaya.textContent = "trending_up";
         }
+        if (elCardStatCahaya) elCardStatCahaya.title = `Sensor LDR: ${norm.cahaya} ADC (Ambang gelap ≥ ${LDR_THRESHOLD} ADC)`;
     }
-
-    if (elAiTrainingSamples) elAiTrainingSamples.textContent = data.ai_training_samples ?? "100";
-    if (elAiModelDate) elAiModelDate.textContent = formatModelDate(data.ai_model_trained_at);
 }
 
-function updateCalibrationUI(data) {
-    if (!elCalibrationStatusBadge) return;
+// ==================== 3 MANUAL ACTUATOR CARDS ====================
+function updateActuatorCards(data) {
+    const fanOn = String(data.kipas || "OFF").toUpperCase() === "ON";
+    const ledOn = String(data.led || "OFF").toUpperCase() === "ON";
+    const alarmOn = String(data.buzzer || "OFF").toUpperCase() === "ON" && !data.buzzer_muted;
+
+    if (elCardKipas && elToggleKipas) {
+        elCardKipas.classList.toggle("is-on", fanOn);
+        elToggleKipas.setAttribute("aria-checked", String(fanOn));
+    }
+
+    if (elCardLed && elToggleLed) {
+        elCardLed.classList.toggle("is-on", ledOn);
+        elToggleLed.setAttribute("aria-checked", String(ledOn));
+    }
+
+    if (elCardBuzzer && elToggleBuzzer) {
+        elCardBuzzer.classList.toggle("is-on", alarmOn);
+        elToggleBuzzer.setAttribute("aria-checked", String(alarmOn));
+    }
+}
+
+async function toggleActuatorManual(device) {
+    const currentVal = (() => {
+        if (device === "kipas") return elCardKipas?.classList.contains("is-on") ? "ON" : "OFF";
+        if (device === "led") return elCardLed?.classList.contains("is-on") ? "ON" : "OFF";
+        return elCardBuzzer?.classList.contains("is-on") ? "ON" : "OFF";
+    })();
+
+    const nextState = currentVal === "ON" ? "OFF" : "ON";
+    manualDeviceState[device] = nextState;
+
+    // Optimistic update langsung pada UI & model 3D
+    const baseData = latestServerData ? { ...latestServerData } : {
+        suhu: 0,
+        kelembapan: 0,
+        cahaya: 0,
+        gas: 0,
+        led: manualDeviceState.led || "OFF",
+        kipas: manualDeviceState.kipas || "OFF",
+        buzzer: manualDeviceState.buzzer || "OFF",
+        esp32_online: false
+    };
+
+    baseData[device] = nextState;
+    if (device === "buzzer") {
+        baseData.buzzer_muted = nextState === "OFF";
+    }
+
+    if (isSimulationMode) {
+        latestServerData = baseData;
+        handleDataSuccess(baseData, { skipHistory: true });
+        return;
+    }
+
+    const effective = getEffectiveActuatorState(baseData);
+    const previewNorm = {
+        ...baseData,
+        led: effective.led,
+        kipas: effective.kipas,
+        buzzer: effective.buzzer,
+        buzzer_muted: effective.buzzerMuted,
+        esp32_online: isEsp32Online
+    };
+    updateActuatorCards(previewNorm);
+    if (window.Room3D && typeof window.Room3D.updateData === "function") {
+        window.Room3D.updateData(previewNorm);
+    }
+
+    try {
+        const res = await fetch("/api/device/control", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            body: JSON.stringify({ device, state: nextState })
+        });
+        if (res.ok) {
+            await fetchSensorData();
+        }
+    } catch (err) {
+        // Mode preview offline: pertahankan toggle manual lokal
+    }
+}
+
+[
+    { card: elCardKipas, btn: elToggleKipas, device: "kipas" },
+    { card: elCardLed, btn: elToggleLed, device: "led" },
+    { card: elCardBuzzer, btn: elToggleBuzzer, device: "buzzer" }
+].forEach(({ card, btn, device }) => {
+    if (card) {
+        card.addEventListener("click", (e) => {
+            if (e.target.closest(".actuator-switch")) return;
+            toggleActuatorManual(device);
+        });
+    }
+    if (btn) {
+        btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            toggleActuatorManual(device);
+        });
+    }
+});
+
+// ==================== AI PENDETEKSI & KALIBRASI ====================
+function formatShortDate(value) {
+    if (!value) return "Belum ada";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return date.toLocaleDateString("id-ID", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric"
+    });
+}
+
+function formatSlotDateTime(value) {
+    if (!value) return "Belum ada";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    const dateStr = date.toLocaleDateString("id-ID", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric"
+    });
+    const hh = String(date.getHours()).padStart(2, "0");
+    const mm = String(date.getMinutes()).padStart(2, "0");
+    return `${dateStr}, ${hh}:${mm}`;
+}
+
+function showCalibrationNotice(text, duration = 4500) {
+    if (!elCalibrationNotice) return;
+    elCalibrationNotice.textContent = text;
+    elCalibrationNotice.hidden = false;
+    if (calibrationNoticeTimer) clearTimeout(calibrationNoticeTimer);
+    calibrationNoticeTimer = setTimeout(() => {
+        if (elCalibrationNotice) elCalibrationNotice.hidden = true;
+    }, duration);
+}
+
+function updateAIUI(data, isOffline = false) {
+    const slotByClock = getTimeSlotKeyForDate(new Date());
+    const activeSlot = data.ai_active_slot in SLOT_METAS ? data.ai_active_slot : slotByClock;
 
     const status = String(data.calibration_status || "BELUM DIKALIBRASI").toUpperCase();
     const samples = Math.max(0, Number(data.calibration_samples ?? 0));
     const target = Math.max(1, Number(data.calibration_target ?? 100));
-    const skipped = Math.max(0, Number(data.calibration_skipped ?? 0));
-    const percent = Math.min(100, (samples / target) * 100);
     const busy = Boolean(data.calibration_busy) || status === "KALIBRASI BERLANGSUNG" || status === "MELATIH MODEL";
 
-    let pillClass = "ai-state-neutral";
-    if (status === "KALIBRASI BERLANGSUNG" || status === "MELATIH MODEL") {
-        pillClass = "ai-state-calibration";
-    } else if (status === "KALIBRASI BERHASIL") {
-        pillClass = "ai-state-normal";
-    } else if (status === "KALIBRASI GAGAL") {
-        pillClass = "ai-state-failed";
+    // Kunci target kalibrasi ke waktu sekarang (tidak bisa memilih slot waktu lain)
+    const busySlot = data.calibration_target_slot in SLOT_METAS ? data.calibration_target_slot : activeSlot;
+    currentTargetSlotKey = busy ? busySlot : activeSlot;
+    const targetMeta = SLOT_METAS[currentTargetSlotKey] || SLOT_METAS.pagi;
+    currentTargetSlotLabel = targetMeta.label;
+
+    if (elAiSlotHeaderIcon) {
+        elAiSlotHeaderIcon.textContent = targetMeta.icon;
     }
 
-    setStatusPill(elCalibrationStatusBadge, status, pillClass);
-    if (elCalibrationMessage) {
-        elCalibrationMessage.textContent = calibrationActionNotice || data.calibration_message || "Model tersimpan akan dijadikan acuan normal.";
-    }
-    if (elCalibrationCount) elCalibrationCount.textContent = `${samples} / ${target}`;
-    if (elCalibrationProgressFill) elCalibrationProgressFill.style.width = `${percent}%`;
-    if (elCalibrationProgressTrack) elCalibrationProgressTrack.setAttribute("aria-valuenow", String(Math.round(percent)));
+    // Update Slot Popover items (hanya untuk melihat status ada/belum & kapan terakhir ambil data)
+    const slotsObj = data.ai_slots || {};
+    ["pagi", "siang", "sore", "malam"].forEach(slotKey => {
+        const itemEl = document.getElementById(`slot-card-${slotKey}`);
+        const pillEl = document.getElementById(`slot-pill-${slotKey}`);
+        const slotInfo = slotsObj[slotKey];
 
-    const serverActiveSlotKey = data.calibration_target_slot || data.ai_active_slot || "siang";
-    const serverActiveSlotLabel = data.calibration_target_slot_label || data.ai_active_slot_label || "Siang";
-
-    if (busy) {
-        manualSelectedSlotKey = null;
-    }
-
-    if (manualSelectedSlotKey && SLOT_METAS[manualSelectedSlotKey]) {
-        currentTargetSlotKey = manualSelectedSlotKey;
-        currentTargetSlotLabel = SLOT_METAS[manualSelectedSlotKey].label;
-    } else {
-        currentTargetSlotKey = serverActiveSlotKey;
-        currentTargetSlotLabel = serverActiveSlotLabel;
-    }
-
-    if (elCalibrationTargetName) {
-        const meta = SLOT_METAS[currentTargetSlotKey] || { range: "" };
-        const range = meta.range || data.calibration_target_slot_range || "";
-        const tag = manualSelectedSlotKey ? " [Manual]" : " [Waktu Nyata]";
-        elCalibrationTargetName.textContent = `Target: Slot ${currentTargetSlotLabel} (${range})${tag}`;
-    }
-
-    // Mini 4 Slots Card Render
-    if (data.ai_slots) {
-        const slotsObj = data.ai_slots;
-        ["pagi", "siang", "sore", "malam"].forEach(slotKey => {
-            const cardEl = document.getElementById(`slot-card-${slotKey}`);
-            const pillEl = document.getElementById(`slot-pill-${slotKey}`);
-            const metaEl = document.getElementById(`slot-meta-${slotKey}`);
-            const slotData = slotsObj[slotKey];
-
-            if (cardEl && slotData) {
-                cardEl.classList.toggle("is-active-slot", slotData.is_active_now);
-                cardEl.classList.toggle("is-selected-target", slotKey === currentTargetSlotKey);
+        if (itemEl) {
+            const isNow = Boolean(slotInfo?.is_active_now) || slotKey === activeSlot;
+            itemEl.classList.toggle("is-active-slot", isNow);
+        }
+        if (pillEl) {
+            const calibrated = Boolean(slotInfo?.is_calibrated);
+            const lastTaken = slotInfo?.trained_at ? formatSlotDateTime(slotInfo.trained_at) : null;
+            if (calibrated) {
+                pillEl.textContent = lastTaken || "Sudah ada";
+                pillEl.title = lastTaken ? `Terakhir ambil data: ${lastTaken}` : "Data kalibrasi sudah ada";
+            } else {
+                pillEl.textContent = "Belum ada";
+                pillEl.title = "Belum ada data kalibrasi pada waktu ini";
             }
+            pillEl.classList.toggle("is-calibrated", calibrated);
+        }
+    });
 
-            if (pillEl && slotData) {
-                if (slotData.is_calibrated) {
-                    pillEl.className = "time-slot-pill pill-calibrated";
-                    pillEl.textContent = "TERKALIBRASI";
-                } else {
-                    pillEl.className = "time-slot-pill pill-default";
-                    pillEl.textContent = "DEFAULT";
-                }
-            }
-
-            if (metaEl && slotData) {
-                if (slotData.is_calibrated) {
-                    metaEl.textContent = `${slotData.samples || 100} sampel kalibrasi`;
-                } else {
-                    metaEl.textContent = "Model bawaan umum";
-                }
-            }
-        });
-    }
-
-    const canCancel = (status === "KALIBRASI BERLANGSUNG") && !calibrationActionInProgress;
-    elBtnCalibrationStart.disabled = calibrationActionInProgress || busy || (!isServerConnected && !isSimulationMode) || (!isEsp32Online && !isSimulationMode);
-    elBtnCalibrationCancel.disabled = !canCancel;
+    const selectedSlotData = slotsObj[currentTargetSlotKey];
+    const selectedIsCalibrated = Boolean(selectedSlotData?.is_calibrated);
 
     if (elBtnCalibrationReset) {
-        elBtnCalibrationReset.disabled = calibrationActionInProgress || busy || (!isServerConnected && !isSimulationMode);
-        elBtnCalibrationReset.textContent = `Reset Slot ${currentTargetSlotLabel}`;
+        elBtnCalibrationReset.disabled = !selectedIsCalibrated || calibrationActionInProgress || busy || (!isServerConnected && !isSimulationMode);
+        elBtnCalibrationReset.textContent = `Reset ${currentTargetSlotLabel}`;
     }
 
-    if (calibrationActionInProgress) {
-        elBtnCalibrationStart.textContent = "Memproses...";
-    } else if (status === "KALIBRASI BERLANGSUNG") {
-        elBtnCalibrationStart.textContent = "Kalibrasi Berjalan";
-    } else if (status === "MELATIH MODEL") {
-        elBtnCalibrationStart.textContent = "Melatih Model...";
+    // Gauge Score & Subtitle
+    const scoreVal = (!isOffline && data.ai_score !== null && data.ai_score !== undefined && Number.isFinite(Number(data.ai_score)))
+        ? Number(data.ai_score)
+        : null;
+
+    if (elAiScoreValue) {
+        elAiScoreValue.textContent = scoreVal !== null ? String(Math.round(scoreVal)) : "--";
+    }
+
+    if (elAiArcProgress) {
+        const aiStatus = String(data.ai_status || "").toUpperCase();
+        if (scoreVal !== null) {
+            const clamped = Math.min(100, Math.max(0, scoreVal));
+            const offset = ARC_LENGTH * (1 - clamped / 100);
+            elAiArcProgress.style.strokeDashoffset = String(offset.toFixed(2));
+            if (aiStatus === "NORMAL" || clamped >= 70) {
+                elAiArcProgress.style.stroke = "#13CAB6";
+            } else if (clamped >= 50) {
+                elAiArcProgress.style.stroke = "#FFD634";
+            } else {
+                elAiArcProgress.style.stroke = "#FE623C";
+            }
+        } else {
+            elAiArcProgress.style.strokeDashoffset = String(ARC_LENGTH);
+            elAiArcProgress.style.stroke = "#4D4845";
+        }
+    }
+
+    if (elAiHumanSub) {
+        const aiStatus = String(data.ai_status || "").toUpperCase();
+        if (busy) {
+            elAiHumanSub.textContent = `Mengambil sampel kalibrasi ${currentTargetSlotLabel}...`;
+        } else if (isOffline) {
+            elAiHumanSub.textContent = "Menunggu data sensor ESP32";
+        } else if (aiStatus === "NORMAL") {
+            elAiHumanSub.textContent = "Kondisi normal tidak ada anomali";
+        } else if (aiStatus === "ANOMALI") {
+            elAiHumanSub.textContent = data.ai_status_desc || "Terdeteksi pola anomali pada sensor";
+        } else if (aiStatus === "MENGANALISIS") {
+            elAiHumanSub.textContent = "Menganalisis pola sensor kamar...";
+        } else {
+            elAiHumanSub.textContent = data.ai_status_desc || "AI siap memantau pola kamar";
+        }
+    }
+
+    // Data Terakhir (sesuai slot waktu aktif)
+    const trainedAt = selectedIsCalibrated ? selectedSlotData?.trained_at : null;
+    if (elAiModelDate) {
+        elAiModelDate.textContent = trainedAt ? formatShortDate(trainedAt) : "Belum ada";
+    }
+
+    // Progress Bar & Action Button (Idle vs Collecting)
+    let pct = 0;
+    let progLabel = "Data Terkumpul";
+
+    if (busy) {
+        pct = Math.min(100, Math.round((samples / target) * 100));
+        progLabel = status === "MELATIH MODEL" ? "Melatih model AI..." : "Collecting data...";
+    } else if (selectedIsCalibrated) {
+        pct = 100;
+        progLabel = "Data Terkumpul";
     } else {
-        elBtnCalibrationStart.textContent = `Mulai Kalibrasi (${currentTargetSlotLabel})`;
+        pct = 0;
+        progLabel = "Data Terkumpul";
+    }
+
+    if (elCalibrationProgressFill) elCalibrationProgressFill.style.width = `${pct}%`;
+    if (elCalibrationProgressTrack) elCalibrationProgressTrack.setAttribute("aria-valuenow", String(pct));
+    if (elCalibrationProgressLabel) elCalibrationProgressLabel.textContent = progLabel;
+    if (elCalibrationProgressPct) elCalibrationProgressPct.textContent = `${pct}%`;
+
+    if (elBtnCalibrationAction) {
+        if (calibrationActionInProgress) {
+            elBtnCalibrationAction.textContent = "Memproses...";
+            elBtnCalibrationAction.disabled = true;
+        } else if (status === "MELATIH MODEL") {
+            elBtnCalibrationAction.textContent = "Melatih...";
+            elBtnCalibrationAction.disabled = true;
+        } else if (status === "KALIBRASI BERLANGSUNG") {
+            elBtnCalibrationAction.textContent = "Batal";
+            elBtnCalibrationAction.disabled = false;
+        } else {
+            elBtnCalibrationAction.textContent = `Ambil Data ${currentTargetSlotLabel}`;
+            elBtnCalibrationAction.disabled = false;
+        }
     }
 }
 
 async function sendCalibrationAction(endpoint, actionName) {
     if (calibrationActionInProgress) return;
 
-    if (isSimulationMode) {
-        alert("Kalibrasi model nyata memerlukan koneksi fisik ke server & ESP32.");
-        return;
-    }
-
     calibrationActionInProgress = true;
-    calibrationActionNotice = "";
-    elBtnCalibrationStart.disabled = true;
-    elBtnCalibrationCancel.disabled = true;
-    elCalibrationMessage.textContent = `${actionName} sedang diproses...`;
-
-    let actionError = "";
+    if (latestServerData) updateAIUI(latestServerData, !isEsp32Online && !isSimulationMode);
 
     try {
         const response = await fetch(endpoint, {
@@ -629,462 +739,226 @@ async function sendCalibrationAction(endpoint, actionName) {
             body: "{}"
         });
         const result = await response.json();
-
         if (!response.ok) {
             throw new Error(result.message || `HTTP ${response.status}`);
         }
+        if (result.message) showCalibrationNotice(result.message);
     } catch (error) {
-        actionError = `${actionName} gagal: ${error.message}`;
-        calibrationActionNotice = actionError;
+        showCalibrationNotice(`${actionName} gagal: ${error.message}`);
     } finally {
         calibrationActionInProgress = false;
         await fetchSensorData();
-
-        if (actionError) {
-            elCalibrationMessage.textContent = actionError;
-        }
     }
 }
 
-function updateConnectionUI() {
-    let pillClass, pillLabel, deviceClass, deviceLabel;
+function startSimulatedCalibration(slotKey) {
+    if (simCalibrationTimer) clearInterval(simCalibrationTimer);
+    simCalibrationState.active = true;
+    simCalibrationState.samples = 10;
+    simCalibrationState.slotKey = slotKey;
+    applySimulationStep(true);
 
+    simCalibrationTimer = setInterval(() => {
+        if (!isSimulationMode || !simCalibrationState.active) {
+            clearInterval(simCalibrationTimer);
+            simCalibrationTimer = null;
+            return;
+        }
+        simCalibrationState.samples = Math.min(100, simCalibrationState.samples + 10);
+        if (simCalibrationState.samples >= 100) {
+            clearInterval(simCalibrationTimer);
+            simCalibrationTimer = null;
+            simCalibrationState.active = false;
+            simCalibrationState.calibratedSlots[slotKey] = true;
+            simCalibrationState.trainedAt[slotKey] = new Date().toISOString();
+            showCalibrationNotice(`Simulasi kalibrasi slot ${SLOT_METAS[slotKey]?.label || slotKey} selesai (100%).`);
+        }
+        applySimulationStep(true);
+    }, 500);
+}
+
+function cancelSimulatedCalibration() {
+    if (simCalibrationTimer) {
+        clearInterval(simCalibrationTimer);
+        simCalibrationTimer = null;
+    }
+    simCalibrationState.active = false;
+    simCalibrationState.samples = 0;
+    showCalibrationNotice("Simulasi pengumpulan data dibatalkan.");
+    applySimulationStep(true);
+}
+
+if (elBtnCalibrationAction) {
+    elBtnCalibrationAction.addEventListener("click", () => {
+        if (isSimulationMode) {
+            if (simCalibrationState.active) {
+                cancelSimulatedCalibration();
+            } else {
+                startSimulatedCalibration(currentTargetSlotKey);
+            }
+            return;
+        }
+
+        const status = String(latestServerData?.calibration_status || "").toUpperCase();
+        if (status === "KALIBRASI BERLANGSUNG") {
+            if (window.confirm("Batalkan pengumpulan data kalibrasi?")) {
+                sendCalibrationAction("/api/calibration/cancel", "Pembatalan kalibrasi");
+            }
+            return;
+        }
+
+        if (!isServerConnected || !isEsp32Online) {
+            showCalibrationNotice("Ambil data kalibrasi memerlukan koneksi ESP32 fisik (atau aktifkan Mode Simulasi).");
+            return;
+        }
+
+        const slotName = currentTargetSlotLabel.toUpperCase();
+        if (window.confirm(`Mulai mengambil 100 sampel normal untuk slot ${slotName}?`)) {
+            sendCalibrationAction(
+                `/api/calibration/start?slot=${encodeURIComponent(currentTargetSlotKey)}`,
+                `Kalibrasi ${currentTargetSlotLabel}`
+            );
+        }
+    });
+}
+
+if (elBtnCalibrationReset) {
+    elBtnCalibrationReset.addEventListener("click", () => {
+        if (isSimulationMode) {
+            simCalibrationState.calibratedSlots[currentTargetSlotKey] = false;
+            simCalibrationState.trainedAt[currentTargetSlotKey] = null;
+            if (elAiSlotPopover) elAiSlotPopover.hidden = true;
+            showCalibrationNotice(`Slot ${currentTargetSlotLabel} direset ke Default (Simulasi).`);
+            applySimulationStep();
+            return;
+        }
+        if (window.confirm(`Reset dataset & model kalibrasi slot ${currentTargetSlotLabel.toUpperCase()} ke default?`)) {
+            sendCalibrationAction(
+                `/api/calibration/reset?slot=${encodeURIComponent(currentTargetSlotKey)}`,
+                `Reset slot ${currentTargetSlotLabel}`
+            );
+            if (elAiSlotPopover) elAiSlotPopover.hidden = true;
+        }
+    });
+}
+
+if (elBtnAiSlotMenu && elAiSlotPopover) {
+    elBtnAiSlotMenu.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const isHidden = elAiSlotPopover.hidden;
+        elAiSlotPopover.hidden = !isHidden;
+        elBtnAiSlotMenu.setAttribute("aria-expanded", String(isHidden));
+    });
+}
+
+// ==================== HISTORY TABLE (5 COLUMNS, NO EXHAUST FAN) ====================
+function renderHistoryTable() {
+    if (!elHistoryTbody) return;
+
+    const rows = historyData.slice(-10).reverse();
+    const htmlRows = rows.map(item => `
+        <tr class="is-data-row">
+            <td>${item.time}</td>
+            <td>${Number(item.suhu).toFixed(1)}&deg;C</td>
+            <td>${Math.round(item.kelembapan)}%</td>
+            <td>${item.gas}</td>
+            <td>${item.cahaya}</td>
+        </tr>
+    `);
+
+    const placeholdersNeeded = Math.max(0, MIN_HISTORY_ROWS - htmlRows.length);
+    for (let i = 0; i < placeholdersNeeded; i++) {
+        htmlRows.push(`
+            <tr class="is-placeholder-row" aria-hidden="true">
+                <td>&nbsp;</td>
+                <td>&nbsp;</td>
+                <td>&nbsp;</td>
+                <td>&nbsp;</td>
+                <td>&nbsp;</td>
+            </tr>
+        `);
+    }
+
+    elHistoryTbody.innerHTML = htmlRows.join("");
+}
+
+// ==================== SYSTEM INFO ====================
+function formatSystemLastUpdate() {
+    if (!isServerConnected && !isSimulationMode) return "-";
     if (isSimulationMode) {
-        pillClass = "status-pill status-connected";
-        pillLabel = "Mode Simulasi Aktif";
-        deviceClass = "device-chip status-connected";
-        deviceLabel = "Simulasi Demo";
-    } else if (!isServerConnected) {
-        pillClass = "status-pill status-disconnected";
-        pillLabel = "Server Terputus";
-        deviceClass = "device-chip status-disconnected";
-        deviceLabel = "Server Terputus";
-    } else if (isEsp32Online) {
-        pillClass = "status-pill status-connected";
-        pillLabel = "ESP32 Online";
-        deviceClass = "device-chip status-connected";
-        deviceLabel = "ESP32 Online";
-    } else {
-        pillClass = "status-pill status-warning";
-        pillLabel = "ESP32 Offline";
-        deviceClass = "device-chip status-warning";
-        deviceLabel = "ESP32 Offline";
+        const now = new Date();
+        return `${now.getDate()} ${MONTHS_ID[now.getMonth()]} ${now.getFullYear()}`;
     }
-
-    elConnectionPill.className = pillClass;
-    elConnectionText.textContent = pillLabel;
-
-    if (elSidebarDevice) {
-        elSidebarDevice.className = deviceClass;
-        elSidebarDeviceText.textContent = deviceLabel;
-        elSidebarLastSeen.textContent = lastSeenTime || "-";
+    if (!lastSeenTime || lastSeenTime === "-" || lastSeenTime === "Belum ada data") {
+        const now = new Date();
+        return `${now.getDate()} ${MONTHS_ID[now.getMonth()]} ${now.getFullYear()}`;
     }
+    const now = new Date();
+    return `${now.getDate()} ${MONTHS_ID[now.getMonth()]} ${now.getFullYear()} • ${lastSeenTime}`;
 }
 
-function setBadge(element, label, variant) {
-    if (!element) return;
-    element.textContent = label;
-    element.className = `sensor-status-badge ${variant}`;
-}
-
-function updateStatCards(data, isOffline = false) {
-    if (!elStatSuhu) return;
-
-    if (isOffline) {
-        elStatSuhu.textContent = "--";
-        setBadge(elStatSuhuBadge, "Offline", "status-offline");
-        if (elFootSuhu) elFootSuhu.textContent = "Menunggu koneksi ESP32";
-        elMeterSuhu.style.width = "0%";
-
-        elStatKelembapan.textContent = "--";
-        setBadge(elStatKelembapanBadge, "Offline", "status-offline");
-        if (elFootKelembapan) elFootKelembapan.textContent = "Menunggu koneksi ESP32";
-        elMeterKelembapan.style.width = "0%";
-
-        elStatGas.textContent = "--";
-        setBadge(elStatGasBadge, "Offline", "status-offline");
-        if (elFootGas) elFootGas.textContent = "Sensor MQ-2 belum terhubung";
-        elMeterGas.style.width = "0%";
-
-        elStatCahaya.textContent = "--";
-        setBadge(elStatCahayaBadge, "Offline", "status-offline");
-        if (elFootCahaya) elFootCahaya.textContent = "Sensor LDR belum terhubung";
-        elMeterCahaya.style.width = "0%";
-        return;
-    }
-
-    // Suhu
-    elStatSuhu.textContent = data.suhu;
-    if (data.suhu < 24) {
-        setBadge(elStatSuhuBadge, "Sejuk", "status-ok");
-        if (elFootSuhu) elFootSuhu.textContent = "Suhu sejuk dan sejuk untuk beristirahat";
-    } else if (data.suhu <= 30) {
-        setBadge(elStatSuhuBadge, "Nyaman", "status-ok");
-        if (elFootSuhu) elFootSuhu.textContent = "Suhu optimal dan nyaman untuk beraktivitas";
-    } else {
-        setBadge(elStatSuhuBadge, "Terasa Gerah", "status-warn");
-        if (elFootSuhu) elFootSuhu.textContent = "Suhu ruangan hangat dan terasa gerah";
-    }
-    const percentSuhu = Math.min(100, Math.max(0, (data.suhu / 45) * 100));
-    elMeterSuhu.style.width = `${percentSuhu}%`;
-
-    // Kelembapan
-    elStatKelembapan.textContent = data.kelembapan;
-    if (data.kelembapan >= HUMIDITY_THRESHOLD) {
-        setBadge(elStatKelembapanBadge, "Lembap · Kipas Aktif", "status-warn");
-        if (elFootKelembapan) elFootKelembapan.textContent = "Udara lembap, exhaust fan otomatis menyedot udara";
-    } else if (data.kelembapan < 45) {
-        setBadge(elStatKelembapanBadge, "Udara Kering", "status-ok");
-        if (elFootKelembapan) elFootKelembapan.textContent = "Kelembapan rendah, ventilasi siaga";
-    } else {
-        setBadge(elStatKelembapanBadge, "Udara Segar", "status-ok");
-        if (elFootKelembapan) elFootKelembapan.textContent = "Rentang kelembapan udara ideal kamar";
-    }
-    const percentKelembapan = Math.min(100, Math.max(0, data.kelembapan));
-    elMeterKelembapan.style.width = `${percentKelembapan}%`;
-
-    // Gas MQ-2
-    let gasText = "Bersih";
-    let gasBadge = "Bersih";
-    let gasBadgeClass = "status-ok";
-    if (data.gas >= GAS_THRESHOLD) {
-        gasText = "Bahaya Asap";
-        gasBadge = "Bahaya Asap";
-        gasBadgeClass = "status-danger";
-        if (elFootGas) elFootGas.textContent = `Sensor MQ-2: ${data.gas} ADC • Alarm dan kipas aktif!`;
-    } else if (data.gas >= 1200) {
-        gasText = "Agak Pengap";
-        gasBadge = "Agak Pengap";
-        gasBadgeClass = "status-warn";
-        if (elFootGas) elFootGas.textContent = `Sensor MQ-2: ${data.gas} ADC • Udara agak pengap`;
-    } else {
-        gasText = "Bersih";
-        gasBadge = "Udara Bersih";
-        gasBadgeClass = "status-ok";
-        if (elFootGas) elFootGas.textContent = `Sensor MQ-2: ${data.gas} ADC • Kondisi udara aman`;
-    }
-    elStatGas.textContent = gasText;
-    setBadge(elStatGasBadge, gasBadge, gasBadgeClass);
-    const percentGas = Math.min(100, Math.max(0, (data.gas / 2600) * 100));
-    elMeterGas.style.width = `${percentGas}%`;
-
-    // Cahaya LDR
-    let cahayaText = "Terang";
-    let cahayaBadge = "Terang";
-    let cahayaBadgeClass = "status-ok";
-    if (data.cahaya >= LDR_THRESHOLD) {
-        cahayaText = "Gelap";
-        cahayaBadge = "Gelap";
-        cahayaBadgeClass = "status-dark";
-        if (elFootCahaya) elFootCahaya.textContent = `Sensor LDR: ${data.cahaya} ADC • Lampu otomatis menyala`;
-    } else if (data.cahaya >= 1200) {
-        cahayaText = "Redup";
-        cahayaBadge = "Redup";
-        cahayaBadgeClass = "status-warn";
-        if (elFootCahaya) elFootCahaya.textContent = `Sensor LDR: ${data.cahaya} ADC • Ruangan temaram`;
-    } else {
-        cahayaText = "Terang";
-        cahayaBadge = "Terang";
-        cahayaBadgeClass = "status-ok";
-        if (elFootCahaya) elFootCahaya.textContent = `Sensor LDR: ${data.cahaya} ADC • Lampu hemat daya padam`;
-    }
-    elStatCahaya.textContent = cahayaText;
-    setBadge(elStatCahayaBadge, cahayaBadge, cahayaBadgeClass);
-    const percentCahaya = Math.min(100, Math.max(0, (data.cahaya / 4095) * 100));
-    elMeterCahaya.style.width = `${percentCahaya}%`;
-}
-
-function updateActuatorCards(data, isOffline = false) {
-    if (isOffline) {
-        elCardLed.classList.remove("state-led-on");
-        elStateLed.textContent = "OFF";
-        elPillLed.textContent = "OFFLINE";
-        elPillLed.className = "output-state-pill pill-off";
-        if (elHumanStatusLed) elHumanStatusLed.textContent = "Menunggu perangkat ESP32";
-
-        elCardBuzzer.classList.remove("state-buzzer-on", "state-buzzer-muted");
-        elStateBuzzer.textContent = "OFF";
-        elPillBuzzer.textContent = "SIAGA";
-        elPillBuzzer.className = "output-state-pill pill-off";
-        if (elHumanStatusBuzzer) elHumanStatusBuzzer.textContent = "Menunggu perangkat ESP32";
-        if (elBtnBuzzerMute) {
-            elBtnBuzzerMute.className = "btn-buzzer-mute state-idle";
-            elBtnBuzzerMute.disabled = true;
-            elBtnBuzzerMute.innerHTML = `${ICONS_BUZZER_BTN.idle} <span id="btn-buzzer-mute-text">Buzzer Siaga</span>`;
-        }
-
-        elCardKipas.classList.remove("state-kipas-on");
-        elStateKipas.textContent = "OFF";
-        elPillKipas.textContent = "OFFLINE";
-        elPillKipas.className = "output-state-pill pill-off";
-        if (elHumanStatusKipas) elHumanStatusKipas.textContent = "Menunggu perangkat ESP32";
-        return;
-    }
-
-    // LED
-    if (data.led === "ON") {
-        elCardLed.classList.add("state-led-on");
-        elStateLed.textContent = "ON";
-        elPillLed.textContent = "MENYALA";
-        elPillLed.className = "output-state-pill pill-on";
-        if (elHumanStatusLed) elHumanStatusLed.textContent = "Menyala Hangat";
-    } else {
-        elCardLed.classList.remove("state-led-on");
-        elStateLed.textContent = "OFF";
-        elPillLed.textContent = "PADAM";
-        elPillLed.className = "output-state-pill pill-off";
-        if (elHumanStatusLed) elHumanStatusLed.textContent = "Padam (Hemat Daya)";
-    }
-
-    // Buzzer
-    const isMuted = Boolean(data.buzzer_muted) || data.buzzer === "MUTED";
-    const isAlarmActive = Number(data.gas) >= GAS_THRESHOLD;
-
-    if (data.buzzer === "ON" || (isAlarmActive && !isMuted)) {
-        elCardBuzzer.classList.remove("state-buzzer-muted");
-        elCardBuzzer.classList.add("state-buzzer-on");
-        elStateBuzzer.textContent = "ON";
-        elPillBuzzer.textContent = "BERBUNYI";
-        elPillBuzzer.className = "output-state-pill pill-danger-on";
-        if (elHumanStatusBuzzer) elHumanStatusBuzzer.textContent = "Berbunyi!";
-
-        if (elBtnBuzzerMute) {
-            elBtnBuzzerMute.className = "btn-buzzer-mute state-alarm";
-            elBtnBuzzerMute.disabled = false;
-            elBtnBuzzerMute.innerHTML = `${ICONS_BUZZER_BTN.mute} <span id="btn-buzzer-mute-text">Senyapkan Alarm Sementara</span>`;
-        }
-    } else if (isMuted && isAlarmActive) {
-        elCardBuzzer.classList.remove("state-buzzer-on");
-        elCardBuzzer.classList.add("state-buzzer-muted");
-        elStateBuzzer.textContent = "MUTED";
-        elPillBuzzer.textContent = "DISENYAPKAN";
-        elPillBuzzer.className = "output-state-pill pill-muted";
-        if (elHumanStatusBuzzer) elHumanStatusBuzzer.textContent = "Disenyapkan Sementara";
-
-        if (elBtnBuzzerMute) {
-            elBtnBuzzerMute.className = "btn-buzzer-mute state-muted";
-            elBtnBuzzerMute.disabled = false;
-            elBtnBuzzerMute.innerHTML = `${ICONS_BUZZER_BTN.unmute} <span id="btn-buzzer-mute-text">Nyalakan Alarm Kembali</span>`;
-        }
-    } else {
-        elCardBuzzer.classList.remove("state-buzzer-on", "state-buzzer-muted");
-        elStateBuzzer.textContent = "OFF";
-        elPillBuzzer.textContent = "HENING";
-        elPillBuzzer.className = "output-state-pill pill-off";
-        if (elHumanStatusBuzzer) elHumanStatusBuzzer.textContent = "Tenang / Siaga";
-
-        if (elBtnBuzzerMute) {
-            elBtnBuzzerMute.className = "btn-buzzer-mute state-idle";
-            elBtnBuzzerMute.disabled = false;
-            elBtnBuzzerMute.innerHTML = `${ICONS_BUZZER_BTN.idle} <span id="btn-buzzer-mute-text">Buzzer Siaga</span>`;
-        }
-    }
-
-    // Exhaust Fan
-    if (data.kipas === "ON") {
-        elCardKipas.classList.add("state-kipas-on");
-        elStateKipas.textContent = "ON";
-        elPillKipas.textContent = "BERPUTAR";
-        elPillKipas.className = "output-state-pill pill-on";
-        if (elHumanStatusKipas) elHumanStatusKipas.textContent = "Sedang Menyedot Udara";
-    } else {
-        elCardKipas.classList.remove("state-kipas-on");
-        elStateKipas.textContent = "OFF";
-        elPillKipas.textContent = "MATI";
-        elPillKipas.className = "output-state-pill pill-off";
-        if (elHumanStatusKipas) elHumanStatusKipas.textContent = "Siaga (Mati)";
-    }
-}
-
-function updateAlertBanner(data) {
-    elAlertTime.textContent = data.time;
-
-    if (!isEsp32Online && !isSimulationMode) {
-        elAlertBanner.className = "alert-banner alert-warning";
-        elAlertIcon.innerHTML = ICONS.stream;
-        elAlertTitle.textContent = "ESP32 Sedang Belum Terhubung";
-        elAlertMessage.textContent = "Server menunggu koneksi dari ESP32. Anda dapat menyalakan 'Mode Simulasi' untuk menguji fitur.";
-        return;
-    }
-
-    if (data.gas >= GAS_THRESHOLD) {
-        const isMuted = Boolean(data.buzzer_muted) || data.buzzer === "MUTED";
-        elAlertBanner.className = isMuted ? "alert-banner alert-warning" : "alert-banner alert-danger";
-        elAlertIcon.innerHTML = ICONS.siren;
-        elAlertTitle.textContent = isMuted ? "Waspada: Asap atau Gas Terdeteksi (Buzzer Disenyapkan)" : "Waspada: Asap atau Gas Terdeteksi!";
-        elAlertMessage.textContent = `Sensor MQ-2 mendeteksi nilai ${data.gas} ADC. Exhaust fan aktif menyedot udara keluar.`;
-        return;
-    }
-
-    if (data.kelembapan >= HUMIDITY_THRESHOLD) {
-        elAlertBanner.className = "alert-banner alert-warning";
-        elAlertIcon.innerHTML = ICONS.drop;
-        elAlertTitle.textContent = "Ruangan lembap. Exhaust fan otomatis aktif.";
-        elAlertMessage.textContent = `Kelembapan udara kamar ${data.kelembapan}%. Kipas pembuang aktif menyegarkan sirkulasi udara.`;
-        return;
-    }
-
-    if (data.led === "ON" || data.cahaya >= LDR_THRESHOLD) {
-        elAlertBanner.className = "alert-banner alert-normal";
-        elAlertIcon.innerHTML = ICONS.bulb;
-        elAlertTitle.textContent = "Kamar gelap. Lampu otomatis menyala.";
-        elAlertMessage.textContent = `Intensitas cahaya rendah (LDR ${data.cahaya} ADC). LED kamar menyala hangat otomatis.`;
-        return;
-    }
-
-    elAlertBanner.className = "alert-banner alert-normal";
-    elAlertIcon.innerHTML = ICONS.shield;
-    elAlertTitle.textContent = "Kondisi Kamar 01 Nyaman & Aman";
-    elAlertMessage.textContent = "Semua sensor lingkungan berada dalam batas toleransi normal.";
-}
-
-function updateAlertBannerOnDisconnect() {
-    elAlertBanner.className = "alert-banner alert-disconnected";
-    elAlertIcon.innerHTML = ICONS.alert;
-    elAlertTitle.textContent = "Server Terputus";
-    elAlertMessage.textContent = `Gagal mengambil data dari ${API_URL}. Anda dapat mengaktifkan Mode Simulasi untuk mencoba antarmuka 3D.`;
-}
-
-function updateRoomSummary(data) {
-    const details = [];
-    let leadSentence = "";
-
-    if (!isEsp32Online && !isSimulationMode) {
-        elSummaryBadge.textContent = "Menunggu";
-        elSummaryBadge.style.color = "var(--color-warning)";
-        leadSentence = "ESP32 belum terhubung. Aktifkan Mode Simulasi untuk menguji visualisasi 3D secara interaktif.";
-        details.push({ icon: ICONS.stream, text: `Status Koneksi: Menunggu sinyal dari mikrokontroler ESP32.` });
-        details.push({ icon: ICONS.gear, text: `Fitur Simulasi: Tersedia tombol satu klik di topbar dan panggung 3D.` });
-    } else {
-        if (data.gas >= GAS_THRESHOLD) {
-            elSummaryBadge.textContent = "Gas Tinggi";
-            elSummaryBadge.style.color = "var(--color-danger)";
-            leadSentence = "Nilai sensor gas sedang tinggi. Exhaust fan dan alarm otomatis merespons.";
-            details.push({ icon: ICONS.siren, text: `Nilai MQ-2: ${data.gas} ADC. Peringatan bahaya aktif.` });
-        } else if (data.kelembapan >= HUMIDITY_THRESHOLD) {
-            elSummaryBadge.textContent = "Lembap";
-            elSummaryBadge.style.color = "var(--color-warning)";
-            leadSentence = "Udara ruangan terasa lembap. Kipas ventilasi aktif menyejukkan.";
-            details.push({ icon: ICONS.drop, text: `Kelembapan udara kamar: ${data.kelembapan}%. Kipas berputar.` });
-        } else if (data.cahaya >= LDR_THRESHOLD) {
-            elSummaryBadge.textContent = "Gelap";
-            elSummaryBadge.style.color = "var(--yellow)";
-            leadSentence = "Ruangan dalam keadaan gelap. Lampu kamar menyala otomatis.";
-            details.push({ icon: ICONS.moon, text: `Sensor LDR: ${data.cahaya} ADC. Lampu menyala hangat.` });
-        } else {
-            elSummaryBadge.textContent = "Normal & Nyaman";
-            elSummaryBadge.style.color = "var(--color-success)";
-            leadSentence = "Seluruh kondisi lingkungan kamar kos terpantau stabil dan nyaman.";
-            details.push({ icon: ICONS.check, text: "Suhu, kelembapan, udara, dan pencahayaan berada dalam rentang ideal." });
-        }
-
-        details.push({ icon: ICONS.temp, text: `Suhu ruangan terpantau ${data.suhu}°C.` });
-        details.push({ icon: ICONS.gear, text: `Aktuator: LED ${data.led}, Buzzer ${data.buzzer}, Exhaust Fan ${data.kipas}.` });
-    }
-
-    elSummaryLead.textContent = leadSentence;
-    elSummaryDetails.innerHTML = details.map(item => `
-        <div class="summary-item">
-            <span class="summary-item-icon">${item.icon}</span>
-            <span>${item.text}</span>
-        </div>
-    `).join("");
-}
-
-function updateSystemInfo(success, errText = "") {
+function updateSystemInfo(success) {
     if (isSimulationMode) {
-        elSysServerStatus.textContent = "Mode Simulasi Aktif";
-        elSysEspStatus.textContent = "Simulasi Interaktif Demo";
-        elSysLastUpdate.textContent = new Date().toLocaleTimeString("id-ID", { hour12: false });
+        if (elSysServerStatus) {
+            elSysServerStatus.textContent = "Mode Simulasi";
+            elSysServerStatus.className = "info-val val-status-sim";
+        }
+        if (elSysEspStatus) {
+            elSysEspStatus.textContent = "Simulasi Demo";
+            elSysEspStatus.className = "info-val val-status-sim";
+        }
+        if (elSysLastUpdate) elSysLastUpdate.textContent = formatSystemLastUpdate();
         return;
     }
 
     if (success) {
-        elSysServerStatus.textContent = "Terhubung (200 OK)";
-        elSysEspStatus.textContent = isEsp32Online ? "Online (Menerima Data)" : "Offline (Menunggu Data)";
-        elSysLastUpdate.textContent = lastSeenTime;
+        if (elSysServerStatus) {
+            elSysServerStatus.textContent = "Terhubung";
+            elSysServerStatus.className = "info-val val-status-ok";
+        }
+        if (elSysEspStatus) {
+            elSysEspStatus.textContent = isEsp32Online ? "Terhubung" : "Offline";
+            elSysEspStatus.className = isEsp32Online ? "info-val val-status-ok" : "info-val val-status-err";
+        }
+        if (elSysLastUpdate) elSysLastUpdate.textContent = formatSystemLastUpdate();
     } else {
-        elSysServerStatus.textContent = `Terputus: ${errText || "Offline"}`;
-        elSysEspStatus.textContent = "Menunggu Server";
+        if (elSysServerStatus) {
+            elSysServerStatus.textContent = "Terputus";
+            elSysServerStatus.className = "info-val val-status-err";
+        }
+        if (elSysEspStatus) {
+            elSysEspStatus.textContent = "Offline";
+            elSysEspStatus.className = "info-val val-status-err";
+        }
     }
 }
 
-function renderHistoryTable() {
-    if (!elHistoryTbody) return;
-
-    elHistoryCount.textContent = `${historyData.length} baris`;
-
-    if (historyData.length === 0) {
-        elHistoryTbody.innerHTML = "";
-        elHistoryEmpty.classList.add("show");
-        return;
-    }
-
-    elHistoryEmpty.classList.remove("show");
-
-    const rows = historyData.slice().reverse();
-    elHistoryTbody.innerHTML = rows.map(item => {
-        const fanOn = item.kipas === "ON";
-        const fanLabel = fanOn ? "MENYALA" : "MATI";
-        const fanClass = fanOn ? "pill-on" : "pill-off";
-        return `
-            <tr>
-                <td class="cell-time">${item.time}</td>
-                <td>${item.suhu}°C</td>
-                <td>${item.kelembapan}%</td>
-                <td>${item.cahaya}</td>
-                <td>${item.gas}</td>
-                <td><span class="output-state-pill ${fanClass}">${fanLabel}</span></td>
-            </tr>
-        `;
-    }).join("");
-}
-
-// Chart.js Canvas Logic
+// ==================== SMOOTH CANVAS TREND CHART ====================
 function setupCanvasResolution() {
     const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return null;
 
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
-
     ctx.resetTransform?.();
     ctx.scale(dpr, dpr);
+    return rect;
 }
 
 function drawChart() {
-    setupCanvasResolution();
-    const rect = canvas.getBoundingClientRect();
+    const rect = setupCanvasResolution();
+    if (!rect) return;
+
     const width = rect.width;
     const height = rect.height;
-
-    elChartCount.textContent = `Menampilkan ${historyData.length} data riwayat`;
     ctx.clearRect(0, 0, width, height);
 
-    if (historyData.length < 2) {
-        ctx.fillStyle = CHART_COLORS.axis;
-        ctx.font = "600 14px " + getComputedStyle(document.body).fontFamily;
-        ctx.textAlign = "center";
-        ctx.fillText("Mengumpulkan titik data riwayat sensor...", width / 2, height / 2);
-        return;
-    }
+    const padding = { top: 14, right: 14, bottom: 16, left: 42 };
+    const chartW = Math.max(40, width - padding.left - padding.right);
+    const chartH = Math.max(40, height - padding.top - padding.bottom);
 
-    const padding = { top: 20, right: 20, bottom: 30, left: 45 };
-    const chartW = width - padding.left - padding.right;
-    const chartH = height - padding.top - padding.bottom;
-
-    ctx.strokeStyle = CHART_COLORS.grid;
-    ctx.lineWidth = 1;
-    const gridLines = 4;
-    for (let i = 0; i <= gridLines; i++) {
-        const y = padding.top + (chartH / gridLines) * i;
-        ctx.beginPath();
-        ctx.moveTo(padding.left, y);
-        ctx.lineTo(width - padding.right, y);
-        ctx.stroke();
-    }
-
-    let minY = 0;
+    let minY = 20;
     let maxY = 100;
     let unitLabel = "%";
 
@@ -1093,26 +967,35 @@ function drawChart() {
     } else if (activeMetric === "kelembapan") {
         minY = 20; maxY = 100; unitLabel = "%";
     } else if (activeMetric === "gas") {
-        minY = 200; maxY = 2600; unitLabel = "";
+        minY = 0; maxY = 4095; unitLabel = "";
     } else if (activeMetric === "cahaya") {
         minY = 0; maxY = 4095; unitLabel = "";
     }
 
+    const gridLines = 4;
+    ctx.strokeStyle = CHART_COLORS.grid;
+    ctx.lineWidth = 1;
     ctx.fillStyle = CHART_COLORS.axis;
-    ctx.font = "600 11px " + getComputedStyle(document.body).fontFamily;
+    ctx.font = "500 12px " + getComputedStyle(document.body).fontFamily;
     ctx.textAlign = "right";
+
     for (let i = 0; i <= gridLines; i++) {
+        const y = padding.top + (chartH / gridLines) * i;
+        ctx.beginPath();
+        ctx.moveTo(padding.left, y);
+        ctx.lineTo(width - padding.right, y);
+        ctx.stroke();
+
         const val = maxY - ((maxY - minY) / gridLines) * i;
-        const y = padding.top + (chartH / gridLines) * i + 4;
-        ctx.fillText(Math.round(val) + unitLabel, padding.left - 8, y);
+        ctx.fillText(Math.round(val) + unitLabel, padding.left - 8, y + 3.5);
     }
 
-    if (activeMetric === "gas") {
-        drawThresholdLine(GAS_THRESHOLD, minY, maxY, padding, chartW, chartH, CHART_COLORS.gas, "Ambang Gas (2000)");
-    } else if (activeMetric === "kelembapan") {
-        drawThresholdLine(HUMIDITY_THRESHOLD, minY, maxY, padding, chartW, chartH, CHART_COLORS.warning, "Ambang Kipas ON (60%)");
-    } else if (activeMetric === "cahaya") {
-        drawThresholdLine(LDR_THRESHOLD, minY, maxY, padding, chartW, chartH, CHART_COLORS.cahaya, "Ambang Gelap (2000)");
+    if (historyData.length < 2) {
+        ctx.fillStyle = "rgba(181, 175, 169, 0.55)";
+        ctx.font = "500 11.5px " + getComputedStyle(document.body).fontFamily;
+        ctx.textAlign = "center";
+        ctx.fillText("Menunggu titik data riwayat sensor...", padding.left + chartW / 2, padding.top + chartH / 2 + 4);
+        return;
     }
 
     const getX = (index) => padding.left + (index / (historyData.length - 1)) * chartW;
@@ -1122,239 +1005,284 @@ function drawChart() {
     };
 
     if (activeMetric === "all" || activeMetric === "suhu") {
-        const values = historyData.map(d => activeMetric === "all" ? (d.suhu / 50) * 100 : d.suhu);
-        drawLineSeries(values, CHART_COLORS.suhu, getX, getY, activeMetric !== "all");
+        const values = historyData.map(d => activeMetric === "all" ? (d.suhu / 45) * 100 : d.suhu);
+        drawSmoothSeries(values, CHART_COLORS.suhu, getX, getY);
     }
-
     if (activeMetric === "all" || activeMetric === "kelembapan") {
         const values = historyData.map(d => d.kelembapan);
-        drawLineSeries(values, CHART_COLORS.kelembapan, getX, getY, activeMetric !== "all");
+        drawSmoothSeries(values, CHART_COLORS.kelembapan, getX, getY);
     }
-
     if (activeMetric === "all" || activeMetric === "gas") {
-        const values = historyData.map(d => activeMetric === "all" ? (d.gas / 2500) * 100 : d.gas);
-        drawLineSeries(values, CHART_COLORS.gas, getX, getY, activeMetric !== "all");
+        const values = historyData.map(d => activeMetric === "all" ? (d.gas / 4095) * 100 : d.gas);
+        drawSmoothSeries(values, CHART_COLORS.gas, getX, getY);
     }
-
     if (activeMetric === "all" || activeMetric === "cahaya") {
         const values = historyData.map(d => activeMetric === "all" ? (d.cahaya / 4095) * 100 : d.cahaya);
-        drawLineSeries(values, CHART_COLORS.cahaya, getX, getY, activeMetric !== "all");
-    }
-
-    if (historyData.length > 0) {
-        ctx.fillStyle = CHART_COLORS.axis;
-        ctx.font = "600 11px " + getComputedStyle(document.body).fontFamily;
-        ctx.textAlign = "left";
-        ctx.fillText(historyData[0].time, padding.left, height - 10);
-        ctx.textAlign = "right";
-        ctx.fillText(historyData[historyData.length - 1].time, width - padding.right, height - 10);
+        drawSmoothSeries(values, CHART_COLORS.cahaya, getX, getY);
     }
 }
 
-function hexToRgba(hex, alpha) {
-    const clean = String(hex).replace("#", "");
-    if (clean.length !== 6) return hex;
-    const r = parseInt(clean.substring(0, 2), 16);
-    const g = parseInt(clean.substring(2, 4), 16);
-    const b = parseInt(clean.substring(4, 6), 16);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
-function drawLineSeries(values, color, getX, getY, fillArea = false) {
+function drawSmoothSeries(values, color, getX, getY) {
     if (values.length < 2) return;
 
     ctx.save();
     ctx.strokeStyle = color;
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = 2.4;
+    ctx.lineCap = "round";
     ctx.lineJoin = "round";
 
     ctx.beginPath();
     ctx.moveTo(getX(0), getY(values[0]));
-    for (let i = 1; i < values.length; i++) {
-        ctx.lineTo(getX(i), getY(values[i]));
-    }
-    ctx.stroke();
 
-    if (fillArea) {
-        const rect = canvas.getBoundingClientRect();
-        const bottomY = rect.height - 30;
-        ctx.lineTo(getX(values.length - 1), bottomY);
-        ctx.lineTo(getX(0), bottomY);
-        ctx.closePath();
-
-        const gradient = ctx.createLinearGradient(0, 0, 0, bottomY);
-        gradient.addColorStop(0, hexToRgba(color, 0.22));
-        gradient.addColorStop(1, "rgba(0, 0, 0, 0.0)");
-        ctx.fillStyle = gradient;
-        ctx.fill();
+    for (let i = 1; i < values.length - 1; i++) {
+        const xc = (getX(i) + getX(i + 1)) / 2;
+        const yc = (getY(values[i]) + getY(values[i + 1])) / 2;
+        ctx.quadraticCurveTo(getX(i), getY(values[i]), xc, yc);
     }
 
-    const lastIdx = values.length - 1;
-    ctx.beginPath();
-    ctx.arc(getX(lastIdx), getY(values[lastIdx]), 4, 0, Math.PI * 2);
-    ctx.fillStyle = color;
-    ctx.fill();
-    ctx.strokeStyle = "#ffffff";
-    ctx.lineWidth = 1.5;
+    const last = values.length - 1;
+    ctx.lineTo(getX(last), getY(values[last]));
     ctx.stroke();
-
     ctx.restore();
 }
 
-function drawThresholdLine(val, minY, maxY, padding, chartW, chartH, color, label) {
-    if (val < minY || val > maxY) return;
-    const y = padding.top + chartH - ((val - minY) / (maxY - minY)) * chartH;
-
-    ctx.save();
-    ctx.strokeStyle = color;
-    ctx.setLineDash([4, 4]);
-    ctx.lineWidth = 1.5;
-
-    ctx.beginPath();
-    ctx.moveTo(padding.left, y);
-    ctx.lineTo(padding.left + chartW, y);
-    ctx.stroke();
-
-    ctx.fillStyle = color;
-    ctx.font = "10px " + getComputedStyle(document.body).fontFamily;
-    ctx.textAlign = "left";
-    ctx.fillText(`-- ${label}`, padding.left + 8, y - 5);
-    ctx.restore();
-}
-
-function setActiveMetric(metric, scroll = false) {
+function setActiveMetric(metric) {
     activeMetric = metric || "all";
-    tabButtons.forEach(b => {
-        b.classList.toggle("active", b.dataset.metric === activeMetric);
+    tabButtons.forEach(b => b.classList.toggle("active", b.dataset.metric === activeMetric));
+    legendItems.forEach(item => {
+        const series = item.dataset.series;
+        item.classList.toggle("is-dimmed", activeMetric !== "all" && series !== activeMetric);
     });
     drawChart();
-
-    if (scroll) {
-        const chartSection = document.querySelector(".chart-section");
-        if (chartSection) {
-            chartSection.scrollIntoView({ behavior: "smooth", block: "start" });
-        }
-    }
 }
 
 tabButtons.forEach(btn => {
-    btn.addEventListener("click", () => {
-        setActiveMetric(btn.dataset.metric, false);
-    });
+    btn.addEventListener("click", () => setActiveMetric(btn.dataset.metric));
 });
 
-// Calibration Listeners
-elBtnCalibrationStart.addEventListener("click", () => {
-    const slotName = currentTargetSlotLabel.toUpperCase();
-    const confirmed = window.confirm(
-        `Pastikan ESP32 menyala dan sensor telah stabil.\n\n` +
-        `Kalibrasi ini akan mengumpulkan 100 sampel untuk slot [${slotName}].\n` +
-        `Mulai kalibrasi slot ${slotName}?`
-    );
-
-    if (confirmed) {
-        sendCalibrationAction(
-            `/api/calibration/start?slot=${encodeURIComponent(currentTargetSlotKey)}`,
-            `Mulai kalibrasi (${currentTargetSlotLabel})`
-        );
-    }
-});
-
-elBtnCalibrationCancel.addEventListener("click", () => {
-    const confirmed = window.confirm(
-        "Batalkan pengumpulan sampel? Model lama akan tetap digunakan."
-    );
-
-    if (confirmed) {
-        sendCalibrationAction("/api/calibration/cancel", "Pembatalan kalibrasi");
-    }
-});
-
-if (elBtnCalibrationReset) {
-    elBtnCalibrationReset.addEventListener("click", () => {
-        const slotName = currentTargetSlotLabel.toUpperCase();
-        const confirmed = window.confirm(
-            `Apakah Anda yakin ingin mereset dataset & model kalibrasi slot [${slotName}] kembali ke default bawaan umum?`
-        );
-
-        if (confirmed) {
-            sendCalibrationAction(
-                `/api/calibration/reset?slot=${encodeURIComponent(currentTargetSlotKey)}`,
-                `Reset slot ${currentTargetSlotLabel}`
-            );
-        }
-    });
-}
-
-window.selectSlot = function(slotKey) {
-    if (!slotKey || calibrationActionInProgress) return;
-
-    if (manualSelectedSlotKey === slotKey) {
-        manualSelectedSlotKey = null;
-    } else {
-        manualSelectedSlotKey = slotKey;
-    }
-
-    if (latestServerData) {
-        updateCalibrationUI(latestServerData);
+// ==================== SIMULATION MODE & POPOVER ====================
+const SIM_SCENARIOS = {
+    normal: {
+        suhu: 26.6,
+        kelembapan: 54,
+        cahaya: 920,
+        gas: 460,
+        led: "OFF",
+        kipas: "OFF",
+        buzzer: "OFF",
+        ai_status: "NORMAL",
+        ai_score: 90.0,
+        ai_status_desc: "Kondisi normal tidak ada anomali"
+    },
+    dark: {
+        suhu: 25.4,
+        kelembapan: 55,
+        cahaya: 2850,
+        gas: 490,
+        led: "ON",
+        kipas: "OFF",
+        buzzer: "OFF",
+        ai_status: "NORMAL",
+        ai_score: 92.0,
+        ai_status_desc: "Kondisi normal tidak ada anomali"
+    },
+    humid: {
+        suhu: 28.2,
+        kelembapan: 68,
+        cahaya: 1050,
+        gas: 520,
+        led: "OFF",
+        kipas: "ON",
+        buzzer: "OFF",
+        ai_status: "NORMAL",
+        ai_score: 86.0,
+        ai_status_desc: "Kelembapan meningkat, kipas otomatis menyedot udara"
+    },
+    gas: {
+        suhu: 31.8,
+        kelembapan: 62,
+        cahaya: 1180,
+        gas: 3650,
+        led: "OFF",
+        kipas: "ON",
+        buzzer: "ON",
+        ai_status: "ANOMALI",
+        ai_score: 42.0,
+        ai_status_desc: "Indikasi gas tinggi terdeteksi pada kamar"
+    },
+    anomaly: {
+        suhu: 33.4,
+        kelembapan: 30,
+        cahaya: 3100,
+        gas: 2350,
+        led: "ON",
+        kipas: "OFF",
+        buzzer: "OFF",
+        ai_status: "ANOMALI",
+        ai_score: 36.0,
+        ai_status_desc: "Pola suhu dan cahaya menyimpang dari kebiasaan kamar"
+    },
+    emergency: {
+        suhu: 36.5,
+        kelembapan: 72,
+        cahaya: 2600,
+        gas: 3950,
+        led: "ON",
+        kipas: "ON",
+        buzzer: "ON",
+        ai_status: "ANOMALI",
+        ai_score: 18.0,
+        ai_status_desc: "Darurat! Gas dan suhu ekstrem terdeteksi"
     }
 };
 
-elBtnRefresh.addEventListener("click", () => {
-    fetchSensorData();
+function toggleSimulationMode() {
+    isSimulationMode = !isSimulationMode;
+    window.isSimulationModeActive = isSimulationMode;
+    manualDeviceState.kipas = null;
+    manualDeviceState.led = null;
+    manualDeviceState.buzzer = null;
+
+    if (elBtnToggleDemo) {
+        elBtnToggleDemo.classList.toggle("is-on", isSimulationMode);
+        elBtnToggleDemo.setAttribute("aria-checked", String(isSimulationMode));
+    }
+    if (elSimulationBar) elSimulationBar.hidden = !isSimulationMode;
+    if (elStageSimStrip) elStageSimStrip.hidden = !isSimulationMode;
+
+    if (isSimulationMode) {
+        applySimulationStep();
+        if (simulationInterval) clearInterval(simulationInterval);
+        simulationInterval = setInterval(applySimulationStep, 2000);
+    } else {
+        if (simulationInterval) clearInterval(simulationInterval);
+        if (simCalibrationTimer) {
+            clearInterval(simCalibrationTimer);
+            simCalibrationTimer = null;
+        }
+        simCalibrationState.active = false;
+        historyData = [];
+        fetchInitialHistory();
+        fetchSensorData();
+    }
+}
+
+function applySimulationStep(skipHistory = false) {
+    const base = SIM_SCENARIOS[simulationScenario] || SIM_SCENARIOS.normal;
+    const jitterSuhu = (Math.random() - 0.5) * 0.4;
+    const jitterHum = (Math.random() - 0.5) * 1.0;
+    const jitterLdr = Math.round((Math.random() - 0.5) * 30);
+    const jitterGas = Math.round((Math.random() - 0.5) * 20);
+
+    const activeSlot = getTimeSlotKeyForDate(new Date());
+    const activeMeta = SLOT_METAS[activeSlot] || SLOT_METAS.pagi;
+    const isCalibBusy = simCalibrationState.active;
+
+    const simData = {
+        suhu: Number((base.suhu + jitterSuhu).toFixed(1)),
+        kelembapan: Math.round(base.kelembapan + jitterHum),
+        cahaya: Math.max(0, base.cahaya + jitterLdr),
+        gas: Math.max(0, base.gas + jitterGas),
+        led: manualDeviceState.led || base.led,
+        kipas: manualDeviceState.kipas || base.kipas,
+        buzzer: manualDeviceState.buzzer || base.buzzer,
+        buzzer_muted: manualDeviceState.buzzer === "OFF",
+        esp32_online: true,
+        last_seen: new Date().toLocaleTimeString("id-ID", { hour12: false }),
+        ai_status: base.ai_status,
+        ai_score: base.ai_score,
+        ai_status_desc: base.ai_status_desc,
+        ai_available: true,
+        ai_active_slot: activeSlot,
+        ai_active_slot_label: activeMeta.label,
+        ai_active_slot_range: activeMeta.range,
+        ai_model_trained_at: simCalibrationState.trainedAt[activeSlot] || null,
+        calibration_status: isCalibBusy ? "KALIBRASI BERLANGSUNG" : "KALIBRASI BERHASIL",
+        calibration_busy: isCalibBusy,
+        calibration_samples: isCalibBusy ? simCalibrationState.samples : 100,
+        calibration_target: 100,
+        calibration_target_slot: isCalibBusy ? simCalibrationState.slotKey : activeSlot,
+        ai_slots: {
+            pagi: { key: "pagi", label: "Pagi", range: "05:00 - 11:00", is_calibrated: simCalibrationState.calibratedSlots.pagi, is_active_now: activeSlot === "pagi", samples: 100, trained_at: simCalibrationState.trainedAt.pagi },
+            siang: { key: "siang", label: "Siang", range: "11:00 - 15:00", is_calibrated: simCalibrationState.calibratedSlots.siang, is_active_now: activeSlot === "siang", samples: 100, trained_at: simCalibrationState.trainedAt.siang },
+            sore: { key: "sore", label: "Sore", range: "15:00 - 18:30", is_calibrated: simCalibrationState.calibratedSlots.sore, is_active_now: activeSlot === "sore", samples: 100, trained_at: simCalibrationState.trainedAt.sore },
+            malam: { key: "malam", label: "Malam", range: "18:30 - 05:00", is_calibrated: simCalibrationState.calibratedSlots.malam, is_active_now: activeSlot === "malam", samples: 100, trained_at: simCalibrationState.trainedAt.malam }
+        }
+    };
+
+    handleDataSuccess(simData, { skipHistory });
+}
+
+if (elBtnToggleDemo) {
+    elBtnToggleDemo.addEventListener("click", toggleSimulationMode);
+}
+
+document.querySelectorAll(".sim-preset-btn[data-sim]").forEach(btn => {
+    btn.addEventListener("click", () => {
+        simulationScenario = btn.dataset.sim;
+        manualDeviceState.kipas = null;
+        manualDeviceState.led = null;
+        manualDeviceState.buzzer = null;
+        document.querySelectorAll(".sim-preset-btn[data-sim]").forEach(b => {
+            b.classList.toggle("is-active", b.dataset.sim === simulationScenario);
+        });
+        applySimulationStep();
+        if (window.Room3D && typeof window.Room3D.focusScenario === "function") {
+            window.Room3D.focusScenario(simulationScenario);
+        }
+    });
 });
+
+// Status Popover Toggle & Outside Click Close
+if (elConnectionPill && elStatusPopover) {
+    elConnectionPill.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const isHidden = elStatusPopover.hidden;
+        elStatusPopover.hidden = !isHidden;
+        elConnectionPill.setAttribute("aria-expanded", String(isHidden));
+        if (elAiSlotPopover) elAiSlotPopover.hidden = true;
+    });
+}
+
+document.addEventListener("click", (e) => {
+    if (elStatusPopover && !elStatusPopover.hidden && elStatusMenuWrap && !elStatusMenuWrap.contains(e.target)) {
+        elStatusPopover.hidden = true;
+        if (elConnectionPill) elConnectionPill.setAttribute("aria-expanded", "false");
+    }
+    if (elAiSlotPopover && !elAiSlotPopover.hidden && !elAiSlotPopover.contains(e.target) && e.target !== elBtnAiSlotMenu && !elBtnAiSlotMenu?.contains(e.target)) {
+        elAiSlotPopover.hidden = true;
+        if (elBtnAiSlotMenu) elBtnAiSlotMenu.setAttribute("aria-expanded", "false");
+    }
+});
+
+if (elBtnRefresh) {
+    elBtnRefresh.addEventListener("click", () => {
+        fetchSensorData();
+    });
+}
 
 window.addEventListener("resize", () => {
     drawChart();
 });
 
-// Sidebar Navigation
-const SECTION_LABELS = {
-    dashboard: "Overview",
-    monitoring: "Monitoring",
-    ai: "AI Analysis",
-    riwayat: "Sensor History",
-    perangkat: "Device Control"
-};
-
+// ==================== SIDEBAR NAVIGATION & SCROLLSPY ====================
 function setActiveNav(id) {
     navItems.forEach(item => {
-        item.classList.toggle("is-active", item.dataset.nav === id);
+        const active = item.dataset.nav === id;
+        item.classList.toggle("is-active", active);
+        const icon = item.querySelector(".material-symbols-rounded");
+        if (icon) icon.classList.toggle("icon-filled", active);
     });
-
-    const label = SECTION_LABELS[id] || "Overview";
-    if (elPageTitle) elPageTitle.textContent = "Smart Kamar Kos 01";
-    if (elBreadcrumbCurrent) elBreadcrumbCurrent.textContent = label;
-}
-
-function closeSidebar() {
-    if (!elSidebar) return;
-    elSidebar.classList.remove("open");
-    document.body.classList.remove("nav-open");
-}
-
-if (elMenuToggle) {
-    elMenuToggle.addEventListener("click", () => {
-        elSidebar.classList.toggle("open");
-        document.body.classList.toggle("nav-open");
-    });
-}
-
-if (elSidebarOverlay) {
-    elSidebarOverlay.addEventListener("click", closeSidebar);
 }
 
 navItems.forEach(item => {
     item.addEventListener("click", (event) => {
         const id = item.dataset.nav;
         const target = document.getElementById(id);
-
         if (!target) return;
-
         event.preventDefault();
         setActiveNav(id);
         target.scrollIntoView({ behavior: "smooth", block: "start" });
-        closeSidebar();
     });
 });
 
@@ -1365,230 +1293,12 @@ if ("IntersectionObserver" in window && pageSections.length) {
                 setActiveNav(entry.target.id);
             }
         });
-    }, { rootMargin: "-45% 0px -50% 0px", threshold: 0 });
+    }, { rootMargin: "-40% 0px -50% 0px", threshold: 0 });
 
     pageSections.forEach(section => navObserver.observe(section));
 }
 
-// Buzzer Mute Action
-if (elBtnBuzzerMute) {
-    elBtnBuzzerMute.addEventListener("click", async () => {
-        if (isBuzzerMuting) return;
-        isBuzzerMuting = true;
-
-        if (isSimulationMode) {
-            // Local simulation toggle mute
-            if (latestServerData) {
-                latestServerData.buzzer_muted = !latestServerData.buzzer_muted;
-                if (latestServerData.buzzer === "ON" && latestServerData.buzzer_muted) {
-                    latestServerData.buzzer = "MUTED";
-                } else if (latestServerData.buzzer === "MUTED" && !latestServerData.buzzer_muted) {
-                    latestServerData.buzzer = "ON";
-                }
-                handleDataSuccess(latestServerData);
-            }
-            isBuzzerMuting = false;
-            return;
-        }
-
-        const isCurrentlyMuted = elBtnBuzzerMute.classList.contains("state-muted");
-        const targetEndpoint = isCurrentlyMuted ? "/api/buzzer/unmute" : "/api/buzzer/mute";
-
-        elBtnBuzzerMute.disabled = true;
-        elBtnBuzzerMute.innerHTML = `<span class="btn-spinner"></span> <span>Memproses...</span>`;
-
-        try {
-            const response = await fetch(targetEndpoint, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" }
-            });
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-            await fetchSensorData();
-        } catch (err) {
-            console.error("Gagal mengubah status buzzer:", err);
-            await fetchSensorData();
-        } finally {
-            isBuzzerMuting = false;
-            if (elBtnBuzzerMute) elBtnBuzzerMute.disabled = false;
-        }
-    });
-}
-
-// Mode simulasi dan demo interaktif
-const SIM_SCENARIOS = {
-    normal: {
-        suhu: 26.5,
-        kelembapan: 52,
-        cahaya: 950,
-        gas: 480,
-        led: "OFF",
-        kipas: "OFF",
-        buzzer: "OFF",
-        ai_status: "NORMAL",
-        ai_score: 94.2,
-        ai_status_desc: "Pola sensor stabil dan selaras dengan patokan kalibrasi miniatur."
-    },
-    dark: {
-        suhu: 25.2,
-        kelembapan: 54,
-        cahaya: 2850,
-        gas: 510,
-        led: "ON",
-        kipas: "OFF",
-        buzzer: "OFF",
-        ai_status: "NORMAL",
-        ai_score: 91.8,
-        ai_status_desc: "Kamar gelap terdeteksi, lampu kamar otomatis menyala hangat."
-    },
-    humid: {
-        suhu: 27.8,
-        kelembapan: 68,
-        cahaya: 1100,
-        gas: 530,
-        led: "OFF",
-        kipas: "ON",
-        buzzer: "OFF",
-        ai_status: "NORMAL",
-        ai_score: 87.5,
-        ai_status_desc: "Kelembapan melebihi ambang batas 60%, exhaust fan otomatis menyedot udara."
-    },
-    gas: {
-        suhu: 32.5,
-        kelembapan: 63,
-        cahaya: 1250,
-        gas: 2450,
-        led: "OFF",
-        kipas: "ON",
-        buzzer: "ON",
-        ai_status: "ANOMALI",
-        ai_score: 38.0,
-        ai_status_desc: "Bahaya! Konsentrasi gas MQ-2 tinggi, alarm dan kipas ventilasi aktif."
-    },
-    anomaly: {
-        suhu: 38.5,
-        kelembapan: 28,
-        cahaya: 3400,
-        gas: 1450,
-        led: "ON",
-        kipas: "OFF",
-        buzzer: "OFF",
-        ai_status: "ANOMALI",
-        ai_score: 32.5,
-        ai_status_desc: "Perubahan pola kamar terdeteksi: Suhu dan cahaya tinggi menyimpang dari slot waktu."
-    }
-};
-
-function toggleSimulationMode() {
-    isSimulationMode = !isSimulationMode;
-    window.isSimulationModeActive = isSimulationMode;
-
-    if (isSimulationMode) {
-        elBtnToggleDemo.classList.add("is-active");
-        elBtnDemoText.textContent = "Keluar Simulasi";
-        if (elSimulationBar) elSimulationBar.style.display = "flex";
-        if (elOfflineHelperBanner) elOfflineHelperBanner.style.display = "none";
-
-        applySimulationStep();
-        if (simulationInterval) clearInterval(simulationInterval);
-        simulationInterval = setInterval(applySimulationStep, 2000);
-    } else {
-        elBtnToggleDemo.classList.remove("is-active");
-        elBtnDemoText.textContent = "Mode Simulasi";
-        if (elSimulationBar) elSimulationBar.style.display = "none";
-        if (simulationInterval) clearInterval(simulationInterval);
-
-        if (!isEsp32Online) {
-            const resetData = {
-                suhu: 0,
-                kelembapan: 0,
-                cahaya: 0,
-                gas: 0,
-                led: "OFF",
-                buzzer: "OFF",
-                kipas: "OFF",
-                esp32_online: false,
-                lastSeen: lastSeenTime
-            };
-            updateStatCards(resetData, true);
-            updateActuatorCards(resetData, true);
-            updateAIUI({ ai_status: "STANDBY" }, true);
-            updateHumanVerdicts(resetData, { ai_status: "STANDBY" });
-            updateAlertBanner(resetData);
-            updateRoomSummary(resetData);
-            if (window.Room3D && typeof window.Room3D.updateData === "function") {
-                window.Room3D.updateData(resetData);
-            }
-        }
-        fetchSensorData();
-    }
-}
-
-function applySimulationStep() {
-    const base = SIM_SCENARIOS[simulationScenario] || SIM_SCENARIOS.normal;
-    // Jitter halus agar pembacaan tampak hidup dan alami
-    const jitterSuhu = (Math.random() - 0.5) * 0.4;
-    const jitterHum = (Math.random() - 0.5) * 1.0;
-    const jitterLdr = Math.round((Math.random() - 0.5) * 30);
-    const jitterGas = Math.round((Math.random() - 0.5) * 20);
-
-    const simData = {
-        suhu: Number((base.suhu + jitterSuhu).toFixed(1)),
-        kelembapan: Math.round(base.kelembapan + jitterHum),
-        cahaya: Math.max(0, base.cahaya + jitterLdr),
-        gas: Math.max(0, base.gas + jitterGas),
-        led: base.led,
-        kipas: base.kipas,
-        buzzer: base.buzzer,
-        buzzer_muted: latestServerData?.buzzer_muted || false,
-        esp32_online: true,
-        last_seen: new Date().toLocaleTimeString("id-ID", { hour12: false }),
-        ai_status: base.ai_status,
-        ai_score: base.ai_score,
-        ai_status_desc: base.ai_status_desc,
-        ai_available: true,
-        ai_active_slot: "siang",
-        ai_active_slot_label: "Siang",
-        ai_active_slot_range: "11:00 - 15:00",
-        ai_model_source: "Simulasi Interaktif",
-        ai_is_slot_calibrated: true,
-        calibration_status: "KALIBRASI BERHASIL",
-        calibration_samples: 100,
-        calibration_target: 100,
-        ai_slots: {
-            pagi: { key: "pagi", label: "Pagi", range: "05:00 - 11:00", is_calibrated: true, is_active_now: false },
-            siang: { key: "siang", label: "Siang", range: "11:00 - 15:00", is_calibrated: true, is_active_now: true, samples: 100 },
-            sore: { key: "sore", label: "Sore", range: "15:00 - 18:30", is_calibrated: false, is_active_now: false },
-            malam: { key: "malam", label: "Malam", range: "18:30 - 05:00", is_calibrated: false, is_active_now: false }
-        }
-    };
-
-    handleDataSuccess(simData);
-}
-
-if (elBtnToggleDemo) {
-    elBtnToggleDemo.addEventListener("click", toggleSimulationMode);
-}
-
-if (elBtnActivateSim) {
-    elBtnActivateSim.addEventListener("click", () => {
-        if (!isSimulationMode) toggleSimulationMode();
-    });
-}
-
-document.querySelectorAll(".sim-preset-btn[data-sim]").forEach(btn => {
-    btn.addEventListener("click", () => {
-        document.querySelectorAll(".sim-preset-btn[data-sim]").forEach(b => b.classList.remove("is-active"));
-        btn.classList.add("is-active");
-        simulationScenario = btn.dataset.sim;
-        applySimulationStep();
-        if (window.Room3D && typeof window.Room3D.focusScenario === "function") {
-            window.Room3D.focusScenario(simulationScenario);
-        }
-    });
-});
-
+// ==================== INIT ====================
 async function fetchInitialHistory() {
     try {
         const response = await fetch("/api/history?limit=40", {
@@ -1615,11 +1325,12 @@ async function fetchInitialHistory() {
             drawChart();
         }
     } catch (err) {
-        // Fallback jika database belum aktif atau server dalam mode in-memory
+        // Fallback jika database belum aktif
     }
 }
 
 renderHistoryTable();
+drawChart();
 fetchInitialHistory();
 fetchSensorData();
 setInterval(fetchSensorData, POLLING_INTERVAL);

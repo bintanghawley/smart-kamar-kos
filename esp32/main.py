@@ -11,7 +11,7 @@ SERVER_URL = "http://skk.kradev.my.id/data"
 DEVICE_ID = "esp32-kamar-01"
 DEVICE_TOKEN = ""
 
-GAS_THRESHOLD = 2000
+GAS_THRESHOLD = 3500
 LDR_THRESHOLD = 2000
 HUMIDITY_THRESHOLD = 60
 FAN_OFF_DELAY = 10000
@@ -41,6 +41,9 @@ suhu = 0
 kelembapan = 0
 
 buzzer_muted = False
+manual_led = None
+manual_kipas = None
+manual_buzzer = None
 fan_running = False
 fan_off_timer = None
 wifi_logged = False
@@ -121,8 +124,18 @@ def resolve_server():
         return False
 
 
+def _parse_manual_header(response_lower, header_name, current_val):
+    if header_name + b": 1" in response_lower:
+        return "ON"
+    if header_name + b": 0" in response_lower:
+        return "OFF"
+    if header_name + b": a" in response_lower:
+        return None
+    return current_val
+
+
 def terapkan_status_mute(response):
-    global buzzer_muted
+    global buzzer_muted, manual_led, manual_kipas, manual_buzzer
 
     response_lower = response.lower()
 
@@ -141,6 +154,10 @@ def terapkan_status_mute(response):
         b'"buzzer_mute":false' in response_lower
     ):
         buzzer_muted = False
+
+    manual_led = _parse_manual_header(response_lower, b"x-manual-led", manual_led)
+    manual_kipas = _parse_manual_header(response_lower, b"x-manual-kipas", manual_kipas)
+    manual_buzzer = _parse_manual_header(response_lower, b"x-manual-buzzer", manual_buzzer)
 
 
 def kirim_data(payload):
@@ -253,20 +270,34 @@ while True:
     udara_lembap = kelembapan >= HUMIDITY_THRESHOLD
     kondisi_fan = gas_warning or udara_lembap
 
-    if not gas_warning:
-        buzzer_muted = False
+    if manual_buzzer == "ON":
+        buzzer.value(0)
+    elif manual_buzzer == "OFF" or buzzer_muted:
         buzzer.value(1)
-    elif buzzer_muted:
+    elif not gas_warning:
+        buzzer_muted = False
         buzzer.value(1)
     else:
         buzzer.value(0)
 
-    if nilai_ldr >= LDR_THRESHOLD:
+    if manual_led == "ON":
+        led.value(1)
+    elif manual_led == "OFF":
+        led.value(0)
+    elif nilai_ldr >= LDR_THRESHOLD:
         led.value(1)
     else:
         led.value(0)
 
-    if kondisi_fan:
+    if manual_kipas == "ON":
+        relay.value(1)
+        fan_running = True
+        fan_off_timer = None
+    elif manual_kipas == "OFF":
+        relay.value(0)
+        fan_running = False
+        fan_off_timer = None
+    elif kondisi_fan:
         relay.value(1)
         fan_running = True
         fan_off_timer = None

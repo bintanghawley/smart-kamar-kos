@@ -1,5 +1,9 @@
 
 import os
+
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+
 import csv
 import json
 import time
@@ -96,7 +100,7 @@ ESP32_TIMEOUT_SECONDS = 7
 CALIBRATION_TARGET = 100
 CALIBRATION_INTERVAL_SECONDS = 2
 CALIBRATION_CONTAMINATION = 0.01
-GAS_THRESHOLD = 2000
+GAS_THRESHOLD = 3500
 LDR_THRESHOLD = 2000
 HUMIDITY_THRESHOLD = 60
 FAN_OFF_DELAY = 10000
@@ -132,6 +136,12 @@ model_lock = threading.RLock()
 
 buzzer_muted = False
 
+manual_overrides = {
+    "led": None,
+    "kipas": None,
+    "buzzer": None
+}
+
 sensor_data = {
     "suhu": 0,
     "kelembapan": 0,
@@ -142,6 +152,73 @@ sensor_data = {
     "kipas": "OFF",
     "buzzer_muted": False
 }
+
+
+def set_manual_device_state(device, state=None):
+    """Set or toggle manual override state ('ON', 'OFF', or 'AUTO') for an actuator."""
+    global buzzer_muted
+
+    device_key = str(device or "").strip().lower()
+    if device_key not in ("led", "kipas", "buzzer"):
+        return 400, {"status": "ERROR", "message": "Perangkat tidak valid (led, kipas, buzzer)."}
+
+    with state_lock:
+        current_val = str(sensor_data.get(device_key, "OFF")).upper()
+        if state is None:
+            target_state = "OFF" if current_val == "ON" else "ON"
+        else:
+            target_state = str(state).strip().upper()
+
+        if target_state not in ("ON", "OFF", "AUTO"):
+            return 400, {"status": "ERROR", "message": "Status harus ON, OFF, atau AUTO."}
+
+        if target_state == "AUTO":
+            manual_overrides[device_key] = None
+            if device_key == "buzzer":
+                buzzer_muted = False
+                sensor_data["buzzer_muted"] = False
+                current_gas = sensor_data.get("gas", 0)
+                sensor_data["buzzer"] = (
+                    "ON" if isinstance(current_gas, (int, float)) and current_gas >= GAS_THRESHOLD else "OFF"
+                )
+        else:
+            manual_overrides[device_key] = target_state
+            if device_key == "buzzer":
+                if target_state == "OFF":
+                    buzzer_muted = True
+                    sensor_data["buzzer_muted"] = True
+                    current_gas = sensor_data.get("gas", 0)
+                    sensor_data["buzzer"] = (
+                        "MUTED" if isinstance(current_gas, (int, float)) and current_gas >= GAS_THRESHOLD else "OFF"
+                    )
+                else:
+                    buzzer_muted = False
+                    sensor_data["buzzer_muted"] = False
+                    sensor_data["buzzer"] = "ON"
+            else:
+                sensor_data[device_key] = target_state
+
+        overrides_copy = {k: (v if v is not None else "AUTO") for k, v in manual_overrides.items()}
+        applied_val = sensor_data[device_key]
+
+    try:
+        db.record_incident(
+            "MANUAL_CONTROL",
+            "INFO",
+            f"Kendali manual {device_key.upper()} diubah menjadi {target_state}.",
+            gas_value=sensor_data.get("gas"),
+            ai_score=ai_score
+        )
+    except Exception:
+        pass
+
+    return 200, {
+        "status": "OK",
+        "device": device_key,
+        "state": applied_val,
+        "mode": target_state,
+        "manual_overrides": overrides_copy
+    }
 
 last_received_timestamp = 0
 last_received_time_str = "Belum ada data"
@@ -335,7 +412,10 @@ def get_calibration_payload():
     curr_meta = TIME_SLOTS[curr_slot]
 
     with state_lock:
-        target_slot = calibration_state.get("target_slot") or curr_slot
+        busy = calibration_state["status"] in (
+            STATUS_KALIBRASI_BERLANGSUNG, STATUS_MELATIH_MODEL
+        )
+        target_slot = (calibration_state.get("target_slot") if busy else curr_slot) or curr_slot
         target_meta = TIME_SLOTS.get(target_slot, curr_meta)
 
         return {
@@ -442,6 +522,18 @@ def start_calibration(requested_slot=None):
                 "message": "Kalibrasi sedang berjalan."
             }
 
+        # Kunci kalibrasi ke slot waktu saat ini (tidak boleh mengambil data slot waktu lain)
+        curr_slot = get_current_time_slot_key()
+        if requested_slot and requested_slot != curr_slot:
+            curr_label = TIME_SLOTS[curr_slot]["label"]
+            req_label = TIME_SLOTS.get(requested_slot, {}).get("label", str(requested_slot).capitalize())
+            return 409, {
+                "status": "ERROR",
+                "message": f"Tidak bisa mengambil data {req_label} karena waktu sekarang {curr_label}."
+            }
+        target_slot = curr_slot
+        target_meta = TIME_SLOTS[target_slot]
+
         online = (
             last_received_timestamp > 0
             and time.time() - last_received_timestamp
@@ -461,14 +553,6 @@ def start_calibration(requested_slot=None):
                 "status": "ERROR",
                 "message": error
             }
-
-        # Tentukan target slot waktu
-        if requested_slot in TIME_SLOTS:
-            target_slot = requested_slot
-        else:
-            target_slot = get_current_time_slot_key()
-
-        target_meta = TIME_SLOTS[target_slot]
 
         try:
             os.makedirs(AI_DIR, exist_ok=True)
@@ -1152,12 +1236,41 @@ class SmartKosServer(BaseHTTPRequestHandler):
 
         clean_path = self.path.split("?")[0]
 
+        if clean_path in ("/api/device/control", "/api/device/toggle"):
+            req_data = {}
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                if length > 0:
+                    body = self.rfile.read(length)
+                    parsed = json.loads(body.decode("utf-8"))
+                    if isinstance(parsed, dict):
+                        req_data = parsed
+            except Exception:
+                pass
+
+            device_param = req_data.get("device")
+            state_param = req_data.get("state")
+
+            if "?" in self.path:
+                for param in self.path.split("?", 1)[1].split("&"):
+                    if param.startswith("device=") and not device_param:
+                        device_param = param.split("=", 1)[1].strip()
+                    elif param.startswith("state=") and not state_param:
+                        state_param = param.split("=", 1)[1].strip()
+
+            status_code, resp = set_manual_device_state(device_param, state_param)
+            self.send_json(status_code, resp)
+            return
+
         if clean_path == "/api/buzzer/mute":
             with state_lock:
                 buzzer_muted = True
+                manual_overrides["buzzer"] = "OFF"
                 sensor_data["buzzer_muted"] = True
                 if sensor_data.get("gas", 0) >= GAS_THRESHOLD:
                     sensor_data["buzzer"] = "MUTED"
+                else:
+                    sensor_data["buzzer"] = "OFF"
             print(
                 "[{}] Buzzer dimatikan manual via dashboard.".format(
                     datetime.now().strftime("%H:%M:%S")
@@ -1173,6 +1286,7 @@ class SmartKosServer(BaseHTTPRequestHandler):
         if clean_path == "/api/buzzer/unmute":
             with state_lock:
                 buzzer_muted = False
+                manual_overrides["buzzer"] = None
                 sensor_data["buzzer_muted"] = False
                 if sensor_data.get("gas", 0) >= GAS_THRESHOLD:
                     sensor_data["buzzer"] = "ON"
@@ -1295,7 +1409,19 @@ class SmartKosServer(BaseHTTPRequestHandler):
                         sensor_data[key] = str(payload[key]).upper()
 
                 current_gas = sensor_data.get("gas", 0)
-                if isinstance(current_gas, (int, float)) and current_gas >= GAS_THRESHOLD:
+                if manual_overrides.get("led") in ("ON", "OFF"):
+                    sensor_data["led"] = manual_overrides["led"]
+                if manual_overrides.get("kipas") in ("ON", "OFF"):
+                    sensor_data["kipas"] = manual_overrides["kipas"]
+
+                if manual_overrides.get("buzzer") == "ON":
+                    sensor_data["buzzer"] = "ON"
+                elif manual_overrides.get("buzzer") == "OFF":
+                    if isinstance(current_gas, (int, float)) and current_gas >= GAS_THRESHOLD:
+                        sensor_data["buzzer"] = "MUTED"
+                    else:
+                        sensor_data["buzzer"] = "OFF"
+                elif isinstance(current_gas, (int, float)) and current_gas >= GAS_THRESHOLD:
                     sensor_data["buzzer"] = "MUTED" if buzzer_muted else "ON"
                 else:
                     sensor_data["buzzer"] = "OFF"
@@ -1309,6 +1435,10 @@ class SmartKosServer(BaseHTTPRequestHandler):
 
                 current_data = dict(sensor_data)
                 current_mute = buzzer_muted
+                current_overrides = {
+                    k: (v if v is not None else "AUTO")
+                    for k, v in manual_overrides.items()
+                }
                 samples_to_train = None
                 slot_to_train = None
 
@@ -1349,10 +1479,28 @@ class SmartKosServer(BaseHTTPRequestHandler):
                 )
             )
 
+            def _ov_hdr(val):
+                if val == "ON":
+                    return "1"
+                if val == "OFF":
+                    return "0"
+                return "A"
+
             self.send_json(
                 200,
-                {"status": "OK", "buzzer_mute": current_mute},
-                extra_headers={"X-Buzzer-Mute": "1" if current_mute else "0"}
+                {
+                    "status": "OK",
+                    "buzzer_mute": current_mute,
+                    "manual_led": current_overrides["led"],
+                    "manual_kipas": current_overrides["kipas"],
+                    "manual_buzzer": current_overrides["buzzer"]
+                },
+                extra_headers={
+                    "X-Buzzer-Mute": "1" if current_mute else "0",
+                    "X-Manual-Led": _ov_hdr(current_overrides["led"]),
+                    "X-Manual-Kipas": _ov_hdr(current_overrides["kipas"]),
+                    "X-Manual-Buzzer": _ov_hdr(current_overrides["buzzer"])
+                }
             )
 
             try:
@@ -1447,12 +1595,41 @@ class SmartKosServer(BaseHTTPRequestHandler):
 
         clean_path = self.path.split("?")[0]
 
+        if clean_path in ("/api/device/control", "/api/device/toggle"):
+            req_data = {}
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                if length > 0:
+                    body = self.rfile.read(length)
+                    parsed = json.loads(body.decode("utf-8"))
+                    if isinstance(parsed, dict):
+                        req_data = parsed
+            except Exception:
+                pass
+
+            device_param = req_data.get("device")
+            state_param = req_data.get("state")
+
+            if "?" in self.path:
+                for param in self.path.split("?", 1)[1].split("&"):
+                    if param.startswith("device=") and not device_param:
+                        device_param = param.split("=", 1)[1].strip()
+                    elif param.startswith("state=") and not state_param:
+                        state_param = param.split("=", 1)[1].strip()
+
+            status_code, resp = set_manual_device_state(device_param, state_param)
+            self.send_json(status_code, resp)
+            return
+
         if clean_path == "/api/buzzer/mute":
             with state_lock:
                 buzzer_muted = True
+                manual_overrides["buzzer"] = "OFF"
                 sensor_data["buzzer_muted"] = True
                 if sensor_data.get("gas", 0) >= GAS_THRESHOLD:
                     sensor_data["buzzer"] = "MUTED"
+                else:
+                    sensor_data["buzzer"] = "OFF"
             self.send_json(200, {
                 "status": "OK",
                 "message": "Buzzer berhasil dimatikan.",
@@ -1463,6 +1640,7 @@ class SmartKosServer(BaseHTTPRequestHandler):
         if clean_path == "/api/buzzer/unmute":
             with state_lock:
                 buzzer_muted = False
+                manual_overrides["buzzer"] = None
                 sensor_data["buzzer_muted"] = False
                 if sensor_data.get("gas", 0) >= GAS_THRESHOLD:
                     sensor_data["buzzer"] = "ON"
@@ -1506,6 +1684,10 @@ class SmartKosServer(BaseHTTPRequestHandler):
                 response["has_live_data"] = online
                 response["last_seen"] = last_received_time_str
                 response["buzzer_muted"] = buzzer_muted
+                response["manual_overrides"] = {
+                    k: (v if v is not None else "AUTO")
+                    for k, v in manual_overrides.items()
+                }
                 response["gas_threshold"] = GAS_THRESHOLD
                 response["ldr_threshold"] = LDR_THRESHOLD
 

@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/CSS2DRenderer.js';
 
+const GAS_THRESHOLD = 3500;
+
 let scene, camera, renderer, cssRenderer, controls;
 let container;
 let isInitialized = false;
@@ -44,12 +46,12 @@ let currentData = {
 
 const VIEW_PRESETS = {
     outside: {
-        cam: new THREE.Vector3(6.8, 5.2, 7.8),
-        target: new THREE.Vector3(0, 1.2, 0)
+        cam: new THREE.Vector3(6.2, 4.4, 7.0),
+        target: new THREE.Vector3(0.0, 1.15, -0.15)
     },
     inside: {
-        cam: new THREE.Vector3(0.1, 7.8, 4.5),
-        target: new THREE.Vector3(0, 0.8, 0)
+        cam: new THREE.Vector3(0.15, 7.2, 4.3),
+        target: new THREE.Vector3(0, 0.85, 0)
     },
     sensors: {
         cam: new THREE.Vector3(-1.0, 4.2, -7.5),
@@ -389,12 +391,12 @@ function buildModel() {
     backVentHole.closePath();
     backShape.holes.push(backVentHole);
 
-    // Lubang Exhaust Fan di kanan pandangan dari belakang (-X): X dari -1.55 s/d -0.75, Y dari 1.05 s/d 1.85
+    // Lubang Exhaust Fan di sisi kanan belakang (+X): X dari +0.75 s/d +1.55, Y dari 1.05 s/d 1.85
     const fanHole = new THREE.Path();
-    fanHole.moveTo(-1.55, 1.05);
-    fanHole.lineTo(-0.75, 1.05);
-    fanHole.lineTo(-0.75, 1.85);
-    fanHole.lineTo(-1.55, 1.85);
+    fanHole.moveTo(0.75, 1.05);
+    fanHole.lineTo(1.55, 1.05);
+    fanHole.lineTo(1.55, 1.85);
+    fanHole.lineTo(0.75, 1.85);
     fanHole.closePath();
     backShape.holes.push(fanHole);
 
@@ -409,9 +411,9 @@ function buildModel() {
     backWallMesh.receiveShadow = true;
     houseGroup.add(backWallMesh);
 
-    // Exhaust fan di dinding belakang (X = -1.15) dengan bilah berputar dan housing
+    // Exhaust fan di dinding belakang (X = +1.15) dengan bilah berputar dan housing
     fanHousing = new THREE.Group();
-    fanHousing.position.set(-1.15, 1.45, -houseD / 2);
+    fanHousing.position.set(1.15, 1.45, -houseD / 2);
 
     const fanCasingMat = new THREE.MeshStandardMaterial({
         color: 0x18181c,
@@ -479,38 +481,38 @@ function buildModel() {
     fanHousing.add(fanOuterFrame, fanTunnel, b1, b2, b3, b4, fanImpeller, ringGuard);
     houseGroup.add(fanHousing);
 
-    // Sensor belakang (+X): DHT11 dan modul biru
+    // Sensor belakang (-X): DHT11 dan modul biru
     const pcbMat = new THREE.MeshStandardMaterial({ color: 0x0b5fa5, roughness: 0.5 });
     const tapeMat = new THREE.MeshStandardMaterial({ color: 0xf0ede6, roughness: 0.9 });
 
-    // Modul DHT11 (Biru-Putih berongga) pada X = +0.85
+    // Modul DHT11 (Biru-Putih berongga) pada X = -0.85
     const dhtPcb = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.44, 0.03), pcbMat);
-    dhtPcb.position.set(0.85, 1.50, -houseD / 2 - 0.02);
+    dhtPcb.position.set(-0.85, 1.50, -houseD / 2 - 0.02);
 
     const dhtGrid = new THREE.Mesh(
         new THREE.BoxGeometry(0.24, 0.30, 0.08),
         new THREE.MeshStandardMaterial({ color: 0x72c4e8, roughness: 0.6 })
     );
-    dhtGrid.position.set(0.85, 1.55, -houseD / 2 - 0.07);
+    dhtGrid.position.set(-0.85, 1.55, -houseD / 2 - 0.07);
 
     // Lakban kertas putih modul DHT11
     const dhtTape = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.12, 0.01), tapeMat);
-    dhtTape.position.set(0.85, 1.28, -houseD / 2 - 0.04);
+    dhtTape.position.set(-0.85, 1.28, -houseD / 2 - 0.04);
     houseGroup.add(dhtPcb, dhtGrid, dhtTape);
 
-    // Modul Sensor Biru Tambahan pada X = +1.40
+    // Modul Sensor Biru Tambahan pada X = -1.40
     const blueModPcb = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.42, 0.03), pcbMat);
-    blueModPcb.position.set(1.40, 1.50, -houseD / 2 - 0.02);
+    blueModPcb.position.set(-1.40, 1.50, -houseD / 2 - 0.02);
 
     const blueModPot = new THREE.Mesh(
         new THREE.CylinderGeometry(0.05, 0.05, 0.06, 12),
         new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.8 })
     );
     blueModPot.rotation.x = Math.PI / 2;
-    blueModPot.position.set(1.40, 1.52, -houseD / 2 - 0.05);
+    blueModPot.position.set(-1.40, 1.52, -houseD / 2 - 0.05);
 
     const blueModTape = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.12, 0.01), tapeMat);
-    blueModTape.position.set(1.40, 1.28, -houseD / 2 - 0.04);
+    blueModTape.position.set(-1.40, 1.28, -houseD / 2 - 0.04);
     houseGroup.add(blueModPcb, blueModPot, blueModTape);
 
     // Dinding samping kiri (-X) dan kanan (+X) dengan bentuk segilima pelana
@@ -591,6 +593,19 @@ function buildModel() {
     espLedLight = new THREE.PointLight(0x2bd9a8, 0.6, 2.0);
     espLedLight.position.set(0.9, 1.05, -2.85);
     houseGroup.add(espLedLight);
+
+    // Modul Buzzer Alarm di atas boks ESP32
+    const buzzerBody = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.14, 0.14, 0.12, 20),
+        new THREE.MeshStandardMaterial({ color: 0x161618, roughness: 0.45, metalness: 0.2 })
+    );
+    buzzerBody.position.set(1.15, 0.91, -2.65);
+    const buzzerRing = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.05, 0.05, 0.13, 16),
+        new THREE.MeshStandardMaterial({ color: 0xfe623c, roughness: 0.4 })
+    );
+    buzzerRing.position.set(1.15, 0.915, -2.65);
+    houseGroup.add(buzzerBody, buzzerRing);
 
     // Interior kamar kos: tempat tidur, meja, laptop, dan lampu plafon
     interiorGroup = new THREE.Group();
@@ -722,7 +737,7 @@ function createParticleSystems() {
     for (let i = 0; i < 22; i++) {
         const p = new THREE.Mesh(airGeo, airMat.clone());
         p.position.set(
-            -1.15 + (Math.random() - 0.5) * 0.35,
+            1.15 + (Math.random() - 0.5) * 0.35,
             1.45 + (Math.random() - 0.5) * 0.35,
             -1.95 - Math.random() * 1.8
         );
@@ -768,7 +783,7 @@ function createParticleSystems() {
             new THREE.RingGeometry(0.2, 0.28, 24),
             ringMat.clone()
         );
-        ring.position.set(0.9, 1.0, -2.85);
+        ring.position.set(1.15, 0.99, -2.65);
         ring.rotation.x = Math.PI / 2;
         ring.userData = { progress: i * 0.33 };
         ring.visible = false;
@@ -777,49 +792,28 @@ function createParticleSystems() {
     }
 }
 
-// Definisi titik hotspot 3D dengan transform anchor dan dot interaktif
+// Definisi 3 Hotspot Aktuator 3D (Exhaust Fan, Lampu, Alarm) menggunakan Google Material Symbols
 const HOTSPOT_DEFINITIONS = [
     {
-        id: 'lamp',
-        name: 'Lampu Kamar & Sensor Cahaya',
-        pinText: '💡',
-        pos: new THREE.Vector3(0, 2.05, 0),
-        normal: new THREE.Vector3(0, 1, 0)
-    },
-    {
-        id: 'left_sensor',
-        name: 'Sensor Samping Kiri (MQ-2)',
-        pinText: '⚠️',
-        pos: new THREE.Vector3(-2.0 - 0.18, 1.85, -0.80),
-        normal: new THREE.Vector3(-1, 0, 0)
-    },
-    {
-        id: 'right_sensor',
-        name: 'Sensor Samping Kanan (LDR)',
-        pinText: '☀️',
-        pos: new THREE.Vector3(2.0 + 0.18, 0.65, -0.90),
-        normal: new THREE.Vector3(1, 0, 0)
-    },
-    {
-        id: 'temp',
-        name: 'Sensor Suhu & Kelembapan (DHT11)',
-        pinText: '🌡️',
-        pos: new THREE.Vector3(0.85, 1.50, -1.8 - 0.18),
-        normal: new THREE.Vector3(0, 0, -1)
-    },
-    {
         id: 'fan',
-        name: 'Exhaust Fan (GPIO 27)',
-        pinText: '🌀',
-        pos: new THREE.Vector3(-1.15, 1.45, -1.8 - 0.18),
-        normal: new THREE.Vector3(0, 0, -1)
+        name: 'Exhaust Fan',
+        icon: 'mode_fan',
+        filled: true,
+        pos: new THREE.Vector3(1.22, 1.82, -1.98)
     },
     {
-        id: 'esp',
-        name: 'Boks Kontroler ESP32',
-        pinText: '⚙️',
-        pos: new THREE.Vector3(0.0, 0.95, -2.85),
-        normal: new THREE.Vector3(0, 0.7, -0.7).normalize()
+        id: 'lamp',
+        name: 'Lampu',
+        icon: 'light',
+        filled: false,
+        pos: new THREE.Vector3(0.0, 1.98, 0.0)
+    },
+    {
+        id: 'alarm',
+        name: 'Alarm',
+        icon: 'notification_sound',
+        filled: true,
+        pos: new THREE.Vector3(1.15, 0.98, -2.65)
     }
 ];
 
@@ -827,27 +821,33 @@ function initHotspots() {
     hotspotObjects = [];
 
     HOTSPOT_DEFINITIONS.forEach(def => {
-        // Lapisan 1 (Outer): Anchor untuk CSS2DObject (Three.js transform kontrol)
+        // Lapisan 1 (Outer): Anchor untuk CSS2DObject (Three.js transform kontrol murni)
         const anchorEl = document.createElement('div');
         anchorEl.className = 'hotspot-anchor';
 
-        // Lapisan 2 (Inner): Tombol interaktif (menangani klik, hover scale, warna)
-        const dotEl = document.createElement('button');
-        dotEl.type = 'button';
-        dotEl.className = `hotspot-dot pin-${def.id}`;
-        dotEl.setAttribute('aria-label', `Periksa komponen ${def.name}`);
-        dotEl.title = `Klik untuk info: ${def.name}`;
-        dotEl.innerHTML = `
-            <span class="dot-pulse"></span>
-            <span class="dot-icon">${def.pinText}</span>
+        // Lapisan 2 (Inner): Pill interaktif (hover -> muncul card ON/OFF; click -> auto-fokus kamera)
+        const btnEl = document.createElement('button');
+        btnEl.type = 'button';
+        btnEl.className = `hotspot-pill-btn pin-${def.id}`;
+        btnEl.setAttribute('aria-label', `${def.name} - Klik untuk fokus kamera`);
+        btnEl.innerHTML = `
+            <span class="hotspot-ring" aria-hidden="true"></span>
+            <span class="hotspot-icon-circle" aria-hidden="true">
+                <span class="material-symbols-rounded${def.filled ? ' icon-filled' : ''} hotspot-gicon">${def.icon}</span>
+            </span>
+            <span class="hotspot-hover-card">
+                <span class="hotspot-name">${def.name}</span>
+                <span class="hotspot-sep">&bull;</span>
+                <span class="hotspot-state is-off" data-state-label>OFF</span>
+            </span>
         `;
 
-        dotEl.addEventListener('click', (e) => {
+        btnEl.addEventListener('click', (e) => {
             e.stopPropagation();
-            inspectHotspot(def.id);
+            focusHotspot(def.id);
         });
 
-        anchorEl.appendChild(dotEl);
+        anchorEl.appendChild(btnEl);
 
         const cObject = new CSS2DObject(anchorEl);
         cObject.position.copy(def.pos);
@@ -858,13 +858,13 @@ function initHotspots() {
             name: def.name,
             object: cObject,
             anchor: anchorEl,
-            dot: dotEl,
-            worldPos: def.pos.clone(),
-            normal: def.normal.clone()
+            btn: btnEl,
+            stateLabel: btnEl.querySelector('[data-state-label]'),
+            worldPos: def.pos.clone()
         });
     });
 
-    // Klik di canvas menutup inspector
+    // Klik pada canvas membersihkan sorotan fokus aktif
     renderer.domElement.addEventListener('click', () => {
         closeInspector();
     });
@@ -872,160 +872,50 @@ function initHotspots() {
 
 function updateHotspotsOcclusion() {
     if (!camera || hotspotObjects.length === 0) return;
-
-    const camPos = camera.position;
-    const toCam = new THREE.Vector3();
-
     hotspotObjects.forEach(h => {
-        toCam.subVectors(camPos, h.worldPos).normalize();
-        const dot = toCam.dot(h.normal);
-
-        let isFacing = false;
-        if (h.id === 'lamp') {
-            isFacing = isRoofOpen ? (camPos.y > 0.5) : (camPos.z > 2.0 && camPos.y > 0.8);
-        } else {
-            isFacing = dot > 0.12;
-        }
-
-        if (isFacing) {
-            h.anchor.style.opacity = '1';
-            h.anchor.style.visibility = 'visible';
-            h.dot.style.pointerEvents = 'auto';
-        } else {
-            h.anchor.style.opacity = '0';
-            h.anchor.style.visibility = 'hidden';
-            h.dot.style.pointerEvents = 'none';
-        }
+        h.anchor.style.opacity = '1';
+        h.anchor.style.visibility = 'visible';
+        h.btn.style.pointerEvents = 'auto';
     });
 }
 
-export function inspectHotspot(id) {
+export function focusHotspot(id) {
     activeHotspotId = id;
-    const card = document.getElementById('hotspot-inspector-card');
-    if (!card) return;
-
-    // Tandai titik aktif dengan ring sorotan
     hotspotObjects.forEach(h => {
-        h.dot.classList.toggle('is-selected', h.id === id);
+        h.btn.classList.toggle('is-focused', h.id === id);
     });
 
-    const titleEl = document.getElementById('inspector-title');
-    const badgeEl = document.getElementById('inspector-badge');
-    const descEl = document.getElementById('inspector-desc');
-    const subEl = document.getElementById('inspector-sub');
-
-    const suhu = Number(currentData.suhu ?? 0);
-    const kelembapan = Number(currentData.kelembapan ?? 0);
-    const cahaya = Number(currentData.cahaya ?? 0);
-    const gas = Number(currentData.gas ?? 0);
-    const ledOn = String(currentData.led ?? 'OFF').toUpperCase() === 'ON';
-    const fanOn = String(currentData.kipas ?? 'OFF').toUpperCase() === 'ON';
-    const online = Boolean(currentData.esp32_online);
-
-    if (!online) {
-        if (id === 'lamp') {
-            titleEl.textContent = 'Lampu Kamar & Sensor Cahaya';
-            badgeEl.textContent = 'Offline';
-            badgeEl.className = 'inspector-badge badge-normal';
-            descEl.textContent = 'Perangkat Offline — Menunggu data dari ESP32.';
-            subEl.textContent = 'Sensor LDR: Standby • Pin Kontrol: GPIO 26';
-        } else if (id === 'left_sensor') {
-            titleEl.textContent = 'Sensor Samping Kiri (MQ-2 Gas & Asap)';
-            badgeEl.textContent = 'Offline';
-            badgeEl.className = 'inspector-badge badge-normal';
-            descEl.textContent = 'Perangkat Offline — Menunggu data dari ESP32.';
-            subEl.textContent = 'Sensor MQ-2: Standby • Ambang Bahaya ≥ 2000 ADC';
-        } else if (id === 'right_sensor') {
-            titleEl.textContent = 'Sensor Samping Kanan (LDR Cahaya)';
-            badgeEl.textContent = 'Offline';
-            badgeEl.className = 'inspector-badge badge-normal';
-            descEl.textContent = 'Perangkat Offline — Menunggu data dari ESP32.';
-            subEl.textContent = 'Sensor LDR: Standby • Ambang Gelap ≥ 2000 ADC';
-        } else if (id === 'temp') {
-            titleEl.textContent = 'Sensor Suhu & Kelembapan (DHT11)';
-            badgeEl.textContent = 'Offline';
-            badgeEl.className = 'inspector-badge badge-normal';
-            descEl.textContent = 'Perangkat Offline — Menunggu data dari ESP32.';
-            subEl.textContent = 'Modul DHT11 (GPIO 18) • Standby';
-        } else if (id === 'fan') {
-            titleEl.textContent = 'Exhaust Fan Ventilasi';
-            badgeEl.textContent = 'Offline';
-            badgeEl.className = 'inspector-badge badge-normal';
-            descEl.textContent = 'Perangkat Offline — Menunggu data dari ESP32.';
-            subEl.textContent = 'Relay GPIO 27 • Standby';
-        } else if (id === 'esp') {
-            titleEl.textContent = 'Boks Kontroler ESP32';
-            badgeEl.textContent = 'ESP32 Offline';
-            badgeEl.className = 'inspector-badge badge-warn';
-            descEl.textContent = 'ESP32 belum terhubung fisik. Anda dapat menggunakan Mode Simulasi untuk pengujian.';
-            subEl.textContent = 'Firmware MicroPython • Dual-Core Tensilica LX6';
-        }
-        card.classList.add('is-open');
-        return;
-    }
-
     if (id === 'lamp') {
-        titleEl.textContent = 'Lampu Kamar & Sensor Cahaya';
-        badgeEl.textContent = ledOn ? 'Menyala Hangat' : 'Padam (Hemat Daya)';
-        badgeEl.className = `inspector-badge ${ledOn ? 'badge-warn' : 'badge-normal'}`;
-        descEl.textContent = ledOn
-            ? 'Lampu kamar menyala otomatis karena sensor mendeteksi intensitas cahaya rendah.'
-            : 'Ruangan cukup terang. Lampu dalam kondisi padam hemat daya.';
-        subEl.textContent = `Sensor LDR: ${cahaya} ADC • Pin Kontrol: GPIO 26`;
-    } else if (id === 'left_sensor') {
-        titleEl.textContent = 'Sensor Samping Kiri (MQ-2 Gas & Asap)';
-        const isDanger = gas >= 2000;
-        badgeEl.textContent = isDanger ? 'Bahaya Asap' : (gas >= 1200 ? 'Agak Pengap' : 'Udara Bersih');
-        badgeEl.className = `inspector-badge ${isDanger ? 'badge-danger' : (gas >= 1200 ? 'badge-warn' : 'badge-normal')}`;
-        descEl.textContent = isDanger
-            ? 'Terdeteksi konsentrasi gas/asap tinggi! Alarm buzzer dan exhaust fan otomatis aktif.'
-            : 'Konsentrasi gas dalam batas normal kamar kos.';
-        subEl.textContent = `Sensor MQ-2: ${gas} ADC • Ambang Bahaya ≥ 2000 ADC`;
-    } else if (id === 'right_sensor') {
-        titleEl.textContent = 'Sensor Samping Kanan (LDR Cahaya)';
-        const isDark = cahaya >= 2000;
-        badgeEl.textContent = isDark ? 'Kamar Gelap' : (cahaya >= 1200 ? 'Kamar Redup' : 'Kamar Terang');
-        badgeEl.className = `inspector-badge ${isDark ? 'badge-warn' : 'badge-normal'}`;
-        descEl.textContent = isDark
-            ? 'Pencahayaan rendah, sistem mengaktifkan lampu kamar otomatis.'
-            : 'Intensitas cahaya alami mencukupi aktivitas kamar.';
-        subEl.textContent = `Sensor LDR: ${cahaya} ADC • Ambang Gelap ≥ 2000 ADC`;
-    } else if (id === 'temp') {
-        titleEl.textContent = 'Sensor Suhu & Kelembapan (DHT11)';
-        const tempState = suhu < 24 ? 'Sejuk' : (suhu <= 30 ? 'Nyaman' : 'Gerah');
-        const humState = kelembapan < 45 ? 'Kering' : (kelembapan < 60 ? 'Segar' : 'Lembap');
-        badgeEl.textContent = `${tempState} & ${humState}`;
-        badgeEl.className = `inspector-badge ${kelembapan >= 60 ? 'badge-warn' : 'badge-normal'}`;
-        descEl.textContent = `Suhu kamar ${suhu.toFixed(1)}°C dan kelembapan ${kelembapan}%. ${kelembapan >= 60 ? 'Exhaust fan aktif membantu sirkulasi udara.' : 'Kondisi udara terpantau nyaman.'}`;
-        subEl.textContent = `Modul DHT11 (GPIO 18) • Ambang Kipas Kelembapan ≥ 60%`;
+        setRoofOpen(true);
+        animateCameraSpherical(
+            new THREE.Vector3(2.1, 4.3, 3.4),
+            new THREE.Vector3(0, 1.85, 0),
+            1200
+        );
     } else if (id === 'fan') {
-        titleEl.textContent = 'Exhaust Fan Ventilasi';
-        badgeEl.textContent = fanOn ? 'Sedang Menyedot Udara' : 'Siaga (Mati)';
-        badgeEl.className = `inspector-badge ${fanOn ? 'badge-active' : 'badge-normal'}`;
-        descEl.textContent = fanOn
-            ? 'Baling-baling kipas 7-blade berputar menyedot udara keluar untuk menjaga sirkulasi.'
-            : 'Kipas dalam posisi siaga. Otomatis berputar saat kelembapan ≥ 60% atau gas ≥ 2000 ADC.';
-        subEl.textContent = `Relay GPIO 27 • Proteksi Delay Pendinginan 10 Detik`;
-    } else if (id === 'esp') {
-        titleEl.textContent = 'Boks Kontroler ESP32';
-        badgeEl.textContent = online ? 'ESP32 Terhubung' : 'Siaga Simulasi';
-        badgeEl.className = `inspector-badge ${online ? 'badge-normal' : 'badge-warn'}`;
-        descEl.textContent = online
-            ? 'Mikrokontroler ESP32 terhubung dan mengirimkan data telemetri sensor secara berkala.'
-            : 'ESP32 belum terhubung fisik. Anda dapat menggunakan Mode Simulasi untuk pengujian.';
-        subEl.textContent = `Firmware MicroPython • Dual-Core Tensilica LX6`;
+        animateCameraSpherical(
+            new THREE.Vector3(1.15, 2.2, -5.6),
+            new THREE.Vector3(1.15, 1.45, -1.8),
+            1200
+        );
+    } else if (id === 'alarm') {
+        animateCameraSpherical(
+            new THREE.Vector3(3.4, 2.5, -5.3),
+            new THREE.Vector3(1.05, 0.90, -2.65),
+            1200
+        );
     }
+}
 
-    card.classList.add('is-open');
+export function inspectHotspot(id) {
+    focusHotspot(id);
 }
 
 export function closeInspector() {
     activeHotspotId = null;
     hotspotObjects.forEach(h => {
-        h.dot.classList.remove('is-selected');
+        h.btn.classList.remove('is-focused');
     });
-    const card = document.getElementById('hotspot-inspector-card');
-    if (card) card.classList.remove('is-open');
 }
 
 export function init(containerElement) {
@@ -1048,7 +938,7 @@ export function init(containerElement) {
 
     // 1. Scene
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0c0b0a);
+    scene.background = new THREE.Color(0x26221f);
 
     // 2. Camera
     camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
@@ -1131,14 +1021,18 @@ export function init(containerElement) {
     // Event Listeners
     window.addEventListener('resize', onWindowResize);
 
-    const btnCloseInspector = document.getElementById('btn-close-inspector');
-    if (btnCloseInspector) {
-        btnCloseInspector.addEventListener('click', closeInspector);
+    const btnViewOutside = document.getElementById('btn-view-outside');
+    if (btnViewOutside) {
+        btnViewOutside.addEventListener('click', () => {
+            setRoomView('outside');
+        });
     }
 
-    const btnToggleRoof = document.getElementById('btn-toggle-roof');
-    if (btnToggleRoof) {
-        btnToggleRoof.addEventListener('click', toggleRoof);
+    const btnViewInside = document.getElementById('btn-view-inside');
+    if (btnViewInside) {
+        btnViewInside.addEventListener('click', () => {
+            setRoomView('inside');
+        });
     }
 
     const btnToggleAutofocus = document.getElementById('btn-toggle-autofocus');
@@ -1184,23 +1078,33 @@ function onWindowResize() {
     cssRenderer.setSize(w, h);
 }
 
-export function toggleRoof() {
-    isRoofOpen = !isRoofOpen;
-    const duration = 350;
+export function setRoofOpen(open) {
+    const targetOpen = Boolean(open);
+    if (isRoofOpen === targetOpen && !roofAnim) {
+        updateRoofButtonUI();
+        return isRoofOpen;
+    }
+
+    isRoofOpen = targetOpen;
+    const duration = 380;
     const now = performance.now();
     const currentY = roofGroup ? roofGroup.position.y : 0;
 
+    let currentOp = isRoofOpen ? 1.0 : 0.0;
     if (roofGroup) {
         roofGroup.traverse(child => {
             if (child.isMesh && child.material) {
                 child.material.transparent = true;
+                if (typeof child.material.opacity === 'number' && roofAnim) {
+                    currentOp = child.material.opacity;
+                }
             }
         });
         roofGroup.visible = true;
     }
 
     const targetY = isRoofOpen ? 2.4 : 0.0;
-    const startOp = isRoofOpen ? 1.0 : 0.0;
+    const startOp = currentOp;
     const targetOp = isRoofOpen ? 0.0 : 1.0;
 
     roofAnim = {
@@ -1216,15 +1120,31 @@ export function toggleRoof() {
     return isRoofOpen;
 }
 
-export function updateRoofButtonUI() {
-    const btnRoofText = document.getElementById('btn-roof-text');
-    const btnRoof = document.getElementById('btn-toggle-roof');
-    if (btnRoofText) {
-        btnRoofText.textContent = isRoofOpen ? 'Tutup Atap' : 'Buka Atap';
+export function toggleRoof() {
+    return setRoofOpen(!isRoofOpen);
+}
+
+export function setRoomView(mode) {
+    if (mode === 'inside') {
+        currentViewMode = 'inside';
+        setRoofOpen(true);
+        animateCameraSpherical(VIEW_PRESETS.inside.cam, VIEW_PRESETS.inside.target, 1200);
+    } else {
+        currentViewMode = 'outside';
+        setRoofOpen(false);
+        closeInspector();
+        animateCameraSpherical(VIEW_PRESETS.outside.cam, VIEW_PRESETS.outside.target, 1200);
     }
-    if (btnRoof) {
-        btnRoof.classList.toggle('is-open', isRoofOpen);
-        btnRoof.title = isRoofOpen ? 'Tutup kembali atap kamar kos' : 'Buka atap untuk melihat perabot interior';
+}
+
+export function updateRoofButtonUI() {
+    const btnOutside = document.getElementById('btn-view-outside');
+    const btnInside = document.getElementById('btn-view-inside');
+    if (btnOutside) {
+        btnOutside.classList.toggle('is-active', !isRoofOpen);
+    }
+    if (btnInside) {
+        btnInside.classList.toggle('is-active', isRoofOpen);
     }
 }
 
@@ -1239,80 +1159,49 @@ export function toggleAutoFocus(forceState = null) {
 }
 
 export function updateAutoFocusButtonUI() {
-    const btnText = document.getElementById('btn-autofocus-text');
     const btnAuto = document.getElementById('btn-toggle-autofocus');
-    if (btnText) {
-        btnText.textContent = isAutoFocusEnabled ? 'Auto-Fokus: ON' : 'Auto-Fokus: OFF';
-    }
     if (btnAuto) {
-        btnAuto.classList.toggle('is-active', isAutoFocusEnabled);
-        btnAuto.title = isAutoFocusEnabled
-            ? 'Auto-Fokus Aktif: Kamera otomatis menyorot saat sensor/aktuator terpicu'
-            : 'Auto-Fokus Nonaktif: Kamera tetap pada posisi pilihan Anda';
+        btnAuto.classList.toggle('is-on', isAutoFocusEnabled);
+        btnAuto.setAttribute('aria-checked', String(isAutoFocusEnabled));
     }
 }
 
 export function resetCamera() {
-    animateCameraSpherical(VIEW_PRESETS.outside.cam, VIEW_PRESETS.outside.target, 1400);
-    closeInspector();
+    setRoomView('outside');
 }
 
 export function setViewMode(modeName) {
+    if (modeName === 'inside' || modeName === 'outside') {
+        setRoomView(modeName);
+        return;
+    }
     if (!VIEW_PRESETS[modeName]) return;
     currentViewMode = modeName;
     const preset = VIEW_PRESETS[modeName];
-
-    if (roofGroup) {
-        roofGroup.visible = (modeName !== 'inside');
-    }
-
-    animateCameraSpherical(preset.cam, preset.target, 1400);
+    animateCameraSpherical(preset.cam, preset.target, 1200);
 }
 
 export function resetView() {
     resetCamera();
 }
 
-export function focusScenario(scenario) {
-    if (!isAutoFocusEnabled) return;
+export function focusScenario(scenario, force = false) {
+    if (!force && !isAutoFocusEnabled) return;
 
     if (scenario === 'dark' || scenario === 'lamp') {
-        if (!isRoofOpen) toggleRoof();
-        animateCameraSpherical(
-            new THREE.Vector3(2.2, 4.4, 3.6),
-            new THREE.Vector3(0, 1.85, 0),
-            1600,
-            () => inspectHotspot('lamp')
-        );
-        showAutoHighlightBadge('Auto-Fokus: Lampu Kamar Menyala');
+        focusHotspot('lamp');
     } else if (scenario === 'humid' || scenario === 'fan') {
-        animateCameraSpherical(
-            new THREE.Vector3(-1.15, 2.2, -5.8),
-            new THREE.Vector3(-1.15, 1.45, -1.8),
-            1600,
-            () => inspectHotspot('fan')
-        );
-        showAutoHighlightBadge('Auto-Fokus: Sirkulasi Kipas Aktif');
-    } else if (scenario === 'gas') {
-        animateCameraSpherical(
-            new THREE.Vector3(-4.8, 3.2, -3.8),
-            new THREE.Vector3(-1.5, 1.85, -1.2),
-            1600,
-            () => inspectHotspot('left_sensor')
-        );
-        showAutoHighlightBadge('Auto-Fokus: Deteksi Gas & Kipas Aktif');
+        focusHotspot('fan');
+    } else if (scenario === 'gas' || scenario === 'alarm' || scenario === 'emergency') {
+        focusHotspot('alarm');
     } else if (scenario === 'normal') {
-        animateCameraSpherical(
-            VIEW_PRESETS.outside.cam,
-            VIEW_PRESETS.outside.target,
-            1600,
-            () => closeInspector()
-        );
+        setRoomView('outside');
     } else if (scenario === 'anomaly') {
+        setRoofOpen(false);
         animateCameraSpherical(
             new THREE.Vector3(5.5, 4.8, 6.5),
             new THREE.Vector3(0, 1.2, 0),
-            1600
+            1200
         );
     }
 }
@@ -1329,11 +1218,12 @@ function checkAutoHighlight(data) {
         return;
     }
 
+    const gasThreshold = Number(data.gas_threshold ?? GAS_THRESHOLD);
     const gas = Number(data.gas ?? 0);
     const ledOn = String(data.led ?? 'OFF').toUpperCase() === 'ON';
     const fanOn = String(data.kipas ?? 'OFF').toUpperCase() === 'ON';
     const buzzerOn = String(data.buzzer ?? 'OFF').toUpperCase() === 'ON';
-    const gasDanger = gas >= 2000 || (buzzerOn && !data.buzzer_muted);
+    const gasDanger = gas >= gasThreshold || (buzzerOn && !data.buzzer_muted);
 
     if (!prevLiveState.hasBaseline) {
         prevLiveState = {
@@ -1375,13 +1265,6 @@ function checkAutoHighlight(data) {
     prevLiveState.gasDanger = gasDanger;
 }
 
-function showAutoHighlightBadge(text) {
-    const subEl = document.getElementById('inspector-sub');
-    if (subEl) {
-        subEl.innerHTML = `<span style="color:var(--turq);font-weight:700;">★ ${text}</span>`;
-    }
-}
-
 export function updateData(data) {
     if (!data) return;
     currentData = Object.assign(currentData, data);
@@ -1389,8 +1272,11 @@ export function updateData(data) {
     const online = Boolean(data.esp32_online);
     const kelembapan = online ? Number(data.kelembapan ?? 0) : 0;
     const gas = online ? Number(data.gas ?? 0) : 0;
-    const ledOn = online && String(data.led ?? 'OFF').toUpperCase() === 'ON';
-    const fanOn = online && String(data.kipas ?? 'OFF').toUpperCase() === 'ON';
+    const ledOn = String(data.led ?? 'OFF').toUpperCase() === 'ON';
+    const fanOn = String(data.kipas ?? 'OFF').toUpperCase() === 'ON';
+    const buzzerRaw = String(data.buzzer ?? 'OFF').toUpperCase();
+    const isMuted = Boolean(data.buzzer_muted) || buzzerRaw === 'MUTED';
+    const alarmOn = buzzerRaw === 'ON' && !isMuted;
 
     checkAutoHighlight(data);
 
@@ -1418,9 +1304,11 @@ export function updateData(data) {
         }
     }
 
+    const gasThreshold = Number(currentData.gas_threshold ?? GAS_THRESHOLD);
+
     // 3. Pendar Lantai Kamar (Comfort Glow)
     if (floorGlowMesh && floorGlowMesh.material) {
-        if (gas >= 2000) {
+        if (gas >= gasThreshold) {
             floorGlowMesh.material.color.setHex(0xff4d5e);
             floorGlowMesh.material.opacity = 0.45;
         } else if (kelembapan >= 60) {
@@ -1432,22 +1320,42 @@ export function updateData(data) {
         }
     }
 
-    // 4. Perbarui warna status titik hotspot
+    // 4. Perbarui label ON/OFF & halo ring pada 3 hotspot
     hotspotObjects.forEach(h => {
-        if (h.id === 'lamp') {
-            h.dot.classList.toggle('status-active', ledOn);
-        } else if (h.id === 'fan') {
-            h.dot.classList.toggle('status-active', fanOn);
-        } else if (h.id === 'left_sensor') {
-            h.dot.classList.toggle('status-danger', gas >= 2000);
-        } else if (h.id === 'temp') {
-            h.dot.classList.toggle('status-warn', kelembapan >= 60);
-        }
-    });
+        let stateText = 'OFF';
+        let stateClass = 'is-off';
+        let activeHalo = false;
+        let dangerHalo = false;
 
-    if (activeHotspotId) {
-        inspectHotspot(activeHotspotId);
-    }
+        if (h.id === 'fan') {
+            stateText = fanOn ? 'ON' : 'OFF';
+            stateClass = fanOn ? 'is-on' : 'is-off';
+            activeHalo = fanOn;
+        } else if (h.id === 'lamp') {
+            stateText = ledOn ? 'ON' : 'OFF';
+            stateClass = ledOn ? 'is-on' : 'is-off';
+            activeHalo = ledOn;
+        } else if (h.id === 'alarm') {
+            if (alarmOn) {
+                stateText = 'ON';
+                stateClass = 'is-on';
+                dangerHalo = true;
+            } else if (isMuted && gas >= gasThreshold) {
+                stateText = 'MUTED';
+                stateClass = 'is-muted';
+            } else {
+                stateText = 'OFF';
+                stateClass = 'is-off';
+            }
+        }
+
+        if (h.stateLabel) {
+            h.stateLabel.textContent = stateText;
+            h.stateLabel.className = `hotspot-state ${stateClass}`;
+        }
+        h.btn.classList.toggle('status-active', activeHalo);
+        h.btn.classList.toggle('status-danger', dangerHalo);
+    });
 }
 
 let lastTime = performance.now();
@@ -1515,9 +1423,9 @@ function animate() {
         }
     }
 
-    // 2. Putaran Bilah Exhaust Fan 3D
+    // 2. Putaran Bilah Exhaust Fan 3D (aktif baik saat otomatis ESP32, simulasi, maupun kendali manual)
     const isOnline = Boolean(currentData.esp32_online);
-    const isFanOn = isOnline && String(currentData.kipas ?? 'OFF').toUpperCase() === 'ON';
+    const isFanOn = String(currentData.kipas ?? 'OFF').toUpperCase() === 'ON';
     if (fanImpeller && isFanOn) {
         fanImpeller.rotation.z -= delta * 24.0;
     }
@@ -1537,8 +1445,9 @@ function animate() {
         }
     }
 
-    // 4. Partikel Asap saat Gas >= 2000
-    const isGasHazard = isOnline && Number(currentData.gas ?? 0) >= 2000;
+    // 4. Partikel Asap saat Gas >= GAS_THRESHOLD
+    const gasThreshold = Number(currentData.gas_threshold ?? GAS_THRESHOLD);
+    const isGasHazard = isOnline && Number(currentData.gas ?? 0) >= gasThreshold;
     for (let i = 0; i < smokeParticles.length; i++) {
         const s = smokeParticles[i];
         s.visible = isGasHazard;
@@ -1552,8 +1461,8 @@ function animate() {
         }
     }
 
-    // 5. Gelombang Suara Buzzer
-    const isBuzzerActive = isOnline && String(currentData.buzzer ?? 'OFF').toUpperCase() === 'ON' && !currentData.buzzer_muted;
+    // 5. Gelombang Suara Buzzer (aktif baik saat gas bahaya maupun kendali manual ON)
+    const isBuzzerActive = String(currentData.buzzer ?? 'OFF').toUpperCase() === 'ON' && !currentData.buzzer_muted;
     for (let i = 0; i < soundWaveMeshes.length; i++) {
         const ring = soundWaveMeshes[i];
         ring.visible = isBuzzerActive;
@@ -1579,8 +1488,11 @@ window.Room3D = {
     init,
     updateData,
     toggleRoof,
+    setRoofOpen,
+    setRoomView,
     toggleAutoFocus,
     resetCamera,
+    focusHotspot,
     inspectHotspot,
     closeInspector,
     focusScenario,

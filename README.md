@@ -109,18 +109,18 @@ Alur interaksi sistem digambarkan dalam bagan berikut:
 
 Sistem bekerja berdasarkan nilai ambang batas (*threshold*) yang telah ditentukan di dalam program:
 
-- **Threshold Gas**: `2000` (nilai ADC)
+- **Threshold Gas**: `3500` (nilai ADC)
 - **Threshold Cahaya**: `2000` (nilai ADC)
 - **Threshold Kelembapan**: `60%`
 - **Delay Fan**: `10000 ms` (10 detik)
 
 ### 1. Sensor Gas (MQ-2)
-- Jika nilai sensor gas $\ge$ 2000:
+- Jika nilai sensor gas $\ge$ 3500:
   - Buzzer aktif (berbunyi nyaring).
   - Exhaust fan langsung aktif berputar untuk membuang gas keluar ruangan.
   - **Mute dari Web**: Pengguna dapat mematikan suara buzzer melalui tombol di dashboard website tanpa menghentikan exhaust fan.
-  - **Auto-Rearm**: Ketika gas turun ke normal (< 2000) lalu naik kembali $\ge$ 2000, buzzer otomatis kembali bersuara.
-- Jika nilai sensor gas < 2000:
+  - **Auto-Rearm**: Ketika gas turun ke normal (< 3500) lalu naik kembali $\ge$ 3500, buzzer otomatis kembali bersuara.
+- Jika nilai sensor gas < 3500:
   - Buzzer mati (kembali hening) dan status mute disetel ulang (*auto-reset*).
 
 ### 2. Sensor Kelembapan (DHT11)
@@ -130,7 +130,7 @@ Sistem bekerja berdasarkan nilai ambang batas (*threshold*) yang telah ditentuka
   - Sistem memulai hitung mundur (*delay*) pemadaman kipas selama 10 detik.
 
 ### 3. Exhaust Fan (Relay)
-$$\text{Kipas ON} \iff (\text{Gas} \ge 2000) \lor (\text{Kelembapan} \ge 60\%)$$
+$$\text{Kipas ON} \iff (\text{Gas} \ge 3500) \lor (\text{Kelembapan} \ge 60\%)$$
 - **Fitur Delay 10 Detik**: Ketika kondisi pemicu kembali normal, kipas tetap menyala selama 10 detik untuk memastikan udara telah tersirkulasi dengan baik. Jika sebelum 10 detik berakhir kondisi pemicu kembali muncul, timer dibatalkan dan kipas terus menyala.
 
 ### 4. Sensor Cahaya (LDR)
@@ -194,7 +194,7 @@ Backend `server.py` menyediakan antarmuka API HTTP berikut:
 | **POST** | `/api/buzzer/mute` | Web Dashboard | Membisukan bunyi alarm buzzer secara manual |
 | **POST** | `/api/buzzer/unmute` | Web Dashboard | Mengaktifkan kembali bunyi alarm buzzer |
 | **POST** | `/api/buzzer/toggle` | Web Dashboard | Beralih status mute/unmute buzzer |
-| **POST** | `/api/calibration/start` | Web Dashboard | Memulai sesi kalibrasi AI untuk slot waktu tertentu |
+| **POST** | `/api/calibration/start` | Web Dashboard | Memulai sesi kalibrasi AI sesuai slot waktu saat ini |
 | **POST** | `/api/calibration/cancel` | Web Dashboard | Membatalkan sesi kalibrasi AI yang sedang berlangsung |
 | **POST** | `/api/calibration/reset` | Web Dashboard | Mereset model kalibrasi AI slot tertentu atau seluruhnya |
 | **GET** | `/api/calibration` | Web Dashboard | Mengambil informasi status kalibrasi seluruh 4 slot waktu |
