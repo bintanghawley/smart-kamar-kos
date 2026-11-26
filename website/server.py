@@ -300,15 +300,72 @@ sensor_data = {
 }
 
 
+def _evaluate_auto_actuators_locked(payload=None):
+    """Evaluate server-side automatic rules for kipas, led, and buzzer while respecting manual overrides."""
+    global buzzer_muted
+
+    payload = payload or {}
+    current_gas = sensor_data.get("gas", 0)
+    current_humid = sensor_data.get("kelembapan", 0)
+    current_ldr = sensor_data.get("cahaya", 0)
+
+    gas_danger = isinstance(current_gas, (int, float)) and current_gas >= GAS_THRESHOLD
+    humid_high = isinstance(current_humid, (int, float)) and current_humid >= HUMIDITY_THRESHOLD
+    ldr_dark = isinstance(current_ldr, (int, float)) and current_ldr >= LDR_THRESHOLD
+
+    # Safety auto-release: do not allow stale manual OFF override to keep Exhaust Fan off on gas danger
+    if gas_danger and manual_overrides.get("kipas") == "OFF":
+        manual_overrides["kipas"] = None
+
+    if manual_overrides.get("kipas") in ("ON", "OFF"):
+        sensor_data["kipas"] = manual_overrides["kipas"]
+    else:
+        payload_fan_on = str(payload.get("kipas", "OFF")).upper() == "ON"
+        sensor_data["kipas"] = "ON" if (gas_danger or humid_high or payload_fan_on) else "OFF"
+
+    if manual_overrides.get("led") in ("ON", "OFF"):
+        sensor_data["led"] = manual_overrides["led"]
+    else:
+        payload_led_on = str(payload.get("led", "OFF")).upper() == "ON"
+        sensor_data["led"] = "ON" if (ldr_dark or payload_led_on) else "OFF"
+
+    if manual_overrides.get("buzzer") == "ON":
+        sensor_data["buzzer"] = "ON"
+    elif manual_overrides.get("buzzer") == "OFF":
+        sensor_data["buzzer"] = "MUTED" if gas_danger else "OFF"
+    elif gas_danger:
+        sensor_data["buzzer"] = "MUTED" if buzzer_muted else "ON"
+    else:
+        sensor_data["buzzer"] = "OFF"
+
+
 def set_manual_device_state(device, state=None):
-    """Set or toggle manual override state ('ON', 'OFF', or 'AUTO') for an actuator."""
+    """Set or toggle manual override state ('ON', 'OFF', or 'AUTO') for an actuator or 'all'."""
     global buzzer_muted
 
     device_key = str(device or "").strip().lower()
-    if device_key not in ("led", "kipas", "buzzer"):
-        return 400, {"status": "ERROR", "message": "Perangkat tidak valid (led, kipas, buzzer)."}
+    if device_key not in ("led", "kipas", "buzzer", "all"):
+        return 400, {"status": "ERROR", "message": "Perangkat tidak valid (led, kipas, buzzer, all)."}
 
     with state_lock:
+        if device_key == "all":
+            target_state = str(state or "AUTO").strip().upper()
+            if target_state != "AUTO":
+                return 400, {"status": "ERROR", "message": "Perangkat 'all' hanya mendukung status AUTO."}
+            manual_overrides["led"] = None
+            manual_overrides["kipas"] = None
+            manual_overrides["buzzer"] = None
+            buzzer_muted = False
+            sensor_data["buzzer_muted"] = False
+            _evaluate_auto_actuators_locked()
+            overrides_copy = {k: (v if v is not None else "AUTO") for k, v in manual_overrides.items()}
+            return 200, {
+                "status": "OK",
+                "device": "all",
+                "mode": "AUTO",
+                "manual_overrides": overrides_copy
+            }
+
         current_val = str(sensor_data.get(device_key, "OFF")).upper()
         if state is None:
             target_state = "OFF" if current_val == "ON" else "ON"
@@ -323,10 +380,7 @@ def set_manual_device_state(device, state=None):
             if device_key == "buzzer":
                 buzzer_muted = False
                 sensor_data["buzzer_muted"] = False
-                current_gas = sensor_data.get("gas", 0)
-                sensor_data["buzzer"] = (
-                    "ON" if isinstance(current_gas, (int, float)) and current_gas >= GAS_THRESHOLD else "OFF"
-                )
+            _evaluate_auto_actuators_locked()
         else:
             manual_overrides[device_key] = target_state
             if device_key == "buzzer":
@@ -1545,6 +1599,8 @@ class SmartKosServer(BaseHTTPRequestHandler):
                 gas_val = payload.get("gas", 0)
                 if isinstance(gas_val, (int, float)) and gas_val < GAS_THRESHOLD:
                     buzzer_muted = False
+                    if manual_overrides.get("buzzer") == "OFF":
+                        manual_overrides["buzzer"] = None
 
                 for key in ("suhu", "kelembapan", "cahaya", "gas"):
                     if key in payload:
@@ -1554,24 +1610,7 @@ class SmartKosServer(BaseHTTPRequestHandler):
                     if key in payload:
                         sensor_data[key] = str(payload[key]).upper()
 
-                current_gas = sensor_data.get("gas", 0)
-                if manual_overrides.get("led") in ("ON", "OFF"):
-                    sensor_data["led"] = manual_overrides["led"]
-                if manual_overrides.get("kipas") in ("ON", "OFF"):
-                    sensor_data["kipas"] = manual_overrides["kipas"]
-
-                if manual_overrides.get("buzzer") == "ON":
-                    sensor_data["buzzer"] = "ON"
-                elif manual_overrides.get("buzzer") == "OFF":
-                    if isinstance(current_gas, (int, float)) and current_gas >= GAS_THRESHOLD:
-                        sensor_data["buzzer"] = "MUTED"
-                    else:
-                        sensor_data["buzzer"] = "OFF"
-                elif isinstance(current_gas, (int, float)) and current_gas >= GAS_THRESHOLD:
-                    sensor_data["buzzer"] = "MUTED" if buzzer_muted else "ON"
-                else:
-                    sensor_data["buzzer"] = "OFF"
-
+                _evaluate_auto_actuators_locked(payload)
                 sensor_data["buzzer_muted"] = buzzer_muted
 
                 last_received_timestamp = time.time()
@@ -1846,6 +1885,7 @@ class SmartKosServer(BaseHTTPRequestHandler):
                 }
                 response["gas_threshold"] = GAS_THRESHOLD
                 response["ldr_threshold"] = LDR_THRESHOLD
+                response["humidity_threshold"] = HUMIDITY_THRESHOLD
 
             ai_payload = get_ai_payload()
             if not online:

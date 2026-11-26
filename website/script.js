@@ -87,6 +87,7 @@ const elStatusPopover = document.getElementById("status-popover");
 const elBtnToggleDemo = document.getElementById("btn-toggle-demo");
 const elSimulationBar = document.getElementById("simulation-bar");
 const elStageSimStrip = document.getElementById("stage-sim-strip");
+const elSunCycleSwitch = document.getElementById("sun-cycle-switch");
 const elBtnRefresh = document.getElementById("btn-refresh");
 
 // Kondisi Saat Ini
@@ -109,6 +110,9 @@ const elCardLed = document.getElementById("card-actuator-led");
 const elToggleLed = document.getElementById("toggle-led");
 const elCardBuzzer = document.getElementById("card-actuator-buzzer");
 const elToggleBuzzer = document.getElementById("toggle-buzzer");
+const elActuatorAutoBar = document.getElementById("actuator-auto-bar");
+const elActuatorAutoText = document.getElementById("actuator-auto-text");
+const elBtnActuatorsAuto = document.getElementById("btn-actuators-auto");
 
 // AI Pendeteksi
 const elBtnAiSlotMenu = document.getElementById("btn-ai-slot-menu");
@@ -240,7 +244,23 @@ function getEffectiveActuatorState(serverData) {
     const online = Boolean(serverData.esp32_online) || isSimulationMode;
     const overrides = serverData.manual_overrides || {};
 
-    const resolveDevice = (key, rawVal) => {
+    const gasVal = Number(serverData.gas ?? 0);
+    const humidVal = Number(serverData.kelembapan ?? 0);
+    const ldrVal = Number(serverData.cahaya ?? 0);
+    const gasThreshold = Number(serverData.gas_threshold ?? GAS_THRESHOLD);
+    const ldrThreshold = Number(serverData.ldr_threshold ?? LDR_THRESHOLD);
+    const humidThreshold = Number(serverData.humidity_threshold ?? HUMIDITY_THRESHOLD);
+
+    // Safety auto-release when gas hazard overrides a stale OFF lock
+    if (online && gasVal >= gasThreshold && manualDeviceState.kipas === "OFF") {
+        manualDeviceState.kipas = null;
+    }
+
+    const autoFan = gasVal >= gasThreshold || humidVal >= humidThreshold;
+    const autoLed = ldrVal >= ldrThreshold;
+    const autoBuzzer = gasVal >= gasThreshold;
+
+    const resolveDevice = (key, rawVal, autoTrigger) => {
         if (manualDeviceState[key] === "ON" || manualDeviceState[key] === "OFF") {
             return manualDeviceState[key];
         }
@@ -248,19 +268,21 @@ function getEffectiveActuatorState(serverData) {
             return overrides[key];
         }
         if (!online) return "OFF";
-        return String(rawVal ?? "OFF").toUpperCase();
+        return (String(rawVal ?? "OFF").toUpperCase() === "ON" || autoTrigger) ? "ON" : "OFF";
     };
 
-    const led = resolveDevice("led", serverData.led);
-    const kipas = resolveDevice("kipas", serverData.kipas);
-    let buzzer = resolveDevice("buzzer", serverData.buzzer);
+    const led = resolveDevice("led", serverData.led, autoLed);
+    const kipas = resolveDevice("kipas", serverData.kipas, autoFan);
+    let buzzer = resolveDevice("buzzer", serverData.buzzer, autoBuzzer);
     let buzzerMuted = Boolean(serverData.buzzer_muted) || buzzer === "MUTED";
 
     if (manualDeviceState.buzzer === "OFF" || overrides.buzzer === "OFF") {
         buzzerMuted = true;
-        buzzer = Number(serverData.gas ?? 0) >= GAS_THRESHOLD ? "MUTED" : "OFF";
+        buzzer = gasVal >= gasThreshold ? "MUTED" : "OFF";
     } else if (manualDeviceState.buzzer === "ON" || overrides.buzzer === "ON") {
         buzzerMuted = false;
+        buzzer = "ON";
+    } else if (online && autoBuzzer && !buzzerMuted) {
         buzzer = "ON";
     }
 
@@ -302,7 +324,15 @@ function handleDataSuccess(data, { skipHistory = false } = {}) {
         kipas,
         buzzer_muted: buzzerMuted,
         esp32_online: isEsp32Online || isSimulationMode,
-        lastSeen: lastSeenTime
+        lastSeen: lastSeenTime,
+        active_slot: data.ai_active_slot || getTimeSlotKeyForDate(new Date()),
+        sim_scenario: isSimulationMode ? simulationScenario : null,
+        has_manual_led: Boolean(
+            manualDeviceState.led === "ON" ||
+            manualDeviceState.led === "OFF" ||
+            data.manual_overrides?.led === "ON" ||
+            data.manual_overrides?.led === "OFF"
+        )
     };
 
     if (!skipHistory && (isEsp32Online || isSimulationMode)) {
@@ -319,6 +349,7 @@ function handleDataSuccess(data, { skipHistory = false } = {}) {
     updateConnectionUI();
     updateConditionSection(normalizedData, data, isOfflineLive);
     updateActuatorCards(normalizedData);
+    updateActuatorAutoBar(data);
     updateSystemInfo(true);
     updateAIUI(data, isOfflineLive);
     renderHistoryTable();
@@ -342,7 +373,10 @@ function handleDataError() {
         kipas: localKipas,
         buzzer: localBuzzer,
         buzzer_muted: localBuzzer === "OFF",
-        esp32_online: false
+        esp32_online: false,
+        active_slot: getTimeSlotKeyForDate(new Date()),
+        sim_scenario: null,
+        has_manual_led: Boolean(manualDeviceState.led === "ON" || manualDeviceState.led === "OFF")
     };
 
     if (window.Room3D && typeof window.Room3D.updateData === "function") {
@@ -353,6 +387,7 @@ function handleDataError() {
     updateSystemInfo(false);
     updateConditionSection(offlineNorm, { ai_status: "STANDBY" }, true);
     updateActuatorCards(offlineNorm);
+    updateActuatorAutoBar();
     updateAIUI({ ai_available: false, ai_status: "TIDAK TERSEDIA" }, true);
 }
 
@@ -475,6 +510,60 @@ function updateActuatorCards(data) {
     }
 }
 
+function updateActuatorAutoBar(serverData = latestServerData) {
+    if (!elActuatorAutoBar || !elActuatorAutoText) return;
+
+    const labels = { kipas: "Exhaust Fan", led: "Lampu", buzzer: "Alarm" };
+    const overrides = !isSimulationMode && serverData?.manual_overrides ? serverData.manual_overrides : {};
+    const activeManual = ["kipas", "led", "buzzer"]
+        .map(dev => {
+            const val = (manualDeviceState[dev] === "ON" || manualDeviceState[dev] === "OFF")
+                ? manualDeviceState[dev]
+                : (overrides[dev] === "ON" || overrides[dev] === "OFF" ? overrides[dev] : null);
+            return val ? `${labels[dev]} (${val})` : null;
+        })
+        .filter(Boolean);
+
+    elActuatorAutoBar.hidden = activeManual.length === 0;
+    if (activeManual.length > 0) {
+        elActuatorAutoText.textContent = `Kendali manual aktif: ${activeManual.join(", ")}`;
+    }
+}
+
+async function resetActuatorsToAuto() {
+    manualDeviceState.kipas = null;
+    manualDeviceState.led = null;
+    manualDeviceState.buzzer = null;
+
+    if (isSimulationMode) {
+        applySimulationStep(true);
+        return;
+    }
+
+    if (latestServerData) {
+        latestServerData = {
+            ...latestServerData,
+            buzzer_muted: false,
+            manual_overrides: { led: "AUTO", kipas: "AUTO", buzzer: "AUTO" }
+        };
+    }
+
+    try {
+        await fetch("/api/device/control", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            body: JSON.stringify({ device: "all", state: "AUTO" })
+        });
+        await fetchSensorData();
+    } catch (err) {
+        if (latestServerData) {
+            handleDataSuccess(latestServerData, { skipHistory: true });
+        } else {
+            updateActuatorAutoBar();
+        }
+    }
+}
+
 async function toggleActuatorManual(device) {
     const currentVal = (() => {
         if (device === "kipas") return elCardKipas?.classList.contains("is-on") ? "ON" : "OFF";
@@ -515,9 +604,18 @@ async function toggleActuatorManual(device) {
         kipas: effective.kipas,
         buzzer: effective.buzzer,
         buzzer_muted: effective.buzzerMuted,
-        esp32_online: isEsp32Online
+        esp32_online: isEsp32Online,
+        active_slot: baseData.ai_active_slot || getTimeSlotKeyForDate(new Date()),
+        sim_scenario: null,
+        has_manual_led: Boolean(
+            manualDeviceState.led === "ON" ||
+            manualDeviceState.led === "OFF" ||
+            baseData.manual_overrides?.led === "ON" ||
+            baseData.manual_overrides?.led === "OFF"
+        )
     };
     updateActuatorCards(previewNorm);
+    updateActuatorAutoBar(baseData);
     if (window.Room3D && typeof window.Room3D.updateData === "function") {
         window.Room3D.updateData(previewNorm);
     }
@@ -534,6 +632,10 @@ async function toggleActuatorManual(device) {
     } catch (err) {
         // Mode preview offline: pertahankan toggle manual lokal
     }
+}
+
+if (elBtnActuatorsAuto) {
+    elBtnActuatorsAuto.addEventListener("click", resetActuatorsToAuto);
 }
 
 [
@@ -1154,6 +1256,7 @@ function toggleSimulationMode() {
     }
     if (elSimulationBar) elSimulationBar.hidden = !isSimulationMode;
     if (elStageSimStrip) elStageSimStrip.hidden = !isSimulationMode;
+    if (elSunCycleSwitch) elSunCycleSwitch.hidden = !isSimulationMode;
 
     if (isSimulationMode) {
         applySimulationStep();
@@ -1164,6 +1267,9 @@ function toggleSimulationMode() {
         if (simCalibrationTimer) {
             clearInterval(simCalibrationTimer);
             simCalibrationTimer = null;
+        }
+        if (window.Room3D && typeof window.Room3D.setSunTime === "function") {
+            window.Room3D.setSunTime("auto");
         }
         simCalibrationState.active = false;
         historyData = [];
@@ -1232,9 +1338,6 @@ document.querySelectorAll(".sim-preset-btn[data-sim]").forEach(btn => {
             b.classList.toggle("is-active", b.dataset.sim === simulationScenario);
         });
         applySimulationStep();
-        if (window.Room3D && typeof window.Room3D.focusScenario === "function") {
-            window.Room3D.focusScenario(simulationScenario);
-        }
     });
 });
 
@@ -1334,6 +1437,7 @@ async function fetchInitialHistory() {
     }
 }
 
+if (elSunCycleSwitch) elSunCycleSwitch.hidden = !isSimulationMode;
 renderHistoryTable();
 drawChart();
 fetchInitialHistory();
