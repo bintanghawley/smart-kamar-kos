@@ -1,5 +1,5 @@
 // Service Worker - Smart Kamar Kos PWA
-const CACHE_NAME = "smartkos-pwa-v1";
+const CACHE_NAME = "smartkos-pwa-v2";
 const STATIC_ASSETS = [
   "/",
   "/index.html",
