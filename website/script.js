@@ -62,6 +62,14 @@ let simFanWaitHumidClear = false;
 let simLedSnoozeUntil = 0;
 let simLedWaitDarkClear = false;
 
+// Guard anti-kedip: cegah respons polling /api/data lama menimpa klik manual terbaru
+let dataFetchSeq = 0;
+let latestAppliedFetchSeq = 0;
+let controlMutationEpoch = 0;
+let pendingControlRequests = 0;
+let activeSensorFetchController = null;
+const controlOptimisticHoldUntil = { kipas: 0, led: 0, buzzer: 0 };
+
 function clearFanManualMeta() {
     manualDeviceState.kipas = null;
     simFanSnoozeUntil = 0;
@@ -261,16 +269,47 @@ if (document.readyState === "loading") {
 }
 
 // ==================== DATA FETCHING ====================
+function beginControlMutation(devices) {
+    controlMutationEpoch += 1;
+    pendingControlRequests += 1;
+    if (activeSensorFetchController) {
+        activeSensorFetchController._abortedByControl = true;
+        activeSensorFetchController.abort();
+        activeSensorFetchController = null;
+    }
+    const holdUntil = Date.now() + 3000;
+    devices.forEach((dev) => {
+        if (dev in controlOptimisticHoldUntil) {
+            controlOptimisticHoldUntil[dev] = holdUntil;
+        }
+    });
+    return controlMutationEpoch;
+}
+
 async function fetchSensorData() {
-    if (isSimulationMode) return;
+    if (isSimulationMode || pendingControlRequests > 0) return;
+
+    const reqSeq = ++dataFetchSeq;
+    const reqEpoch = controlMutationEpoch;
+
+    if (activeSensorFetchController) {
+        activeSensorFetchController._abortedByControl = true;
+        activeSensorFetchController.abort();
+    }
+
+    const controller = new AbortController();
+    activeSensorFetchController = controller;
+    let timedOut = false;
+    const timeoutId = setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+    }, 2500);
 
     try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2500);
-
         const response = await fetch(API_URL, {
             method: "GET",
             headers: { "Accept": "application/json" },
+            cache: "no-store",
             signal: controller.signal
         });
 
@@ -281,9 +320,25 @@ async function fetchSensorData() {
         }
 
         const data = await response.json();
+
+        // Abaikan respons polling yang sudah kadaluwarsa oleh klik manual atau polling baru
+        if (isSimulationMode || reqEpoch !== controlMutationEpoch || pendingControlRequests > 0 || reqSeq < latestAppliedFetchSeq) {
+            return;
+        }
+        latestAppliedFetchSeq = reqSeq;
         handleDataSuccess(data);
     } catch (error) {
-        handleDataError(error);
+        clearTimeout(timeoutId);
+        if (error?.name === "AbortError" && !timedOut) {
+            return;
+        }
+        if (reqEpoch === controlMutationEpoch && pendingControlRequests === 0) {
+            handleDataError(error);
+        }
+    } finally {
+        if (activeSensorFetchController === controller) {
+            activeSensorFetchController = null;
+        }
     }
 }
 
@@ -370,12 +425,27 @@ function handleDataSuccess(data, { skipHistory = false } = {}) {
     lastSeenTime = data.last_seen || "-";
     const isOfflineLive = !data.esp32_online && !isSimulationMode;
 
-    // Sinkronkan override dari server jika ada
+    // Sinkronkan override dari server, lindungi klik manual yang baru dilakukan dari polling tertunda
     if (data.manual_overrides && !isSimulationMode) {
+        const nowMs = Date.now();
+        const mergedOverrides = { ...data.manual_overrides };
         ["led", "kipas", "buzzer"].forEach(dev => {
-            const ov = data.manual_overrides[dev];
-            manualDeviceState[dev] = (ov === "ON" || ov === "OFF") ? ov : null;
+            const ov = mergedOverrides[dev];
+            const serverOv = (ov === "ON" || ov === "OFF") ? ov : null;
+            if (nowMs < controlOptimisticHoldUntil[dev] && serverOv !== manualDeviceState[dev]) {
+                mergedOverrides[dev] = manualDeviceState[dev] || "AUTO";
+                if (manualDeviceState[dev] === "ON" || manualDeviceState[dev] === "OFF") {
+                    data[dev] = manualDeviceState[dev];
+                    if (dev === "buzzer") {
+                        data.buzzer_muted = manualDeviceState.buzzer === "OFF";
+                    }
+                }
+            } else {
+                manualDeviceState[dev] = serverOv;
+                controlOptimisticHoldUntil[dev] = 0;
+            }
         });
+        data.manual_overrides = mergedOverrides;
     }
 
     const suhu = Number(data.suhu ?? 0);
@@ -897,6 +967,31 @@ function updateActuatorAutoBar(serverData = latestServerData) {
     }
 }
 
+function renderActuatorSnapshot(baseData) {
+    const effective = getEffectiveActuatorState(baseData);
+    const previewNorm = {
+        ...baseData,
+        led: effective.led,
+        kipas: effective.kipas,
+        buzzer: effective.buzzer,
+        buzzer_muted: effective.buzzerMuted,
+        esp32_online: isEsp32Online,
+        active_slot: baseData.ai_active_slot || getTimeSlotKeyForDate(new Date()),
+        sim_scenario: null,
+        has_manual_led: Boolean(
+            manualDeviceState.led === "ON" ||
+            manualDeviceState.led === "OFF" ||
+            baseData.manual_overrides?.led === "ON" ||
+            baseData.manual_overrides?.led === "OFF"
+        )
+    };
+    updateActuatorCards(previewNorm);
+    updateActuatorAutoBar(baseData);
+    if (window.Room3D && typeof window.Room3D.updateData === "function") {
+        window.Room3D.updateData(previewNorm);
+    }
+}
+
 async function resetActuatorsToAuto() {
     clearFanManualMeta();
     clearLedManualMeta();
@@ -907,6 +1002,8 @@ async function resetActuatorsToAuto() {
         return;
     }
 
+    const mutationEpoch = beginControlMutation(["kipas", "led", "buzzer"]);
+
     if (latestServerData) {
         latestServerData = {
             ...latestServerData,
@@ -915,20 +1012,40 @@ async function resetActuatorsToAuto() {
             led_snooze_remaining_sec: 0,
             manual_overrides: { led: "AUTO", kipas: "AUTO", buzzer: "AUTO" }
         };
+        renderActuatorSnapshot(latestServerData);
     }
 
     try {
-        await fetch("/api/device/control", {
+        const res = await fetch("/api/device/control", {
             method: "POST",
             headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            cache: "no-store",
             body: JSON.stringify({ device: "all", state: "AUTO" })
         });
-        await fetchSensorData();
+        if (res.ok && mutationEpoch === controlMutationEpoch) {
+            const ctrl = await res.json();
+            if (latestServerData && ctrl.manual_overrides && mutationEpoch === controlMutationEpoch) {
+                latestServerData = {
+                    ...latestServerData,
+                    buzzer_muted: Boolean(ctrl.buzzer_muted),
+                    kipas_snooze_remaining_sec: Number(ctrl.kipas_snooze_remaining_sec ?? 0),
+                    led_snooze_remaining_sec: Number(ctrl.led_snooze_remaining_sec ?? 0),
+                    manual_overrides: { ...ctrl.manual_overrides }
+                };
+            }
+        }
     } catch (err) {
-        if (latestServerData) {
-            handleDataSuccess(latestServerData, { skipHistory: true });
-        } else {
-            updateActuatorAutoBar();
+        if (mutationEpoch === controlMutationEpoch) {
+            if (latestServerData) {
+                renderActuatorSnapshot(latestServerData);
+            } else {
+                updateActuatorAutoBar();
+            }
+        }
+    } finally {
+        pendingControlRequests = Math.max(0, pendingControlRequests - 1);
+        if (pendingControlRequests === 0 && mutationEpoch === controlMutationEpoch) {
+            await fetchSensorData();
         }
     }
 }
@@ -952,7 +1069,8 @@ async function toggleActuatorManual(device) {
         led: manualDeviceState.led || "OFF",
         kipas: manualDeviceState.kipas || "OFF",
         buzzer: manualDeviceState.buzzer || "OFF",
-        esp32_online: false
+        esp32_online: false,
+        manual_overrides: { led: "AUTO", kipas: "AUTO", buzzer: "AUTO" }
     };
 
     if (device === "kipas") {
@@ -977,6 +1095,10 @@ async function toggleActuatorManual(device) {
     }
 
     baseData[device] = nextState;
+    baseData.manual_overrides = {
+        ...(baseData.manual_overrides || { led: "AUTO", kipas: "AUTO", buzzer: "AUTO" }),
+        [device]: nextState
+    };
     if (device === "buzzer") {
         baseData.buzzer_muted = nextState === "OFF";
     }
@@ -987,40 +1109,43 @@ async function toggleActuatorManual(device) {
         return;
     }
 
-    const effective = getEffectiveActuatorState(baseData);
-    const previewNorm = {
-        ...baseData,
-        led: effective.led,
-        kipas: effective.kipas,
-        buzzer: effective.buzzer,
-        buzzer_muted: effective.buzzerMuted,
-        esp32_online: isEsp32Online,
-        active_slot: baseData.ai_active_slot || getTimeSlotKeyForDate(new Date()),
-        sim_scenario: null,
-        has_manual_led: Boolean(
-            manualDeviceState.led === "ON" ||
-            manualDeviceState.led === "OFF" ||
-            baseData.manual_overrides?.led === "ON" ||
-            baseData.manual_overrides?.led === "OFF"
-        )
-    };
-    updateActuatorCards(previewNorm);
-    updateActuatorAutoBar(baseData);
-    if (window.Room3D && typeof window.Room3D.updateData === "function") {
-        window.Room3D.updateData(previewNorm);
-    }
+    const mutationEpoch = beginControlMutation([device]);
+    latestServerData = baseData;
+    renderActuatorSnapshot(baseData);
 
     try {
         const res = await fetch("/api/device/control", {
             method: "POST",
             headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            cache: "no-store",
             body: JSON.stringify({ device, state: nextState })
         });
-        if (res.ok) {
-            await fetchSensorData();
+        if (res.ok && mutationEpoch === controlMutationEpoch) {
+            const ctrl = await res.json();
+            if (ctrl && ctrl.manual_overrides && mutationEpoch === controlMutationEpoch) {
+                const confirmedState = String(ctrl.state || nextState).toUpperCase();
+                const confirmedOv = ctrl.manual_overrides[device];
+                manualDeviceState[device] = (confirmedOv === "ON" || confirmedOv === "OFF") ? confirmedOv : null;
+                if (manualDeviceState[device] === nextState) {
+                    controlOptimisticHoldUntil[device] = Date.now() + 1200;
+                } else {
+                    controlOptimisticHoldUntil[device] = 0;
+                }
+                latestServerData = {
+                    ...(latestServerData || baseData),
+                    [device]: confirmedState,
+                    buzzer_muted: ctrl.buzzer_muted !== undefined ? Boolean(ctrl.buzzer_muted) : (latestServerData?.buzzer_muted ?? false),
+                    manual_overrides: { ...ctrl.manual_overrides },
+                    kipas_snooze_remaining_sec: Number(ctrl.kipas_snooze_remaining_sec ?? latestServerData?.kipas_snooze_remaining_sec ?? 0),
+                    led_snooze_remaining_sec: Number(ctrl.led_snooze_remaining_sec ?? latestServerData?.led_snooze_remaining_sec ?? 0)
+                };
+                renderActuatorSnapshot(latestServerData);
+            }
         }
     } catch (err) {
         // Mode preview offline: pertahankan toggle manual lokal
+    } finally {
+        pendingControlRequests = Math.max(0, pendingControlRequests - 1);
     }
 }
 

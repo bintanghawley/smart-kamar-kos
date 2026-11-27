@@ -191,7 +191,7 @@ def kirim_data(payload):
 
         response = b""
 
-        while len(response) < 1024:
+        while len(response) < 4096:
             try:
                 chunk = s.recv(256)
             except Exception:
@@ -208,8 +208,8 @@ def kirim_data(payload):
                 response_body = response[header_end + 4:].lower()
 
                 if (
-                    b"x-buzzer-mute:" in headers
-                    or b'"buzzer_mute"' in response_body
+                    b"x-manual-buzzer:" in headers
+                    or (b'"manual_buzzer"' in response_body and b"}" in response_body)
                 ):
                     break
 

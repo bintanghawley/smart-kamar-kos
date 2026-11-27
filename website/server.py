@@ -436,6 +436,7 @@ def set_manual_device_state(device, state=None):
                 "status": "OK",
                 "device": "all",
                 "mode": "AUTO",
+                "buzzer_muted": buzzer_muted,
                 "manual_overrides": overrides_copy,
                 "kipas_snooze_remaining_sec": 0,
                 "led_snooze_remaining_sec": 0
@@ -519,6 +520,7 @@ def set_manual_device_state(device, state=None):
         "device": device_key,
         "state": applied_val,
         "mode": target_state,
+        "buzzer_muted": buzzer_muted,
         "manual_overrides": overrides_copy,
         "kipas_snooze_remaining_sec": fan_snooze_rem,
         "led_snooze_remaining_sec": led_snooze_rem
