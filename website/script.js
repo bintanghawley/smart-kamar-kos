@@ -62,6 +62,66 @@ let simFanWaitHumidClear = false;
 let simLedSnoozeUntil = 0;
 let simLedWaitDarkClear = false;
 
+const NIGHT_SIM_CAHAYA = 2850;
+let lastSyncedSimActuatorsKey = null;
+let simActuatorSyncSeq = 0;
+
+function getEffectiveSimSunSlot() {
+    const mode = (window.Room3D && typeof window.Room3D.getSunTime === "function")
+        ? String(window.Room3D.getSunTime() || "auto").toLowerCase()
+        : "auto";
+    if (mode === "pagi" || mode === "siang" || mode === "sore" || mode === "malam") {
+        return mode;
+    }
+    return getTimeSlotKeyForDate(new Date());
+}
+
+async function syncSimulationActuatorsToServer(active, actuators = {}) {
+    if (!active) {
+        const reqSeq = ++simActuatorSyncSeq;
+        lastSyncedSimActuatorsKey = null;
+        try {
+            await fetch("/api/simulation/actuators", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Accept": "application/json" },
+                cache: "no-store",
+                keepalive: true,
+                body: JSON.stringify({ active: false })
+            });
+        } catch (err) {
+            // Mode preview offline: abaikan error jaringan
+        }
+        return reqSeq;
+    }
+
+    const led = String(actuators.led || "OFF").toUpperCase() === "ON" ? "ON" : "OFF";
+    const kipas = String(actuators.kipas || "OFF").toUpperCase() === "ON" ? "ON" : "OFF";
+    const buzzer = (String(actuators.buzzer || "OFF").toUpperCase() === "ON" && !actuators.buzzerMuted)
+        ? "ON"
+        : "OFF";
+    const nextKey = `1:${led}:${kipas}:${buzzer}`;
+    if (nextKey === lastSyncedSimActuatorsKey) return null;
+
+    lastSyncedSimActuatorsKey = nextKey;
+    const reqSeq = ++simActuatorSyncSeq;
+    try {
+        const res = await fetch("/api/simulation/actuators", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            cache: "no-store",
+            body: JSON.stringify({ active: true, led, kipas, buzzer })
+        });
+        if (!res.ok && reqSeq === simActuatorSyncSeq && lastSyncedSimActuatorsKey === nextKey) {
+            lastSyncedSimActuatorsKey = null;
+        }
+    } catch (err) {
+        if (reqSeq === simActuatorSyncSeq && lastSyncedSimActuatorsKey === nextKey) {
+            lastSyncedSimActuatorsKey = null;
+        }
+    }
+    return reqSeq;
+}
+
 // Guard anti-kedip: cegah respons polling /api/data lama menimpa klik manual terbaru
 let dataFetchSeq = 0;
 let latestAppliedFetchSeq = 0;
@@ -484,6 +544,10 @@ function handleDataSuccess(data, { skipHistory = false } = {}) {
         if (historyData.length > MAX_HISTORY) {
             historyData.shift();
         }
+    }
+
+    if (isSimulationMode) {
+        syncSimulationActuatorsToServer(true, { led, kipas, buzzer, buzzerMuted });
     }
 
     if (window.Room3D && typeof window.Room3D.updateData === "function") {
@@ -1767,12 +1831,18 @@ const SIM_SCENARIOS = {
     }
 };
 
-function toggleSimulationMode() {
+async function toggleSimulationMode() {
     isSimulationMode = !isSimulationMode;
     window.isSimulationModeActive = isSimulationMode;
+    controlMutationEpoch++;
+    if (activeSensorFetchController) {
+        activeSensorFetchController._abortedByControl = true;
+        activeSensorFetchController.abort();
+    }
     clearFanManualMeta();
     clearLedManualMeta();
     manualDeviceState.buzzer = null;
+    lastSyncedSimActuatorsKey = null;
 
     if (elBtnToggleDemo) {
         elBtnToggleDemo.classList.toggle("is-on", isSimulationMode);
@@ -1799,8 +1869,11 @@ function toggleSimulationMode() {
         }
         simCalibrationState.active = false;
         historyData = [];
-        fetchInitialHistory();
-        fetchSensorData();
+        await syncSimulationActuatorsToServer(false);
+        if (!isSimulationMode) {
+            fetchInitialHistory();
+            fetchSensorData();
+        }
     }
 
     if (currentAppPage === "weekly") {
@@ -1815,18 +1888,24 @@ function applySimulationStep(skipHistory = false) {
     const jitterLdr = Math.round((Math.random() - 0.5) * 30);
     const jitterGas = Math.round((Math.random() - 0.5) * 20);
 
+    const effectiveSunSlot = getEffectiveSimSunSlot();
+    const isNightSim = effectiveSunSlot === "malam";
     const activeSlot = getTimeSlotKeyForDate(new Date());
-    const activeMeta = SLOT_METAS[activeSlot] || SLOT_METAS.pagi;
+    const activeMeta = SLOT_METAS[effectiveSunSlot] || SLOT_METAS[activeSlot] || SLOT_METAS.pagi;
     const isCalibBusy = simCalibrationState.active;
+
+    const targetBaseCahaya = isNightSim ? Math.max(base.cahaya, NIGHT_SIM_CAHAYA) : base.cahaya;
+    const simCahaya = Math.min(4095, Math.max(0, targetBaseCahaya + jitterLdr));
+    const autoLed = simCahaya >= LDR_THRESHOLD ? "ON" : base.led;
 
     const simData = {
         suhu: Number((base.suhu + jitterSuhu).toFixed(1)),
         kelembapan: Math.round(base.kelembapan + jitterHum),
-        cahaya: Math.max(0, base.cahaya + jitterLdr),
+        cahaya: simCahaya,
         gas: Math.max(0, base.gas + jitterGas),
-        led: manualDeviceState.led || base.led,
-        kipas: manualDeviceState.kipas || base.kipas,
-        buzzer: manualDeviceState.buzzer || base.buzzer,
+        led: autoLed,
+        kipas: base.kipas,
+        buzzer: base.buzzer,
         buzzer_muted: manualDeviceState.buzzer === "OFF",
         esp32_online: true,
         last_seen: new Date().toLocaleTimeString("id-ID", { hour12: false }),
@@ -1834,20 +1913,20 @@ function applySimulationStep(skipHistory = false) {
         ai_score: base.ai_score,
         ai_status_desc: base.ai_status_desc,
         ai_available: true,
-        ai_active_slot: activeSlot,
+        ai_active_slot: effectiveSunSlot,
         ai_active_slot_label: activeMeta.label,
         ai_active_slot_range: activeMeta.range,
-        ai_model_trained_at: simCalibrationState.trainedAt[activeSlot] || null,
+        ai_model_trained_at: simCalibrationState.trainedAt[effectiveSunSlot] || simCalibrationState.trainedAt[activeSlot] || null,
         calibration_status: isCalibBusy ? "KALIBRASI BERLANGSUNG" : "KALIBRASI BERHASIL",
         calibration_busy: isCalibBusy,
         calibration_samples: isCalibBusy ? simCalibrationState.samples : 100,
         calibration_target: 100,
         calibration_target_slot: isCalibBusy ? simCalibrationState.slotKey : activeSlot,
         ai_slots: {
-            pagi: { key: "pagi", label: "Pagi", range: "05:00 - 11:00", is_calibrated: simCalibrationState.calibratedSlots.pagi, is_active_now: activeSlot === "pagi", samples: 100, trained_at: simCalibrationState.trainedAt.pagi },
-            siang: { key: "siang", label: "Siang", range: "11:00 - 15:00", is_calibrated: simCalibrationState.calibratedSlots.siang, is_active_now: activeSlot === "siang", samples: 100, trained_at: simCalibrationState.trainedAt.siang },
-            sore: { key: "sore", label: "Sore", range: "15:00 - 18:30", is_calibrated: simCalibrationState.calibratedSlots.sore, is_active_now: activeSlot === "sore", samples: 100, trained_at: simCalibrationState.trainedAt.sore },
-            malam: { key: "malam", label: "Malam", range: "18:30 - 05:00", is_calibrated: simCalibrationState.calibratedSlots.malam, is_active_now: activeSlot === "malam", samples: 100, trained_at: simCalibrationState.trainedAt.malam }
+            pagi: { key: "pagi", label: "Pagi", range: "05:00 - 11:00", is_calibrated: simCalibrationState.calibratedSlots.pagi, is_active_now: effectiveSunSlot === "pagi", samples: 100, trained_at: simCalibrationState.trainedAt.pagi },
+            siang: { key: "siang", label: "Siang", range: "11:00 - 15:00", is_calibrated: simCalibrationState.calibratedSlots.siang, is_active_now: effectiveSunSlot === "siang", samples: 100, trained_at: simCalibrationState.trainedAt.siang },
+            sore: { key: "sore", label: "Sore", range: "15:00 - 18:30", is_calibrated: simCalibrationState.calibratedSlots.sore, is_active_now: effectiveSunSlot === "sore", samples: 100, trained_at: simCalibrationState.trainedAt.sore },
+            malam: { key: "malam", label: "Malam", range: "18:30 - 05:00", is_calibrated: simCalibrationState.calibratedSlots.malam, is_active_now: effectiveSunSlot === "malam", samples: 100, trained_at: simCalibrationState.trainedAt.malam }
         }
     };
 
@@ -1857,6 +1936,19 @@ function applySimulationStep(skipHistory = false) {
 if (elBtnToggleDemo) {
     elBtnToggleDemo.addEventListener("click", toggleSimulationMode);
 }
+
+window.addEventListener("room3d:suntimechange", () => {
+    if (!isSimulationMode) return;
+    if (simulationInterval) clearInterval(simulationInterval);
+    simulationInterval = setInterval(applySimulationStep, 2000);
+    applySimulationStep(true);
+});
+
+window.addEventListener("pagehide", () => {
+    if (!isSimulationMode || !navigator.sendBeacon) return;
+    const blob = new Blob([JSON.stringify({ active: false })], { type: "application/json" });
+    navigator.sendBeacon("/api/simulation/actuators", blob);
+});
 
 document.querySelectorAll(".sim-preset-btn[data-sim]").forEach(btn => {
     btn.addEventListener("click", () => {

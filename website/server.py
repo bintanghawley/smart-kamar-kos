@@ -298,6 +298,13 @@ manual_overrides = {
     "buzzer": None
 }
 
+simulation_sync_state = {
+    "active": False,
+    "led": "OFF",
+    "kipas": "OFF",
+    "buzzer": "OFF"
+}
+
 sensor_data = {
     "suhu": 0,
     "kelembapan": 0,
@@ -308,6 +315,13 @@ sensor_data = {
     "kipas": "OFF",
     "buzzer_muted": False
 }
+
+
+def _normalize_sim_actuator_state(val, default="OFF"):
+    """Normalize simulated actuator value into 'ON' or 'OFF' for physical ESP32 control."""
+    if val is None:
+        return default
+    return "ON" if str(val).strip().upper() == "ON" else "OFF"
 
 
 def _clear_fan_manual_override_locked():
@@ -361,6 +375,20 @@ def _evaluate_auto_actuators_locked(payload=None):
     """Evaluate server-side automatic rules for kipas, led, and buzzer while respecting manual overrides."""
     global buzzer_muted, fan_wait_humid_clear
 
+    if simulation_sync_state.get("active"):
+        sim_led = simulation_sync_state.get("led", "OFF")
+        sim_kipas = simulation_sync_state.get("kipas", "OFF")
+        sim_buzzer = simulation_sync_state.get("buzzer", "OFF")
+        manual_overrides["led"] = sim_led
+        manual_overrides["kipas"] = sim_kipas
+        manual_overrides["buzzer"] = sim_buzzer
+        buzzer_muted = (sim_buzzer != "ON")
+        sensor_data["led"] = sim_led
+        sensor_data["kipas"] = sim_kipas
+        sensor_data["buzzer"] = sim_buzzer
+        sensor_data["buzzer_muted"] = buzzer_muted
+        return
+
     payload = payload or {}
     current_gas = sensor_data.get("gas", 0)
     current_humid = sensor_data.get("kelembapan", 0)
@@ -412,6 +440,58 @@ def _evaluate_auto_actuators_locked(payload=None):
         sensor_data["buzzer"] = "OFF"
 
 
+def set_simulation_actuators_state(payload):
+    """Mirror UI simulation actuator states to ESP32 headers without writing fake telemetry or incidents."""
+    global buzzer_muted
+
+    if not isinstance(payload, dict):
+        return 400, {"status": "ERROR", "message": "Payload JSON tidak valid."}
+
+    active = bool(payload.get("active", True))
+    with state_lock:
+        if not active:
+            simulation_sync_state["active"] = False
+            simulation_sync_state["led"] = "OFF"
+            simulation_sync_state["kipas"] = "OFF"
+            simulation_sync_state["buzzer"] = "OFF"
+            _clear_led_manual_override_locked()
+            _clear_fan_manual_override_locked()
+            manual_overrides["buzzer"] = None
+            buzzer_muted = False
+            sensor_data["buzzer_muted"] = False
+            _evaluate_auto_actuators_locked()
+            return 200, {
+                "status": "OK",
+                "active": False,
+                "led": sensor_data.get("led", "OFF"),
+                "kipas": sensor_data.get("kipas", "OFF"),
+                "buzzer": sensor_data.get("buzzer", "OFF"),
+                "buzzer_muted": buzzer_muted,
+                "manual_overrides": {k: (v if v is not None else "AUTO") for k, v in manual_overrides.items()}
+            }
+
+        simulation_sync_state["active"] = True
+        simulation_sync_state["led"] = _normalize_sim_actuator_state(
+            payload.get("led"), simulation_sync_state.get("led", "OFF")
+        )
+        simulation_sync_state["kipas"] = _normalize_sim_actuator_state(
+            payload.get("kipas"), simulation_sync_state.get("kipas", "OFF")
+        )
+        simulation_sync_state["buzzer"] = _normalize_sim_actuator_state(
+            payload.get("buzzer"), simulation_sync_state.get("buzzer", "OFF")
+        )
+        _evaluate_auto_actuators_locked()
+        return 200, {
+            "status": "OK",
+            "active": True,
+            "led": sensor_data.get("led", "OFF"),
+            "kipas": sensor_data.get("kipas", "OFF"),
+            "buzzer": sensor_data.get("buzzer", "OFF"),
+            "buzzer_muted": buzzer_muted,
+            "manual_overrides": {k: (v if v is not None else "AUTO") for k, v in manual_overrides.items()}
+        }
+
+
 def set_manual_device_state(device, state=None):
     """Set or toggle manual override state ('ON', 'OFF', or 'AUTO') for an actuator or 'all'."""
     global buzzer_muted, fan_manual_off_until, fan_wait_humid_clear, led_manual_until, led_wait_dark_clear
@@ -421,6 +501,7 @@ def set_manual_device_state(device, state=None):
         return 400, {"status": "ERROR", "message": "Perangkat tidak valid (led, kipas, buzzer, all)."}
 
     with state_lock:
+        simulation_sync_state["active"] = False
         if device_key == "all":
             target_state = str(state or "AUTO").strip().upper()
             if target_state != "AUTO":
@@ -1571,6 +1652,23 @@ class SmartKosServer(BaseHTTPRequestHandler):
             self.send_json(status_code, resp)
             return
 
+        if clean_path == "/api/simulation/actuators":
+            req_data = {}
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                if length > 0:
+                    body = self.rfile.read(length)
+                    parsed = json.loads(body.decode("utf-8"))
+                    if isinstance(parsed, dict):
+                        req_data = parsed
+            except Exception:
+                self.send_json(400, {"status": "ERROR", "message": "Format JSON tidak valid."})
+                return
+
+            status_code, resp = set_simulation_actuators_state(req_data)
+            self.send_json(status_code, resp)
+            return
+
         if clean_path == "/api/buzzer/mute":
             with state_lock:
                 buzzer_muted = True
@@ -1706,7 +1804,7 @@ class SmartKosServer(BaseHTTPRequestHandler):
 
             with state_lock:
                 gas_val = payload.get("gas", 0)
-                if isinstance(gas_val, (int, float)) and gas_val < GAS_THRESHOLD:
+                if not simulation_sync_state.get("active") and isinstance(gas_val, (int, float)) and gas_val < GAS_THRESHOLD:
                     buzzer_muted = False
                     if manual_overrides.get("buzzer") == "OFF":
                         manual_overrides["buzzer"] = None
@@ -1721,6 +1819,7 @@ class SmartKosServer(BaseHTTPRequestHandler):
 
                 _evaluate_auto_actuators_locked(payload)
                 sensor_data["buzzer_muted"] = buzzer_muted
+                simulation_active_now = bool(simulation_sync_state.get("active"))
 
                 last_received_timestamp = time.time()
                 last_received_time_str = (
@@ -1796,6 +1895,9 @@ class SmartKosServer(BaseHTTPRequestHandler):
                     "X-Manual-Buzzer": _ov_hdr(current_overrides["buzzer"])
                 }
             )
+
+            if simulation_active_now:
+                return
 
             try:
                 ai_pay = get_ai_payload()
@@ -2021,6 +2123,7 @@ class SmartKosServer(BaseHTTPRequestHandler):
                 response["has_live_data"] = online
                 response["last_seen"] = last_received_time_str
                 response["buzzer_muted"] = buzzer_muted
+                response["simulation_active"] = bool(simulation_sync_state.get("active"))
                 response["manual_overrides"] = {
                     k: (v if v is not None else "AUTO")
                     for k, v in manual_overrides.items()

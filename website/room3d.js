@@ -1971,11 +1971,17 @@ export function closeInspector() {
 }
 
 export function setSunTime(mode) {
+    const prevMode = sunTimeMode;
     const normalized = String(mode || 'auto').toLowerCase();
     sunTimeMode = normalized === 'auto' || SUN_PRESETS[normalized] ? normalized : 'auto';
     updateSunButtonsUI();
     triggerSunTransitionIfNeeded(false);
     updateData(currentData);
+    if (prevMode !== sunTimeMode) {
+        window.dispatchEvent(new CustomEvent('room3d:suntimechange', {
+            detail: { mode: sunTimeMode, previousMode: prevMode }
+        }));
+    }
 }
 
 function updateSunButtonsUI() {
@@ -2692,6 +2698,7 @@ window.Room3D = {
     setViewMode,
     resetView,
     setSunTime,
+    getSunTime: () => sunTimeMode,
     set3DFullscreen,
     toggle3DFullscreen,
     is3DFullscreen: () => is3DFullscreen
